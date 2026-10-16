@@ -4,5 +4,43 @@ import SwiftUI
 struct FolioApp: App {
     var body: some Scene {
         DocumentGroup(newDocument: { FolioDocument() }) { DocumentView(doc: $0.document) }
+            .commands { FolioCommands() }
+    }
+}
+
+extension FocusedValues {
+    @Entry var viewer: Viewer?
+}
+
+struct FolioCommands: Commands {
+    @FocusedValue(\.viewer) private var viewer
+
+    var body: some Commands {
+        CommandGroup(replacing: .printItem) {
+            Button("Print…") { viewer?.canvas.print(with: .shared, autoRotate: true, pageScaling: .pageScaleToFit) }
+                .keyboardShortcut("p")
+                .disabled(viewer?.doc.pdf.isLocked ?? true)
+        }
+        CommandGroup(after: .textEditing) {
+            Button("Find Next") { viewer?.step(1) }.keyboardShortcut("g")
+            Button("Find Previous") { viewer?.step(-1) }.keyboardShortcut("g", modifiers: [.command, .shift])
+        }
+        CommandGroup(after: .toolbar) {
+            Button("Single Page") { viewer?.canvas.displayMode = .singlePage }
+            Button("Continuous") { viewer?.canvas.displayMode = .singlePageContinuous }
+            Button("Two Pages") { viewer?.canvas.displayMode = .twoUpContinuous }
+            Divider()
+            Button("Zoom In") { viewer?.canvas.zoomIn(nil) }.keyboardShortcut("+")
+            Button("Zoom Out") { viewer?.canvas.zoomOut(nil) }.keyboardShortcut("-")
+            Button("Actual Size") { viewer?.canvas.scaleFactor = 1 }.keyboardShortcut("0")
+            Button("Zoom to Fit") { viewer?.canvas.autoScales = true }.keyboardShortcut("9")
+            Divider()
+            Button("Thumbnails") { viewer?.pane = .thumbnails }.keyboardShortcut("1", modifiers: [.command, .option])
+            Button("Bookmarks") { viewer?.pane = .bookmarks }.keyboardShortcut("2", modifiers: [.command, .option])
+            Button("Comments") { viewer?.pane = .comments }.keyboardShortcut("3", modifiers: [.command, .option])
+            Button(viewer?.readMode == true ? "Leave Read Mode" : "Read Mode") { viewer?.readMode.toggle() }
+                .keyboardShortcut("r", modifiers: [.command, .option])
+            Divider()
+        }
     }
 }

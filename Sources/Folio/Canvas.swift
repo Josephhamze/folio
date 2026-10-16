@@ -9,6 +9,7 @@ final class Canvas: PDFView {
         super.init(frame: .zero)
         autoScales = true
         displayMode = .singlePageContinuous
+        backgroundColor = .underPageBackgroundColor
     }
 
     required init?(coder: NSCoder) { fatalError() }

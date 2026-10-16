@@ -4,16 +4,80 @@ import SwiftUI
 /// A window's state: its document, its page view and what the window shows.
 @Observable
 final class Viewer {
+    enum Pane: String, CaseIterable, Identifiable {
+        case thumbnails = "Thumbnails", bookmarks = "Bookmarks", comments = "Comments"
+
+        var id: Self { self }
+        var symbol: String { self == .thumbnails ? "rectangle.grid.1x2" : self == .bookmarks ? "bookmark" : "text.bubble" }
+    }
+
+    enum Sheet: String, Identifiable {
+        case signature, protect, properties, split
+
+        var id: Self { self }
+    }
+
     let doc: FolioDocument
     @ObservationIgnored lazy var canvas = Canvas(viewer: self)
+    var pane = Pane.thumbnails
+    var organizing = false
+    var selection: Set<PDFPage> = []
+    var readMode = false
+    var sheet: Sheet?
+    var busy: String?
+    /// A line shown over the pages for four seconds.
+    var message: String? {
+        didSet {
+            guard let message else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(4))
+                if self.message == message { self.message = nil }
+            }
+        }
+    }
+    var tool = Tool.select
+    var color = NSColor.systemYellow
+    /// A note just added, whose comment field takes the keys.
+    var focusNote: PDFAnnotation?
+    var query = ""
+    private(set) var matches: [PDFSelection] = []
+    private(set) var match = 0
 
     init(doc: FolioDocument) {
         self.doc = doc
+    }
+
+    func find() {
+        matches = query.isEmpty ? [] : doc.pdf.findString(query, withOptions: .caseInsensitive)
+        matches.forEach { $0.color = .findHighlightColor }
+        canvas.highlightedSelections = matches
+        match = 0
+        showMatch()
+    }
+
+    func step(_ by: Int) {
+        guard !matches.isEmpty else { return }
+        match = (match + by + matches.count) % matches.count
+        showMatch()
+    }
+
+    private func showMatch() {
+        guard matches.indices.contains(match) else { return canvas.clearSelection() }
+        canvas.setCurrentSelection(matches[match], animate: true)
+        canvas.go(to: matches[match])
+    }
+
+    var matchLabel: String { query.isEmpty ? "" : matches.isEmpty ? "No matches" : "\(match + 1) of \(matches.count)" }
+
+    /// The pages that page commands act on: the selected ones while organizing, otherwise the one in view.
+    var targetPages: [PDFPage] {
+        organizing ? doc.pages.filter(selection.contains) : [canvas.currentPage].compactMap { $0 }
     }
 }
 
 struct DocumentView: View {
     @State var viewer: Viewer
+    @State private var columns = NavigationSplitViewVisibility.all
     @Environment(\.undoManager) private var undoManager
 
     init(doc: FolioDocument) {
@@ -21,10 +85,31 @@ struct DocumentView: View {
     }
 
     var body: some View {
-        PageView(viewer: viewer)
-            .frame(minWidth: 600, minHeight: 500)
-            .onAppear { viewer.doc.undo = undoManager }
-            .onChange(of: undoManager) { viewer.doc.undo = undoManager }
+        NavigationSplitView(columnVisibility: $columns) {
+            Sidebar(viewer: viewer)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 220)
+        } detail: {
+            PageView(viewer: viewer)
+                .overlay(alignment: .top) { Bars(viewer: viewer) }
+        }
+        .toolbar {
+            ToolbarItem { Text(viewer.matchLabel).foregroundStyle(.secondary).monospacedDigit() }
+        }
+        .toolbar(viewer.readMode ? .hidden : .visible, for: .windowToolbar)
+        .searchable(text: $viewer.query, placement: .toolbar, prompt: "Find")
+        .onChange(of: viewer.query) { viewer.find() }
+        .onSubmit(of: .search) { viewer.step(1) }
+        .onChange(of: viewer.readMode) {
+            columns = viewer.readMode ? .detailOnly : .all
+            if let window = viewer.canvas.window, window.styleMask.contains(.fullScreen) != viewer.readMode {
+                window.toggleFullScreen(nil)
+            }
+        }
+        .onExitCommand { viewer.readMode = false }
+        .focusedSceneValue(\.viewer, viewer)
+        .frame(minWidth: 700, minHeight: 500)
+        .onAppear { viewer.doc.undo = undoManager }
+        .onChange(of: undoManager) { viewer.doc.undo = undoManager }
     }
 }
 
@@ -35,5 +120,154 @@ struct PageView: NSViewRepresentable {
 
     func updateNSView(_ canvas: Canvas, context: Context) {
         if canvas.document !== viewer.doc.pdf { canvas.document = viewer.doc.pdf }
+    }
+}
+
+struct Sidebar: View {
+    let viewer: Viewer
+
+    var body: some View {
+        @Bindable var viewer = viewer
+        VStack(spacing: 0) {
+            Picker("Show", selection: $viewer.pane) {
+                ForEach(Viewer.Pane.allCases) { Label($0.rawValue, systemImage: $0.symbol).help($0.rawValue) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .labelStyle(.iconOnly)
+            .padding(8)
+            switch viewer.pane {
+            case .thumbnails: Thumbnails(canvas: viewer.canvas)
+            case .bookmarks: Bookmarks(viewer: viewer)
+            case .comments: Comments(viewer: viewer)
+            }
+        }
+    }
+}
+
+struct Thumbnails: NSViewRepresentable {
+    let canvas: Canvas
+
+    func makeNSView(context: Context) -> PDFThumbnailView {
+        let view = PDFThumbnailView()
+        view.pdfView = canvas
+        view.thumbnailSize = CGSize(width: 120, height: 160)
+        view.backgroundColor = .clear
+        return view
+    }
+
+    func updateNSView(_ view: PDFThumbnailView, context: Context) {}
+}
+
+extension PDFOutline: @retroactive Identifiable {
+    /// The children, or nil for a leaf, as `List` wants them.
+    var kids: [PDFOutline]? { numberOfChildren == 0 ? nil : (0..<numberOfChildren).compactMap { child(at: $0) } }
+}
+
+struct Bookmarks: View {
+    let viewer: Viewer
+
+    var body: some View {
+        let _ = viewer.doc.revision
+        if let items = viewer.doc.pdf.outlineRoot?.kids {
+            List(items, children: \.kids) { item in
+                Text(item.label ?? "")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { if let destination = item.destination { viewer.canvas.go(to: destination) } }
+            }
+        } else {
+            ContentUnavailableView("No Bookmarks", systemImage: "bookmark")
+        }
+    }
+}
+
+struct Comments: View {
+    let viewer: Viewer
+
+    var body: some View {
+        let _ = viewer.doc.revision
+        let comments = viewer.doc.comments.map(\.annotation)
+        if comments.isEmpty {
+            ContentUnavailableView("No Comments", systemImage: "text.bubble")
+        } else {
+            List(comments, id: \.self) { CommentRow(viewer: viewer, annotation: $0) }
+        }
+    }
+}
+
+struct CommentRow: View {
+    let viewer: Viewer
+    let annotation: PDFAnnotation
+    @State private var text = ""
+    @FocusState private var editing: Bool
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Image(systemName: Self.symbols[annotation.type ?? ""] ?? "questionmark").foregroundStyle(Color(nsColor: annotation.color))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Page \((annotation.page.map { viewer.doc.pdf.index(for: $0) } ?? 0) + 1)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("Comment", text: $text, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .focused($editing)
+                    .onSubmit(commit)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { if let page = annotation.page { viewer.canvas.go(to: annotation.bounds, on: page) } }
+        .onChange(of: viewer.doc.revision, initial: true) { if !editing { text = annotation.contents ?? "" } }
+        .onChange(of: editing) { if !editing { commit() } }
+        .task(id: viewer.focusNote) { if viewer.focusNote === annotation { editing = true } }
+    }
+
+    private func commit() {
+        if text != annotation.contents ?? "" { viewer.doc.set(\.contents, of: annotation, to: text, name: "Edit Comment") }
+    }
+
+    static let symbols = ["Text": "note.text", "FreeText": "textformat", "Highlight": "highlighter", "Underline": "underline",
+                          "StrikeOut": "strikethrough", "Square": "rectangle", "Circle": "circle", "Line": "line.diagonal",
+                          "Ink": "pencil.tip"]
+}
+
+/// What the window says over the pages: the password a file needs, work in progress, and short messages.
+struct Bars: View {
+    let viewer: Viewer
+    @State private var password = ""
+    @State private var wrong = false
+
+    var body: some View {
+        let doc = viewer.doc, _ = viewer.doc.revision
+        VStack(spacing: 8) {
+            if !doc.canEdit {
+                HStack {
+                    Image(systemName: "lock.fill")
+                    Text(doc.pdf.isLocked ? "This document is protected." : "Editing is restricted by the author.")
+                    SecureField(doc.pdf.isLocked ? "Password" : "Permissions password", text: $password)
+                        .frame(width: 180)
+                        .onSubmit(unlock)
+                    Button("Unlock", action: unlock)
+                    if wrong { Text("Wrong password").foregroundStyle(.red) }
+                }
+                .pill()
+            }
+            if let busy = viewer.busy {
+                HStack { ProgressView().controlSize(.small); Text(busy) }.pill()
+            }
+            if let message = viewer.message { Text(message).pill() }
+        }
+        .padding(.top, 12)
+    }
+
+    private func unlock() {
+        wrong = !viewer.doc.unlock(password)
+        if !wrong { password = "" }
+    }
+}
+
+private extension View {
+    func pill() -> some View {
+        padding(.horizontal, 14).padding(.vertical, 8).background(.regularMaterial, in: .capsule).shadow(radius: 2)
     }
 }
