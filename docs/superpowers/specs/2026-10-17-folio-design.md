@@ -85,6 +85,13 @@ Everything that changes the document can be undone and is named in Edit › Undo
 
 ## Decisions (Claude's calls)
 
+- **Restricted files:** a file restricted by a permissions (owner) password is honoured, as Preview and Acrobat do.
+  - The tools that change the document, and Remove Protection, stay off.
+  - A bar offers to enter the permissions password, which unlocks them.
+- **Drawing a signature:** done by clicking and dragging in a pad, with the trackpad or a mouse. It is not Preview's finger-on-the-trackpad capture.
+- **Dark mode:** applies to the window around the pages. The pages stay white, as in Preview.
+- **Launch:** opening Folio without a file shows the Open panel, as Preview does. SwiftUI's document apps do this on their own (verified in a spike).
+- **Text box fill:** a free-text annotation's `color` is its fill. It is saved and drawn after reloading (verified), so fixing a line needs just one white-filled text box.
 - Name: Folio. Bundle id: `com.josephhamze.folio`. Folio is an Editor for `com.adobe.pdf` at the Alternate rank, so it shows in Open With without taking over the default app.
 - **The document** is a SwiftUI `DocumentGroup` with a `ReferenceFileDocument` that holds a `PDFDocument`.
   - The macOS 27 SDK marks `ReferenceFileDocument` deprecated, for a future release, in favour of the new `Document` protocol.
