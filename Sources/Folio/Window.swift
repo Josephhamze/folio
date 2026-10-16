@@ -78,6 +78,7 @@ final class Viewer {
 struct DocumentView: View {
     @State var viewer: Viewer
     @State private var columns = NavigationSplitViewVisibility.all
+    @FocusState private var searching: Bool
     @Environment(\.undoManager) private var undoManager
 
     init(doc: FolioDocument) {
@@ -91,12 +92,12 @@ struct DocumentView: View {
         } detail: {
             PageView(viewer: viewer)
                 .overlay(alignment: .top) { Bars(viewer: viewer) }
+                .safeAreaInset(edge: .top, spacing: 0) { if !viewer.readMode { ToolBar(viewer: viewer) } }
         }
-        .toolbar {
-            ToolbarItem { Text(viewer.matchLabel).foregroundStyle(.secondary).monospacedDigit() }
-        }
+        .toolbar { ToolbarItem { Text(viewer.matchLabel).foregroundStyle(.secondary).monospacedDigit() } }
         .toolbar(viewer.readMode ? .hidden : .visible, for: .windowToolbar)
         .searchable(text: $viewer.query, placement: .toolbar, prompt: "Find")
+        .searchFocused($searching)
         .onChange(of: viewer.query) { viewer.find() }
         .onSubmit(of: .search) { viewer.step(1) }
         .onChange(of: viewer.readMode) {
@@ -105,11 +106,52 @@ struct DocumentView: View {
                 window.toggleFullScreen(nil)
             }
         }
+        .onChange(of: viewer.tool) { viewer.canvas.selected = nil }
+        .onChange(of: viewer.doc.revision) { viewer.canvas.outlineSelection() }
+        .onChange(of: viewer.color) {
+            guard let a = viewer.canvas.selected else { return }
+            if a.type == "FreeText" {
+                viewer.doc.set(\.fontColor, of: a, to: viewer.color, name: "Change Colour")
+            } else {
+                viewer.doc.set(\.color, of: a, to: viewer.color, name: "Change Colour")
+            }
+        }
+        .sheet(item: $viewer.sheet) { sheet in
+            if sheet == .signature { SignatureSheet(viewer: viewer) }
+        }
         .onExitCommand { viewer.readMode = false }
+        // Esc, the green button or ⌃⌘F can end full screen without SwiftUI seeing it.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) {
+            if $0.object as? NSWindow === viewer.canvas.window { viewer.readMode = false }
+        }
         .focusedSceneValue(\.viewer, viewer)
+        .focusedSceneValue(\.searchFocus, $searching)
         .frame(minWidth: 700, minHeight: 500)
         .onAppear { viewer.doc.undo = undoManager }
         .onChange(of: undoManager) { viewer.doc.undo = undoManager }
+    }
+}
+
+/// The tools and the colour, in a bar across the top of the pages.
+struct ToolBar: View {
+    @Bindable var viewer: Viewer
+
+    var body: some View {
+        HStack {
+            Picker("Tool", selection: $viewer.tool) {
+                ForEach(Tool.allCases) { Label($0.name, systemImage: $0.symbol).help($0.name) }
+            }
+            .pickerStyle(.segmented)
+            .labelStyle(.iconOnly)
+            .labelsHidden()
+            .fixedSize()
+            ColorPicker("Colour", selection: Binding(get: { viewer.color.cgColor }, set: { viewer.color = NSColor(cgColor: $0) ?? .black }))
+                .labelsHidden()
+        }
+        .disabled(!viewer.doc.canEdit)
+        .padding(6)
+        .frame(maxWidth: .infinity)
+        .background(.bar)
     }
 }
 
@@ -119,7 +161,10 @@ struct PageView: NSViewRepresentable {
     func makeNSView(context: Context) -> Canvas { viewer.canvas }
 
     func updateNSView(_ canvas: Canvas, context: Context) {
-        if canvas.document !== viewer.doc.pdf { canvas.document = viewer.doc.pdf }
+        let _ = viewer.doc.revision
+        // A locked file stays out of the page view, which would ask for its password a second time.
+        let pdf = viewer.doc.pdf.isLocked ? nil : viewer.doc.pdf
+        if canvas.document !== pdf { canvas.document = pdf }
     }
 }
 
@@ -204,7 +249,8 @@ struct CommentRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Image(systemName: Self.symbols[annotation.type ?? ""] ?? "questionmark").foregroundStyle(Color(nsColor: annotation.color))
+            Image(systemName: Self.symbols[annotation.type ?? ""] ?? "questionmark")
+                .foregroundStyle(Color(nsColor: annotation.type == "FreeText" ? annotation.fontColor ?? .labelColor : annotation.color))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Page \((annotation.page.map { viewer.doc.pdf.index(for: $0) } ?? 0) + 1)")
                     .font(.caption)

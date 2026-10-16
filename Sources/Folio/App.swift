@@ -10,10 +10,12 @@ struct FolioApp: App {
 
 extension FocusedValues {
     @Entry var viewer: Viewer?
+    @Entry var searchFocus: FocusState<Bool>.Binding?
 }
 
 struct FolioCommands: Commands {
     @FocusedValue(\.viewer) private var viewer
+    @FocusedValue(\.searchFocus) private var searchFocus
 
     var body: some Commands {
         CommandGroup(replacing: .printItem) {
@@ -22,6 +24,7 @@ struct FolioCommands: Commands {
                 .disabled(viewer?.doc.pdf.isLocked ?? true)
         }
         CommandGroup(after: .textEditing) {
+            Button("Find…") { searchFocus?.wrappedValue = true }.keyboardShortcut("f")
             Button("Find Next") { viewer?.step(1) }.keyboardShortcut("g")
             Button("Find Previous") { viewer?.step(-1) }.keyboardShortcut("g", modifiers: [.command, .shift])
         }
@@ -41,6 +44,9 @@ struct FolioCommands: Commands {
             Button(viewer?.readMode == true ? "Leave Read Mode" : "Read Mode") { viewer?.readMode.toggle() }
                 .keyboardShortcut("r", modifiers: [.command, .option])
             Divider()
+        }
+        CommandMenu("Tools") {
+            Button("Edit Signature…") { viewer?.sheet = .signature }.disabled(viewer == nil)
         }
     }
 }

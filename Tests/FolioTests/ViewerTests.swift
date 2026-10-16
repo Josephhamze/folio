@@ -36,4 +36,21 @@ final class ViewerTests: XCTestCase {
         viewer.selection = [p[2], p[0]]
         XCTAssertEqual(viewer.targetPages, [p[0], p[2]])
     }
+
+    func testFilledFieldIsOneUndoableChange() {
+        let pdf = makePDF([["Name:"]]), page = pdf.page(at: 0)!
+        let field = PDFAnnotation(bounds: CGRect(x: 150, y: 700, width: 200, height: 24), forType: .widget, withProperties: nil)
+        field.widgetFieldType = .text
+        page.addAnnotation(field)
+        let viewer = Viewer(doc: FolioDocument(pdf: pdf)), undo = manualUndo(viewer.doc)
+        viewer.canvas.snapshotFields(on: page)
+        field.widgetStringValue = "Joseph"
+        act(undo) { viewer.canvas.commitFields() }
+        XCTAssertEqual(undo.undoActionName, "Fill Form")
+        undo.undo()
+        XCTAssertEqual(field.widgetStringValue ?? "", "")
+        let revision = viewer.doc.revision
+        act(undo) { viewer.canvas.commitFields() }
+        XCTAssertEqual(viewer.doc.revision, revision)   // nothing new since the last commit
+    }
 }
