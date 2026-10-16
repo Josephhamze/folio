@@ -54,7 +54,8 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
 
     /// False while the file is locked, or restricted by its author and opened without the permissions password.
     var canEdit: Bool {
-        !pdf.isLocked && (!pdf.isEncrypted || pdf.permissionsStatus == .owner
+        _ = revision // an unlock changes the answer, and bumps this
+        return !pdf.isLocked && (!pdf.isEncrypted || pdf.permissionsStatus == .owner
             || pdf.allowsDocumentChanges && pdf.allowsDocumentAssembly && pdf.allowsCommenting && pdf.allowsFormFieldEntry)
     }
 
