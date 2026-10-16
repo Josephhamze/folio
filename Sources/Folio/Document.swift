@@ -126,8 +126,9 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     /// landscape for a wide image.
     static func pages(from urls: [URL]) -> [PDFPage] {
         urls.flatMap { url -> [PDFPage] in
-            if let pdf = PDFDocument(url: url) {
-                return pdf.isLocked ? [] : (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.copy() as? PDFPage }
+            if UTType(filenameExtension: url.pathExtension)?.conforms(to: .pdf) == true {
+                guard let pdf = PDFDocument(url: url), !pdf.isLocked else { return [] }
+                return (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.copy() as? PDFPage }
             }
             guard let image = NSImage(contentsOf: url) else { return [] }
             let paper = NSPrintInfo.shared.paperSize
