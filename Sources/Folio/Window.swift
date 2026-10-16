@@ -73,6 +73,40 @@ final class Viewer {
     var targetPages: [PDFPage] {
         organizing ? doc.pages.filter(selection.contains) : [canvas.currentPage].compactMap { $0 }
     }
+
+    /// Where a ⇧ click's range starts: the page of the last plain or ⌘ click.
+    @ObservationIgnored private var anchor: PDFPage?
+
+    func click(_ page: PDFPage, modifiers: NSEvent.ModifierFlags) {
+        let pages = doc.pages
+        if modifiers.contains(.shift), let anchor, let from = pages.firstIndex(of: anchor), let to = pages.firstIndex(of: page) {
+            selection = Set(pages[min(from, to)...max(from, to)])
+            return
+        }
+        if modifiers.contains(.command) { selection.formSymmetricDifference([page]) } else { selection = [page] }
+        anchor = page
+    }
+
+    /// Moves the selection, or only the dragged page when it isn't selected, in front of `target`, or to the end.
+    func drop(_ dragged: PDFPage, before target: PDFPage?) {
+        let moving = selection.contains(dragged) ? Array(selection) : [dragged]
+        if let target, moving.contains(target) { return }
+        doc.move(moving, to: target.flatMap { doc.pages.firstIndex(of: $0) } ?? doc.pdf.pageCount)
+    }
+
+    /// Puts pages after the last target page.
+    func insert(_ pages: [PDFPage]) {
+        guard !pages.isEmpty else { return }
+        doc.insert(pages, at: (targetPages.last.flatMap { doc.pages.firstIndex(of: $0) } ?? doc.pdf.pageCount - 1) + 1)
+    }
+
+    /// A PDF can't be saved without a page, so the last ones stay.
+    var canDelete: Bool { doc.canEdit && !targetPages.isEmpty && targetPages.count < doc.pdf.pageCount }
+
+    func deletePages() {
+        doc.delete(targetPages)
+        selection = []
+    }
 }
 
 struct DocumentView: View {

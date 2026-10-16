@@ -113,14 +113,15 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     }
 
     func split(every count: Int, into folder: URL, name: String) throws -> [URL] {
-        let all = pages
-        return try stride(from: 0, to: all.count, by: count).enumerated().map { part, start in
-            let url = folder.appendingPathComponent("\(name) \(part + 1).pdf")
-            guard extract(Array(all[start..<min(start + count, all.count)])).write(to: url) else {
-                throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path])
-            }
-            return url
+        let all = pages, starts = Array(stride(from: 0, to: all.count, by: count))
+        let urls = starts.indices.map { folder.appendingPathComponent("\(name) \($0 + 1).pdf") }
+        if let taken = urls.first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
+            throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: taken.path])
         }
+        for (start, url) in zip(starts, urls) where !extract(Array(all[start..<min(start + count, all.count)])).write(to: url) {
+            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path])
+        }
+        return urls
     }
 
     /// Pages from files: copies of a PDF's pages, or an image fitted to a page of the system's paper size, turned

@@ -133,6 +133,17 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual(texts(PDFDocument(url: urls[2])!), ["5"])
     }
 
+    func testSplitNeverOverwrites() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let mine = folder.appendingPathComponent("Doc 2.pdf")
+        try Data("keep".utf8).write(to: mine)
+        let doc = FolioDocument(pdf: makePDF([["1"], ["2"]]))
+        XCTAssertThrowsError(try doc.split(every: 1, into: folder, name: "Doc"))
+        XCTAssertEqual(try Data(contentsOf: mine), Data("keep".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Doc 1.pdf").path))
+    }
+
     func testPagesFromFilesFitPhotosToPaper() {
         let pdfURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).pdf")
         makePDF([["One"], ["Two"]]).write(to: pdfURL)
