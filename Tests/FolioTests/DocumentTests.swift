@@ -78,4 +78,59 @@ final class DocumentTests: XCTestCase {
         undo.redo()
         XCTAssertEqual(value, 2)
     }
+
+    func testPageOperationsUndo() {
+        let doc = FolioDocument(pdf: makePDF([["A"], ["B"], ["C"], ["D"]])), undo = manualUndo(doc)
+        let p = doc.pages
+        act(undo) { doc.rotate([p[0]], by: 90) }
+        XCTAssertEqual(p[0].rotation, 90)
+        undo.undo()
+        XCTAssertEqual(p[0].rotation, 0)
+
+        act(undo) { doc.delete([p[1], p[2]]) }
+        XCTAssertEqual(texts(doc.pdf), ["A", "D"])
+        undo.undo()
+        XCTAssertEqual(texts(doc.pdf), ["A", "B", "C", "D"])
+
+        act(undo) { doc.insert([FolioDocument.blankPage()], at: 1) }
+        XCTAssertEqual(doc.pdf.pageCount, 5)
+        undo.undo()
+        XCTAssertEqual(doc.pdf.pageCount, 4)
+
+        act(undo) { doc.move([p[3]], to: 0) }
+        XCTAssertEqual(texts(doc.pdf), ["D", "A", "B", "C"])
+        undo.undo()
+        XCTAssertEqual(texts(doc.pdf), ["A", "B", "C", "D"])
+        undo.redo()
+        XCTAssertEqual(texts(doc.pdf), ["D", "A", "B", "C"])
+
+        act(undo) { doc.move([p[3], p[0]], to: 4) }
+        XCTAssertEqual(texts(doc.pdf), ["B", "C", "D", "A"])
+    }
+
+    func testExtractKeepsDocumentOrder() {
+        let doc = FolioDocument(pdf: makePDF([["A"], ["B"], ["C"]]))
+        XCTAssertEqual(texts(doc.extract([doc.pages[2], doc.pages[0]])), ["A", "C"])
+        XCTAssertEqual(doc.pdf.pageCount, 3)
+    }
+
+    func testSplitEveryTwo() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Folio Split \(UUID())")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let urls = try FolioDocument(pdf: makePDF([["1"], ["2"], ["3"], ["4"], ["5"]])).split(every: 2, into: folder, name: "Report")
+        XCTAssertEqual(urls.map(\.lastPathComponent), ["Report 1.pdf", "Report 2.pdf", "Report 3.pdf"])
+        XCTAssertEqual(urls.map { PDFDocument(url: $0)!.pageCount }, [2, 2, 1])
+        XCTAssertEqual(texts(PDFDocument(url: urls[2])!), ["5"])
+    }
+
+    func testPagesFromFilesFitPhotosToPaper() {
+        let pdfURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).pdf")
+        makePDF([["One"], ["Two"]]).write(to: pdfURL)
+        let photo = URL(fileURLWithPath: "/System/Library/Wallpapers/.default/DefaultAerial.jpg")   // 3840×2160
+        let pages = FolioDocument.pages(from: [pdfURL, photo])
+        XCTAssertEqual(pages.count, 3)
+        let paper = NSPrintInfo.shared.paperSize
+        XCTAssertEqual(pages[2].bounds(for: .mediaBox).size, CGSize(width: paper.height, height: paper.width))
+        XCTAssertEqual(pages[0].string?.trimmingCharacters(in: .whitespacesAndNewlines), "One")
+    }
 }
