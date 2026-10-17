@@ -14,4 +14,6 @@ The app is signed with your Apple Development certificate when you have one, and
 
 To keep Folio, copy `build/Folio.app` to `/Applications`. It then appears in Finder's Open With menu for PDFs, without making itself the default.
 
+The icon, also in `icon/logo.png`, is drawn by `icon/icon.swift`. After changing it, `swift icon/icon.swift` redraws both.
+
 `swift test` runs the tests.

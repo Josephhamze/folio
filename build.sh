@@ -11,7 +11,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Folio "$APP/Contents/MacOS/"
 cp Info.plist "$APP/Contents/"
-if [ -f icon/Folio.icns ]; then cp icon/Folio.icns "$APP/Contents/Resources/"; fi
+cp icon/Folio.icns "$APP/Contents/Resources/"
 
 ID=$(security find-identity -v -p codesigning | sed -n 's/.*"\(Apple Development[^"]*\)".*/\1/p' | head -1)
 codesign --force --sign "${ID:--}" "$APP"
