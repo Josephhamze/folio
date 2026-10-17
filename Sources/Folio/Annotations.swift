@@ -154,9 +154,16 @@ enum Signature: Codable, Equatable {
             return ink(strokes.map { $0.map { CGPoint(x: origin.x + ($0.x - box.minX) * scale, y: origin.y + ($0.y - box.minY) * scale) } },
                        color: .black, width: 2)
         case .typed(let name):
-            let a = PDFAnnotation(bounds: rect, forType: .freeText, withProperties: nil)
+            let font = NSFont(name: "SnellRoundhand", size: 70)!
+            // Width over height, with the font at 0.7 of the height, plus room for the flourishes and PDFKit's inset, without
+            // which the name wraps.
+            let aspect = name.size(withAttributes: [.font: font]).width / 100 + 0.5
+            let height = min(rect.height, rect.width / aspect)
+            let a = PDFAnnotation(bounds: CGRect(x: rect.midX - height * aspect / 2, y: rect.midY - height / 2, width: height * aspect, height: height),
+                                  forType: .freeText, withProperties: nil)
             a.contents = name
-            a.font = NSFont(name: "SnellRoundhand", size: rect.height * 0.7)
+            a.font = font.withSize(height * 0.7)
+            a.alignment = .center
             a.fontColor = .black
             a.color = .clear
             a.border = PDFBorder()

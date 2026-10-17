@@ -50,6 +50,11 @@ final class AnnotationTests: XCTestCase {
         XCTAssertEqual(typed.type, "FreeText")
         XCTAssertEqual(typed.font?.fontName, "SnellRoundhand")
         XCTAssertEqual(typed.contents, "Jo Hamze")
+        XCTAssertTrue(rect.contains(typed.bounds))
+        // Short initials keep their shape in the middle of a wide box, rather than starting at its left.
+        let initials = Signature.typed("JH").annotation(in: rect)
+        XCTAssertLessThan(initials.bounds.width, rect.width)
+        XCTAssertEqual(initials.bounds.midX, rect.midX, accuracy: 0.01)
         Signature.saved = .typed("X")
         XCTAssertEqual(Signature.saved, .typed("X"))
         Signature.saved = nil
