@@ -43,18 +43,14 @@ final class AnnotationTests: XCTestCase {
 
     func testSignatures() {
         let rect = CGRect(x: 0, y: 0, width: 200, height: 100)
-        let drawn = Signature.drawn([[CGPoint(x: 0, y: 0), CGPoint(x: 40, y: 10)]]).annotation(in: rect)
-        XCTAssertEqual(drawn.type, "Ink")
-        XCTAssertTrue(rect.insetBy(dx: -3, dy: -3).contains(drawn.bounds))
-        let typed = Signature.typed("Jo Hamze").annotation(in: rect)
-        XCTAssertEqual(typed.type, "FreeText")
-        XCTAssertEqual(typed.font?.fontName, "SnellRoundhand")
-        XCTAssertEqual(typed.contents, "Jo Hamze")
-        XCTAssertTrue(rect.contains(typed.bounds))
-        // Short initials keep their shape in the middle of a wide box, rather than starting at its left.
-        let initials = Signature.typed("JH").annotation(in: rect)
-        XCTAssertLessThan(initials.bounds.width, rect.width)
-        XCTAssertEqual(initials.bounds.midX, rect.midX, accuracy: 0.01)
+        // Each fills the box one way and sits in its middle, keeping its shape: a stamp, not a text box or a comment.
+        for signature in [Signature.drawn([[CGPoint(x: 0, y: 0), CGPoint(x: 40, y: 10)], [CGPoint(x: 20, y: 30)]]), .typed("Jo Hamze"), .typed("JH")] {
+            let a = signature.annotation(in: rect)
+            XCTAssertEqual(a.type, "Stamp")
+            XCTAssertEqual(max(a.bounds.width / rect.width, a.bounds.height / rect.height), 1, accuracy: 0.001)
+            XCTAssertEqual(a.bounds.midX, rect.midX, accuracy: 0.01)
+            XCTAssertEqual(a.bounds.midY, rect.midY, accuracy: 0.01)
+        }
         Signature[.sign] = .typed("X")
         Signature[.initial] = .typed("Y")
         XCTAssertEqual(Signature[.sign], .typed("X"))
@@ -63,6 +59,33 @@ final class AnnotationTests: XCTestCase {
         Signature[.initial] = nil
         XCTAssertNil(Signature[.sign])
         XCTAssertNil(Signature[.initial])
+    }
+
+    func testSignatureIsOnePictureAtAnySizeAndInTheFile() {
+        let doc = FolioDocument(pdf: makePDF([[]])), page = doc.pages[0]
+        let scribble = Signature.drawn([(0..<40).map { CGPoint(x: Double($0) * 9, y: $0 % 2 == 0 ? 0 : 60 + Double($0)) }])
+        let small = CGRect(x: 50, y: 600, width: 100, height: 40), large = CGRect(x: 50, y: 200, width: 300, height: 120)
+        for rect in [small, large] { page.addAnnotation(scribble.annotation(in: rect)) }
+        // Three times the size holds nine times the ink: its lines grow with it.
+        XCTAssertEqual(Double(darkPixels(page, in: large)) / Double(darkPixels(page, in: small)), 9, accuracy: 0.5)
+        // It is drawn into the saved file, and into the pages Extract and Split copy.
+        let saved = PDFDocument(data: try! doc.snapshot(contentType: .pdf))!.page(at: 0)!
+        XCTAssertEqual(Double(darkPixels(saved, in: large)), Double(darkPixels(page, in: large)), accuracy: 50)
+        XCTAssertEqual(darkPixels(doc.extract([page]).page(at: 0)!, in: large), darkPixels(page, in: large))
+    }
+
+    /// The pixels of `rect` on the page, at four a point, that are darker than mid grey.
+    private func darkPixels(_ page: PDFPage, in rect: CGRect) -> Int {
+        let width = Int(rect.width) * 4, height = Int(rect.height) * 4
+        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
+                                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)!
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.scaleBy(x: 4, y: 4)
+        context.translateBy(x: -rect.minX, y: -rect.minY)
+        page.draw(with: .mediaBox, to: context)
+        let pixels = context.data!.assumingMemoryBound(to: UInt8.self)
+        return (0..<width * height).filter { pixels[$0] < 128 }.count
     }
 
     func testAddRemoveAndRecolourUndo() {

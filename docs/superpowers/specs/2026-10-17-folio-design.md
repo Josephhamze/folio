@@ -106,9 +106,10 @@ Everything that changes the document can be undone and is named in Edit › Undo
   - New protection is applied with write options: user password, owner password and access permissions.
   - Removing protection moves the pages into a fresh `PDFDocument` (verified: annotations, bookmarks and the title survive; the copy is unencrypted).
 - **Signatures** and initials are stored in UserDefaults: strokes for a drawn one, text for a typed one.
-  - A drawn signature becomes an ink annotation.
-  - A typed one becomes a free-text annotation in Snell Roundhand.
-  - PDFKit writes appearance streams for both (verified), so other apps show them.
+  - Each is placed as one filled outline, a stamp annotation Folio draws itself: the same picture at any size, and neither a comment nor a text box.
+  - A drawn one is inked: smoothed through the midpoints of its points, and thinner where the pen moved faster.
+  - A typed one is its letters' outlines in Snell Roundhand, with the hairlines thickened to a pen's line.
+  - PDFKit writes Folio's drawing into the file as the stamp's appearance (verified), so other apps show it. The stamp copies its outline itself, or pages copied for Extract and Split lose it (verified).
 - **Redaction marks** are square annotations tagged by their name. Apply renders the page at 300 dpi.
 - **OCR:**
   - `VNRecognizeTextRequest` at the `.accurate` level.
@@ -125,6 +126,7 @@ Everything that changes the document can be undone and is named in Edit › Undo
 - Vision's `.accurate` text recognition takes about 24 s the first time in a process (loading its model), then about 0.07 s a page. `.fast` starts at once but reads worse.
 - Free-text (with a custom font) and ink annotations come back from a save with appearance streams.
 - A `PDFDocument` that was opened encrypted and unlocked stays encrypted after `dataRepresentation()`.
+- A `PDFAnnotation` subclass's own `draw(with:in:)` is saved as its appearance stream, as vector paths; PDFium, Chrome's renderer, shows it.
 
 ## Left to the builder
 

@@ -142,32 +142,119 @@ enum Signature: Codable, Equatable {
         set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: tool.rawValue) }
     }
 
-    /// The signature fitted into `rect`, keeping its shape.
-    func annotation(in rect: CGRect) -> PDFAnnotation {
+    /// Its outline, to fill, y up: the strokes in ink, or the name's letters with no line finer than a pen's.
+    var path: CGPath {
         switch self {
         case .drawn(let strokes):
-            let box = extent(strokes), scale = min(rect.width / max(box.width, 1), rect.height / max(box.height, 1))
-            let origin = CGPoint(x: rect.midX - box.width * scale / 2, y: rect.midY - box.height * scale / 2)
-            return ink(strokes.map { $0.map { CGPoint(x: origin.x + ($0.x - box.minX) * scale, y: origin.y + ($0.y - box.minY) * scale) } },
-                       color: .black, width: 2)
+            let path = CGMutablePath()
+            strokes.forEach { path.addPath(inked($0)) }
+            return path
         case .typed(let name):
-            let font = NSFont(name: "SnellRoundhand", size: 70)!
-            // Width over height, with the font at 0.7 of the height, plus room for the flourishes and PDFKit's inset, without
-            // which the name wraps.
-            let aspect = name.size(withAttributes: [.font: font]).width / 100 + 0.5
-            let height = min(rect.height, rect.width / aspect)
-            let a = PDFAnnotation(bounds: CGRect(x: rect.midX - height * aspect / 2, y: rect.midY - height / 2, width: height * aspect, height: height),
-                                  forType: .freeText, withProperties: nil)
-            a.contents = name
-            a.font = font.withSize(height * 0.7)
-            a.alignment = .center
-            a.fontColor = .black
-            a.color = .clear
-            a.border = PDFBorder()
-            a.border?.lineWidth = 0
-            return a
+            let letters = CGMutablePath()
+            let line = CTLineCreateWithAttributedString(NSAttributedString(string: name, attributes: [.font: NSFont(name: "SnellRoundhand", size: 100)!]))
+            for run in CTLineGetGlyphRuns(line) as! [CTRun] {
+                let font = (CTRunGetAttributes(run) as NSDictionary)[kCTFontAttributeName] as! CTFont, count = CTRunGetGlyphCount(run)
+                var glyphs = [CGGlyph](repeating: 0, count: count), positions = [CGPoint](repeating: .zero, count: count)
+                CTRunGetGlyphs(run, CFRange(), &glyphs)
+                CTRunGetPositions(run, CFRange(), &positions)
+                for (glyph, position) in zip(glyphs, positions) {
+                    var at = CGAffineTransform(translationX: position.x, y: position.y)
+                    // The script's hairlines are finer than any pen's, and vanish when the name is small. Letter by letter
+                    // is seven times quicker than the whole name, which matters while a drag redraws it.
+                    CTFontCreatePathForGlyph(font, glyph, &at).map {
+                        letters.addPath($0.union($0.copy(strokingWithWidth: 1.5, lineCap: .round, lineJoin: .round, miterLimit: 1)))
+                    }
+                }
+            }
+            return letters
         }
     }
+
+    /// Its outline fitted into `rect`, keeping its shape, in the middle.
+    func path(in rect: CGRect) -> CGPath {
+        let path = path
+        guard !path.isEmpty else { return path }   // a name not typed yet, or only spaces: nothing to fit
+        let box = path.boundingBoxOfPath, scale = min(rect.width / box.width, rect.height / box.height)
+        var fit = CGAffineTransform(translationX: rect.midX - box.width * scale / 2, y: rect.midY - box.height * scale / 2)
+            .scaledBy(x: scale, y: scale).translatedBy(x: -box.minX, y: -box.minY)
+        return path.copy(using: &fit)!
+    }
+
+    /// The signature fitted into `rect`, keeping its shape.
+    func annotation(in rect: CGRect) -> PDFAnnotation {
+        let path = path(in: rect)
+        let a = SignatureAnnotation(bounds: path.boundingBoxOfPath, forType: .stamp, withProperties: nil)
+        var origin = CGAffineTransform(translationX: -a.bounds.minX, y: -a.bounds.minY)
+        a.outline = path.copy(using: &origin)!
+        a.color = .black
+        return a
+    }
+}
+
+/// A placed signature: its outline, from the bounds' corner, filled in its colour. PDFKit writes this drawing into the file
+/// as the annotation's appearance, so it is the same sharp picture at any size and zoom, here and in other apps.
+final class SignatureAnnotation: PDFAnnotation {
+    var outline: CGPath = CGMutablePath()
+
+    override func draw(with box: PDFDisplayBox, in context: CGContext) {
+        context.saveGState()
+        context.translateBy(x: bounds.minX, y: bounds.minY)
+        context.addPath(outline)
+        context.setFillColor(color.cgColor)
+        context.fillPath()
+        context.restoreGState()
+    }
+
+    /// PDFKit copies a page's annotations this way, for Extract and Split, and would leave the outline behind.
+    override func copy(with zone: NSZone? = nil) -> Any {
+        let copy = super.copy(with: zone) as! SignatureAnnotation
+        copy.outline = outline
+        return copy
+    }
+}
+
+/// A stroke of the pen as ink, an outline to fill: smoothed into curves between the midpoints of its points, and thinner
+/// where the pen moved faster. The points come at a steady rate, so the gap between two is the speed.
+private func inked(_ stroke: [CGPoint]) -> CGPath {
+    var points: [SIMD3<Double>] = []   // x, y and the speed there, then the width
+    for p in stroke where points.last.map({ hypot(p.x - $0.x, p.y - $0.y) >= 1 }) ?? true {
+        let gap = points.last.map { hypot(p.x - $0.x, p.y - $0.y) } ?? 0, speed = 0.7 * gap + 0.3 * (points.last?.z ?? 0)
+        points.append(SIMD3(p.x, p.y, speed))
+    }
+    points = points.map { SIMD3($0.x, $0.y, max(3.5 / (1 + $0.z / 10), 1)) }
+    guard points.count > 1 else {
+        return CGPath(ellipseIn: CGRect(x: stroke[0].x - 1.75, y: stroke[0].y - 1.75, width: 3.5, height: 3.5), transform: nil)
+    }
+    // Each point is the control of a quadratic curve from the midpoint before it to the one after; the ends are the ends.
+    let ends = [points[0]] + zip(points, points.dropFirst()).map { ($0 + $1) / 2 } + [points[points.count - 1]]
+    var samples = [points[0]]
+    for (i, c) in points.enumerated() {
+        let a = ends[i], b = ends[i + 1], steps = max(1, Int((hypot(c.x - a.x, c.y - a.y) + hypot(b.x - c.x, b.y - c.y)) / 4))
+        for step in 1...steps {
+            let t = Double(step) / Double(steps)
+            samples.append((1 - t) * (1 - t) * a + 2 * (1 - t) * t * c + t * t * b)
+        }
+    }
+    // Half the width out to the left of each sample, round the end, back along the right and round the start.
+    let normals = samples.indices.map { i in
+        let d = samples[min(i + 1, samples.count - 1)] - samples[max(i - 1, 0)]
+        return atan2(d.y, d.x) + .pi / 2
+    }
+    let edge = { (i: Int, angle: Double) in
+        CGPoint(x: samples[i].x + samples[i].z / 2 * cos(angle), y: samples[i].y + samples[i].z / 2 * sin(angle))
+    }
+    let last = samples.count - 1, cap = (1..<8).map { Double.pi * Double($0) / 8 }
+    let outline = samples.indices.map { edge($0, normals[$0]) } + cap.map { edge(last, normals[last] - $0) }
+        + samples.indices.reversed().map { edge($0, normals[$0] + .pi) } + cap.map { edge(0, normals[0] + .pi - $0) }
+    // Through the midpoints of the outline too, so it stays a curve however far it is zoomed.
+    let path = CGMutablePath(), mid = { (i: Int) in
+        let a = outline[i], b = outline[(i + 1) % outline.count]
+        return CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+    }
+    path.move(to: mid(outline.count - 1))
+    for i in outline.indices { path.addQuadCurve(to: mid(i), control: outline[i]) }
+    path.closeSubpath()
+    return path
 }
 
 extension FolioDocument {

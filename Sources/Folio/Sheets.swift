@@ -25,24 +25,22 @@ struct SignatureSheet: View {
                 if typing {
                     VStack {
                         TextField(tool == .sign ? "Your name" : "Your initials", text: $name)
-                        Text(name).font(.custom("SnellRoundhand", size: 48)).frame(maxHeight: .infinity)
+                        // As it will be placed, y up, so turned over for the view, whose y runs down.
+                        SwiftUI.Canvas { context, size in
+                            let path = Signature.typed(name).path(in: CGRect(x: 20, y: size.height / 2 - 30, width: size.width - 40, height: 60))
+                            context.fill(Path(path).applying(CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: size.height)), with: .foreground)
+                        }
                     }
                 } else {
-                    SwiftUI.Canvas { context, _ in
-                        for stroke in strokes {
-                            var path = Path()
-                            path.addLines(stroke)
-                            context.stroke(path, with: .color(.black), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
-                        }
-                    }
-                    .background(.white)
-                    .gesture(DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            if !drawing { strokes.append([]) }
-                            drawing = true
-                            strokes[strokes.count - 1].append(value.location)
-                        }
-                        .onEnded { _ in drawing = false })
+                    SwiftUI.Canvas { context, _ in context.fill(Path(Signature.drawn(strokes).path), with: .color(.black)) }
+                        .background(.white)
+                        .gesture(DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                if !drawing { strokes.append([]) }
+                                drawing = true
+                                strokes[strokes.count - 1].append(value.location)
+                            }
+                            .onEnded { _ in drawing = false })
                 }
             }
             .frame(width: pad.width, height: pad.height)
