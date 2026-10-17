@@ -80,4 +80,34 @@ final class ViewerTests: XCTestCase {
         XCTAssertEqual(texts(viewer.doc.pdf), ["C", "A", "B", "D"])
         viewer.doc.undo?.endUndoGrouping()
     }
+
+    func testAnnotationsAreDrawnAtTheScreensPixels() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([[]]))), page = viewer.doc.pages[0]
+        page.addAnnotation(Signature.typed("Jo").annotation(in: CGRect(x: 100, y: 600, width: 100, height: 50)))
+        // Off the screen, so the test shows nothing.
+        let window = NSWindow(contentRect: CGRect(x: -4000, y: -4000, width: 600, height: 400), styleMask: .borderless, backing: .buffered, defer: false)
+        window.contentView = viewer.canvas
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.canvas.scaleFactor = 3
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        // The layer PDFKit draws each annotation into, at a pixel a point unless Folio redraws it.
+        let layers = {
+            var found: [CALayer] = []
+            func walk(_ layer: CALayer) {
+                if NSStringFromClass(type(of: layer)) == "PDFPageLayerAnnotationEffect" { found.append(layer) }
+                layer.sublayers?.forEach(walk)
+            }
+            walk(viewer.canvas.layer!)
+            return found
+        }
+        let sharp = { (count: Int) in layers().count == count && layers().allSatisfy { $0.contentsScale == 3 * window.backingScaleFactor } }
+        for _ in 0..<100 where !sharp(1) { RunLoop.main.run(until: Date() + 0.05) }
+        XCTAssertTrue(sharp(1), "\(layers().map(\.contentsScale))")
+        // One added later, as each change is.
+        page.addAnnotation(Signature.typed("JH").annotation(in: CGRect(x: 100, y: 500, width: 100, height: 50)))
+        viewer.canvas.sharpenAnnotations()
+        for _ in 0..<100 where !sharp(2) { RunLoop.main.run(until: Date() + 0.05) }
+        XCTAssertTrue(sharp(2), "\(layers().map(\.contentsScale))")
+    }
 }

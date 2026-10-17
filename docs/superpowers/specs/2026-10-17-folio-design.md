@@ -127,6 +127,7 @@ Everything that changes the document can be undone and is named in Edit › Undo
 - Free-text (with a custom font) and ink annotations come back from a save with appearance streams.
 - A `PDFDocument` that was opened encrypted and unlocked stays encrypted after `dataRepresentation()`.
 - A `PDFAnnotation` subclass's own `draw(with:in:)` is saved as its appearance stream, as vector paths; PDFium, Chrome's renderer, shows it.
+- `PDFView` draws each annotation (not form fields) into a layer of its own at one pixel a point and stretches it with the zoom, so annotations look pixelated on a Retina screen. No setting changes this. The canvas redraws those layers at the zoom after each tile draw and each change, at most 4096 pixels a side.
 
 ## Left to the builder
 

@@ -143,7 +143,10 @@ struct DocumentView: View {
             }
         }
         .onChange(of: viewer.tool) { viewer.canvas.selected = nil }
-        .onChange(of: viewer.doc.revision) { viewer.canvas.outlineSelection() }
+        .onChange(of: viewer.doc.revision) {
+            viewer.canvas.outlineSelection()
+            viewer.canvas.sharpenAnnotations()
+        }
         .onChange(of: viewer.color) {
             guard let a = viewer.canvas.selected else { return }
             if a.type == "FreeText" {

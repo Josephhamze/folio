@@ -52,6 +52,33 @@ final class Canvas: PDFView {
     /// PDFKit registers its own undo for each form field it changes, which would sit beside "Fill Form".
     override var undoManager: UndoManager? { nil }
 
+    /// A page's tiles are drawn at the zoom once its annotations have their layers: the moment to sharpen those.
+    override func draw(_ page: PDFPage, to context: CGContext) {
+        super.draw(page, to: context)
+        sharpenAnnotations()
+    }
+
+    /// PDFKit draws each annotation into a layer of its own at one pixel a point, and stretches it with the zoom, so on a Retina
+    /// screen annotations look pixelated. This redraws those layers at the pixels they cover, a turn of the run loop from now,
+    /// when an annotation just added has its layer. Never past 4096 pixels a side, so a page-sized box at 20× still fits in memory.
+    func sharpenAnnotations() {
+        DispatchQueue.main.async { [self] in
+            guard let window else { return }
+            func sharpen(_ layer: CALayer) {
+                // PDFKit's own class: if it is ever renamed, annotations are only as blurry as before.
+                if NSStringFromClass(type(of: layer)) == "PDFPageLayerAnnotationEffect" {
+                    let scale = min(scaleFactor * window.backingScaleFactor, 4096 / max(layer.bounds.width, layer.bounds.height, 1))
+                    if layer.contentsScale != scale {
+                        layer.contentsScale = scale
+                        layer.setNeedsDisplay()
+                    }
+                }
+                layer.sublayers?.forEach(sharpen)
+            }
+            layer.map(sharpen)
+        }
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.tabbingMode = .preferred
@@ -137,6 +164,7 @@ final class Canvas: PDFView {
             default: shape(viewer.tool, from: from, to: at, color: viewer.color)
             }
             draft.map(page.addAnnotation)
+            sharpenAnnotations()
         default:
             super.mouseDragged(with: event)
         }
