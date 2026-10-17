@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// The signature pad: draw it or type it, then save it for the sign tool.
+/// The signature pad: draw it or type it, then save it for the sign tool, or as initials for the initial tool.
 struct SignatureSheet: View {
     let viewer: Viewer
+    let tool: Tool
     @Environment(\.dismiss) private var dismiss
     @State private var typing = false
     @State private var strokes: [[CGPoint]] = []
@@ -12,6 +13,7 @@ struct SignatureSheet: View {
 
     var body: some View {
         VStack(spacing: 16) {
+            Text(tool == .sign ? "Signature" : "Initials").font(.headline)
             Picker("Signature", selection: $typing) {
                 Text("Draw").tag(false)
                 Text("Type").tag(true)
@@ -22,7 +24,7 @@ struct SignatureSheet: View {
             Group {
                 if typing {
                     VStack {
-                        TextField("Your name", text: $name)
+                        TextField(tool == .sign ? "Your name" : "Your initials", text: $name)
                         Text(name).font(.custom("SnellRoundhand", size: 48)).frame(maxHeight: .infinity)
                     }
                 } else {
@@ -50,8 +52,8 @@ struct SignatureSheet: View {
                 Button("Cancel", role: .cancel) { dismiss() }
                 Button("Save") {
                     // The pad's y runs down; a page's runs up.
-                    Signature.saved = typing ? .typed(name) : .drawn(strokes.map { $0.map { CGPoint(x: $0.x, y: pad.height - $0.y) } })
-                    viewer.tool = .sign
+                    Signature[tool] = typing ? .typed(name) : .drawn(strokes.map { $0.map { CGPoint(x: $0.x, y: pad.height - $0.y) } })
+                    viewer.tool = tool
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)

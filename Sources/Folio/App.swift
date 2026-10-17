@@ -46,7 +46,8 @@ struct FolioCommands: Commands {
             Divider()
         }
         CommandMenu("Tools") {
-            Button("Edit Signature…") { viewer?.sheet = .signature }.disabled(viewer == nil)
+            Button("Edit Signature…") { viewer?.sheet = .signature(.sign) }.disabled(viewer == nil)
+            Button("Edit Initials…") { viewer?.sheet = .signature(.initial) }.disabled(viewer == nil)
         }
     }
 }

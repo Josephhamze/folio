@@ -24,7 +24,7 @@ A free, native Mac PDF viewer and editor that covers what the owner would otherw
 
 **Fill and sign**
 - Fill form fields with PDFKit's own widgets. Each change can be undone and marks the document edited.
-- Signature: draw it with the trackpad or mouse, or type it (shown in a script font). It is saved once for the user. The Sign tool places it with a click, or at the size of a dragged box.
+- Signature and initials: draw each with the trackpad or mouse, or type it (shown in a script font). Each is saved once for the user. The Sign and Initial tools place them with a click, or at the size of a dragged box, keeping their shape.
 
 **Edit**
 - Add text anywhere: the text box tool.
@@ -105,7 +105,7 @@ Everything that changes the document can be undone and is named in Edit › Undo
   - PDFKit keeps a file's encryption on a plain save (verified).
   - New protection is applied with write options: user password, owner password and access permissions.
   - Removing protection moves the pages into a fresh `PDFDocument` (verified: annotations, bookmarks and the title survive; the copy is unencrypted).
-- **Signatures** are stored in UserDefaults: strokes for a drawn one, text for a typed one.
+- **Signatures** and initials are stored in UserDefaults: strokes for a drawn one, text for a typed one.
   - A drawn signature becomes an ink annotation.
   - A typed one becomes a free-text annotation in Snell Roundhand.
   - PDFKit writes appearance streams for both (verified), so other apps show them.

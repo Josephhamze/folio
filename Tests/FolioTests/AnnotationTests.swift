@@ -55,10 +55,14 @@ final class AnnotationTests: XCTestCase {
         let initials = Signature.typed("JH").annotation(in: rect)
         XCTAssertLessThan(initials.bounds.width, rect.width)
         XCTAssertEqual(initials.bounds.midX, rect.midX, accuracy: 0.01)
-        Signature.saved = .typed("X")
-        XCTAssertEqual(Signature.saved, .typed("X"))
-        Signature.saved = nil
-        XCTAssertNil(Signature.saved)
+        Signature[.sign] = .typed("X")
+        Signature[.initial] = .typed("Y")
+        XCTAssertEqual(Signature[.sign], .typed("X"))
+        XCTAssertEqual(Signature[.initial], .typed("Y"))
+        Signature[.sign] = nil
+        Signature[.initial] = nil
+        XCTAssertNil(Signature[.sign])
+        XCTAssertNil(Signature[.initial])
     }
 
     func testAddRemoveAndRecolourUndo() {

@@ -110,10 +110,10 @@ final class Canvas: PDFView {
                 viewer.message = "The original text stays underneath in the file."
             }
             edit(cover)
-        case .sign:
-            if Signature.saved == nil {
+        case .sign, .initial:
+            if Signature[viewer.tool] == nil {
                 start = nil
-                viewer.sheet = .signature
+                viewer.sheet = .signature(viewer.tool)
             }
         case .rect, .oval, .line, .arrow, .pen, .redact:
             break
@@ -128,12 +128,12 @@ final class Canvas: PDFView {
             guard let selected, let origin else { return super.mouseDragged(with: event) }
             selected.bounds = origin.offsetBy(dx: at.x - from.x, dy: at.y - from.y)
             outlineSelection()
-        case .rect, .oval, .line, .arrow, .redact, .pen, .sign:
+        case .rect, .oval, .line, .arrow, .redact, .pen, .sign, .initial:
             stroke.append(at)
             draft.map(page.removeAnnotation)
             draft = switch viewer.tool {
             case .pen: ink([stroke], color: viewer.color, width: 2)
-            case .sign: Signature.saved?.annotation(in: CGRect(origin: from, size: .zero).union(CGRect(origin: at, size: .zero)))
+            case .sign, .initial: Signature[viewer.tool]?.annotation(in: CGRect(origin: from, size: .zero).union(CGRect(origin: at, size: .zero)))
             default: shape(viewer.tool, from: from, to: at, color: viewer.color)
             }
             draft.map(page.addAnnotation)
@@ -169,11 +169,10 @@ final class Canvas: PDFView {
             guard let draft else { return }
             page.removeAnnotation(draft)
             viewer.doc.add(draft, to: page, name: viewer.tool == .pen ? "Draw" : viewer.tool == .redact ? "Mark for Redaction" : "Add Shape")
-        case .sign:
-            guard let signature = Signature.saved else { return }
+        case .sign, .initial:
+            guard let signature = Signature[viewer.tool] else { return }
             draft.map(page.removeAnnotation)
-            let height = 180 / signature.aspect
-            viewer.doc.add(draft ?? signature.annotation(in: CGRect(x: at.x - 90, y: at.y - height / 2, width: 180, height: height)), to: page, name: "Sign")
+            viewer.doc.add(draft ?? signature.annotation(in: CGRect(x: at.x - 90, y: at.y - 22.5, width: 180, height: 45)), to: page, name: viewer.tool.name)
             viewer.tool = .select
         default:
             break

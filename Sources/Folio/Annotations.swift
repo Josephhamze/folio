@@ -1,7 +1,7 @@
 import PDFKit
 
 enum Tool: String, CaseIterable, Identifiable {
-    case select, highlight, underline, strike, note, text, rect, oval, line, arrow, pen, sign, editText, redact
+    case select, highlight, underline, strike, note, text, rect, oval, line, arrow, pen, sign, initial, editText, redact
 
     var id: Self { self }
 
@@ -19,6 +19,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .arrow: "Arrow"
         case .pen: "Pen"
         case .sign: "Sign"
+        case .initial: "Initial"
         case .editText: "Edit Text"
         case .redact: "Redact"
         }
@@ -38,6 +39,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .arrow: "arrow.up.right"
         case .pen: "pencil.tip"
         case .sign: "signature"
+        case .initial: "pencil.and.scribble"
         case .editText: "character.cursor.ibeam"
         case .redact: "rectangle.fill"
         }
@@ -129,20 +131,15 @@ extension PDFAnnotation {
     }
 }
 
-/// The user's signature: strokes drawn on the pad, y up, or a name typed and shown in a script font.
+/// The user's signature or initials: strokes drawn on the pad, y up, or typed and shown in a script font.
 enum Signature: Codable, Equatable {
     case drawn([[CGPoint]])
     case typed(String)
 
-    static var saved: Signature? {
-        get { UserDefaults.standard.data(forKey: "signature").flatMap { try? JSONDecoder().decode(Signature.self, from: $0) } }
-        set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: "signature") }
-    }
-
-    /// Width over height.
-    var aspect: CGFloat {
-        guard case .drawn(let strokes) = self, extent(strokes).height > 0 else { return 4 }
-        return extent(strokes).width / extent(strokes).height
+    /// The signature the sign tool places, or the initials for the initial tool.
+    static subscript(tool: Tool) -> Signature? {
+        get { UserDefaults.standard.data(forKey: tool.rawValue).flatMap { try? JSONDecoder().decode(Signature.self, from: $0) } }
+        set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: tool.rawValue) }
     }
 
     /// The signature fitted into `rect`, keeping its shape.

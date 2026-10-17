@@ -11,8 +11,10 @@ final class Viewer {
         var symbol: String { self == .thumbnails ? "rectangle.grid.1x2" : self == .bookmarks ? "bookmark" : "text.bubble" }
     }
 
-    enum Sheet: String, Identifiable {
-        case signature, protect, properties, split
+    enum Sheet: Hashable, Identifiable {
+        /// The pad for the sign tool's signature, or the initial tool's initials.
+        case signature(Tool)
+        case protect, properties, split
 
         var id: Self { self }
     }
@@ -151,7 +153,7 @@ struct DocumentView: View {
             }
         }
         .sheet(item: $viewer.sheet) { sheet in
-            if sheet == .signature { SignatureSheet(viewer: viewer) }
+            if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
         }
         .onExitCommand { viewer.readMode = false }
         // Esc, the green button or ⌃⌘F can end full screen without SwiftUI seeing it.
