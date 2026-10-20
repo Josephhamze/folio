@@ -41,6 +41,64 @@ final class AnnotationTests: XCTestCase {
         XCTAssertNil(coverLine(at: CGPoint(x: 300, y: 300), on: page))
     }
 
+    func testTextBoxSitsOnTheLineItIsBeside() {
+        let page = makePDF([["Name:"]]).page(at: 0)!, line = page.selectionForLine(at: CGPoint(x: 90, y: 725))!.bounds(for: page)
+        let box = textBox(at: CGPoint(x: 300, y: 725), on: page), font = box.font!
+        XCTAssertEqual(box.type, "FreeText")
+        XCTAssertEqual([font.fontName, "\(font.pointSize)"], ["Georgia", "18.0"])
+        XCTAssertEqual(rgb(box.fontColor), [0, 0, 0])
+        XCTAssertEqual(box.bounds.minY, line.minY - 2, accuracy: 0.01)
+        XCTAssertEqual(box.bounds.height, font.ascender - font.descender + 4, accuracy: 0.01)
+        XCTAssertEqual(box.bounds.minX, 298)
+        XCTAssertEqual(box.contents ?? "", "")
+    }
+
+    func testTextBoxTakesTheNearestRunAndItsColour() {
+        let page = makePDF([["Heading", "Small print"]], styles: [1: [.font: NSFont(name: "Helvetica-Bold", size: 11)!, .foregroundColor: NSColor.red]]).page(at: 0)!
+        // Far to the right of the small print, at its height: the heading is nearer, but the box goes on this line.
+        let small = textBox(at: CGPoint(x: 300, y: 682), on: page)
+        XCTAssertEqual([small.font!.fontName, "\(small.font!.pointSize)"], ["Helvetica-Bold", "11.0"])
+        XCTAssertEqual(rgb(small.fontColor), [1, 0, 0])
+        XCTAssertEqual(textBox(at: CGPoint(x: 300, y: 728), on: page).font?.fontName, "Georgia")
+    }
+
+    func testTextBoxOnAPageWithNoText() {
+        let box = textBox(at: CGPoint(x: 100, y: 100), on: makePDF([[]]).page(at: 0)!)
+        XCTAssertEqual([box.font!.fontName, "\(box.font!.pointSize)"], ["Helvetica", "12.0"])
+        XCTAssertEqual(rgb(box.fontColor), [0, 0, 0])
+        XCTAssertEqual(box.bounds.midY, 100, accuracy: 0.01)
+    }
+
+    /// A colour's red, green and blue, rounded to tenths, in Generic RGB: PDFKit keeps an annotation's colour as bare
+    /// components and hands them back in that space.
+    private func rgb(_ color: NSColor?) -> [Double] {
+        let c = color!.usingColorSpace(.genericRGB)!
+        return [c.redComponent, c.greenComponent, c.blueComponent].map { (Double($0) * 10).rounded() / 10 }
+    }
+
+    func testFitOnlyGrowsFromTheTopLeft() {
+        let bounds = CGRect(x: 10, y: 100, width: 300, height: 40), font = NSFont(name: "Helvetica", size: 12)!
+        XCTAssertEqual(fit(bounds, around: "Hi", in: font), bounds)
+        let long = fit(bounds, around: "A line of words far longer than three hundred points of page can hold", in: font)
+        XCTAssertGreaterThan(long.width, 300)
+        XCTAssertEqual(long.minX, 10)
+        XCTAssertEqual(long.maxY, 140)
+    }
+
+    func testSetFontIsOneUndoableChange() {
+        let doc = FolioDocument(pdf: makePDF([[]])), undo = manualUndo(doc)
+        let box = textBox(at: CGPoint(x: 100, y: 100), on: doc.pages[0]), old = box.bounds
+        box.contents = "Hello"
+        act(undo) { doc.setFont(NSFont(name: "Helvetica", size: 30)!, of: box) }
+        XCTAssertEqual(box.font?.pointSize, 30)
+        XCTAssertGreaterThan(box.bounds.height, old.height)
+        XCTAssertEqual(box.bounds.maxY, old.maxY, accuracy: 0.01)
+        XCTAssertEqual(undo.undoActionName, "Change Font")
+        undo.undo()
+        XCTAssertEqual(box.font?.pointSize, 12)
+        XCTAssertEqual(box.bounds, old)
+    }
+
     func testSignatures() {
         let rect = CGRect(x: 0, y: 0, width: 200, height: 100)
         // Each fills the box one way and sits in its middle, keeping its shape: a stamp, not a text box or a comment.

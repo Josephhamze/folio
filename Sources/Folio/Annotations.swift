@@ -123,6 +123,42 @@ func coverLine(at point: CGPoint, on page: PDFPage) -> PDFAnnotation? {
     return a
 }
 
+/// An empty text box at `point` in the font, size and colour of the nearest text on the page, so what is typed matches it.
+/// At the height of a line it takes that line's nearest text and sits on it as an Edit Text cover does, on the same baseline;
+/// elsewhere it is centred on the point. A page with no text gets Helvetica 12 in black, a font every PDF app has.
+func textBox(at point: CGPoint, on page: PDFPage) -> PDFAnnotation {
+    // Each run of one font and colour on the page, with its line's bounds.
+    var runs: [(bounds: CGRect, line: CGRect, style: [NSAttributedString.Key: Any])] = []
+    for line in page.selection(for: page.bounds(for: .mediaBox))?.selectionsByLine() ?? [] {
+        guard let text = line.attributedString else { continue }
+        let start = line.range(at: 0, on: page).location, bounds = line.bounds(for: page)
+        text.enumerateAttributes(in: NSRange(location: 0, length: text.length)) { style, range, _ in
+            let run = page.selection(for: NSRange(location: start + range.location, length: range.length))?.bounds(for: page) ?? .zero
+            if !run.isEmpty { runs.append((run, bounds, style)) }
+        }
+    }
+    let distance = { (r: CGRect) in hypot(max(r.minX - point.x, 0, point.x - r.maxX), max(r.minY - point.y, 0, point.y - r.maxY)) }
+    let beside = runs.filter { $0.line.minY...$0.line.maxY ~= point.y }
+    let near = (beside.isEmpty ? runs : beside).min { distance($0.bounds) < distance($1.bounds) }
+    let font = near?.style[.font] as? NSFont ?? NSFont(name: "Helvetica", size: 12)!, height = font.ascender - font.descender + 4
+    let y = beside.isEmpty ? point.y - height / 2 : near!.line.minY - 2
+    let box = PDFAnnotation(bounds: CGRect(x: point.x - 2, y: y, width: font.pointSize, height: height), forType: .freeText, withProperties: nil)
+    box.font = font
+    box.fontColor = near?.style[.foregroundColor] as? NSColor ?? .black
+    box.color = .clear
+    box.border = PDFBorder()
+    box.border?.lineWidth = 0
+    return box
+}
+
+/// `bounds` grown to hold `text` in `font`, from the same top left corner. Never shrunk: an Edit Text cover that shrank would
+/// uncover the line beneath it.
+func fit(_ bounds: CGRect, around text: String, in font: NSFont) -> CGRect {
+    let size = (text as NSString).size(withAttributes: [.font: font])
+    let width = max(bounds.width, size.width + 8), height = max(bounds.height, size.height + 4)
+    return CGRect(x: bounds.minX, y: bounds.maxY - height, width: width, height: height)
+}
+
 extension PDFAnnotation {
     var isRedaction: Bool { value(forAnnotationKey: .name) as? String == "folio-redaction" }
 
@@ -270,6 +306,12 @@ extension FolioDocument {
     func set<V>(_ key: ReferenceWritableKeyPath<PDFAnnotation, V>, of a: PDFAnnotation, to value: V, name: String) {
         let old = a[keyPath: key]
         change(name, do: { a[keyPath: key] = value }, undo: { a[keyPath: key] = old })
+    }
+
+    /// Puts the text box in `font`, grown to hold its words in it.
+    func setFont(_ font: NSFont, of box: PDFAnnotation) {
+        let old = (font: box.font, bounds: box.bounds), bounds = fit(box.bounds, around: box.contents ?? "", in: font)
+        change("Change Font", do: { box.font = font; box.bounds = bounds }, undo: { box.font = old.font; box.bounds = old.bounds })
     }
 
     /// Every comment, page by page.
