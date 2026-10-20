@@ -150,8 +150,8 @@ func coverLine(at point: CGPoint, on page: PDFPage) -> PDFAnnotation? {
 }
 
 /// An empty text box at `point` in the font, size and colour of the nearest text on the page, so what is typed matches it.
-/// At the height of a line it takes that line's nearest text and sits on it as an Edit Text cover does, on the same baseline;
-/// elsewhere it is centred on the point. A page with no text gets Helvetica 12 in black, a font every PDF app has.
+/// At the height of a line it takes that line's nearest text and puts the words on its baseline; elsewhere it is centred on
+/// the point. A page with no text gets Helvetica 12 in black, a font every PDF app has.
 func textBox(at point: CGPoint, on page: PDFPage) -> PDFAnnotation {
     // Each run of one font and colour on the page, with its line's bounds.
     var runs: [(bounds: CGRect, line: CGRect, style: [NSAttributedString.Key: Any])] = []
@@ -166,7 +166,9 @@ func textBox(at point: CGPoint, on page: PDFPage) -> PDFAnnotation {
     let distance = { (r: CGRect) in hypot(max(r.minX - point.x, 0, point.x - r.maxX), max(r.minY - point.y, 0, point.y - r.maxY)) }
     let beside = runs.filter { $0.line.minY...$0.line.maxY ~= point.y }
     let near = (beside.isEmpty ? runs : beside).min { distance($0.bounds) < distance($1.bounds) }
-    let font = near?.style[.font] as? NSFont ?? NSFont(name: "Helvetica", size: 12)!, height = font.ascender - font.descender + 4
+    // PDFKit draws a text box's words 2 pt in from its left and about 3.5 pt down from its top, so a box 2 pt under the line's
+    // descent and 3.5 pt over its ascent puts them on the line's baseline.
+    let font = near?.style[.font] as? NSFont ?? NSFont(name: "Helvetica", size: 12)!, height = font.ascender - font.descender + 5.5
     let y = beside.isEmpty ? point.y - height / 2 : near!.line.minY - 2
     let box = PDFAnnotation(bounds: CGRect(x: point.x - 2, y: y, width: font.pointSize, height: height), forType: .freeText, withProperties: nil)
     box.font = font

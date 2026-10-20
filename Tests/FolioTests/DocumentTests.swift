@@ -3,19 +3,20 @@ import PDFKit
 import XCTest
 @testable import Folio
 
-/// Pages holding these lines in Georgia 18, or the row's own style: the first 72 pt from the top, then one every 40 pt,
-/// starting 72 pt from the left.
-func makePDF(_ pages: [[String]], size: CGSize = CGSize(width: 612, height: 792), styles: [Int: [NSAttributedString.Key: Any]] = [:]) -> PDFDocument {
+/// Pages holding these lines in Georgia 18: the first 72 pt from the top, then one every 40 pt, starting 72 pt from the left.
+func makePDF(_ pages: [[String]], size: CGSize = CGSize(width: 612, height: 792)) -> PDFDocument {
+    makePDF(styled: pages.map { $0.map { NSAttributedString(string: $0, attributes: [.font: NSFont(name: "Georgia", size: 18)!]) } }, size: size)
+}
+
+/// Pages holding these lines in their own styles, placed as above.
+func makePDF(styled pages: [[NSAttributedString]], size: CGSize = CGSize(width: 612, height: 792)) -> PDFDocument {
     let data = NSMutableData()
     var box = CGRect(origin: .zero, size: size)
     let context = CGContext(consumer: CGDataConsumer(data: data)!, mediaBox: &box, nil)!
     for lines in pages {
         context.beginPDFPage(nil)
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
-        for (row, line) in lines.enumerated() {
-            (line as NSString).draw(at: CGPoint(x: 72, y: size.height - 72 - CGFloat(row) * 40),
-                                    withAttributes: styles[row] ?? [.font: NSFont(name: "Georgia", size: 18)!])
-        }
+        for (row, line) in lines.enumerated() { line.draw(at: CGPoint(x: 72, y: size.height - 72 - CGFloat(row) * 40)) }
         context.endPDFPage()
     }
     NSGraphicsContext.current = nil

@@ -48,18 +48,39 @@ final class AnnotationTests: XCTestCase {
         XCTAssertEqual([font.fontName, "\(font.pointSize)"], ["Georgia", "18.0"])
         XCTAssertEqual(rgb(box.fontColor), [0, 0, 0])
         XCTAssertEqual(box.bounds.minY, line.minY - 2, accuracy: 0.01)
-        XCTAssertEqual(box.bounds.height, font.ascender - font.descender + 4, accuracy: 0.01)
+        XCTAssertEqual(box.bounds.height, font.ascender - font.descender + 5.5, accuracy: 0.01)
         XCTAssertEqual(box.bounds.minX, 298)
         XCTAssertEqual(box.contents ?? "", "")
     }
 
     func testTextBoxTakesTheNearestRunAndItsColour() {
-        let page = makePDF([["Heading", "Small print"]], styles: [1: [.font: NSFont(name: "Helvetica-Bold", size: 11)!, .foregroundColor: NSColor.red]]).page(at: 0)!
+        let page = makePDF(styled: [[NSAttributedString(string: "Heading", attributes: [.font: NSFont(name: "Georgia", size: 18)!]),
+                                     NSAttributedString(string: "Small print", attributes: [.font: NSFont(name: "Helvetica-Bold", size: 11)!, .foregroundColor: NSColor.red])]]).page(at: 0)!
         // Far to the right of the small print, at its height: the heading is nearer, but the box goes on this line.
         let small = textBox(at: CGPoint(x: 300, y: 682), on: page)
         XCTAssertEqual([small.font!.fontName, "\(small.font!.pointSize)"], ["Helvetica-Bold", "11.0"])
         XCTAssertEqual(rgb(small.fontColor), [1, 0, 0])
         XCTAssertEqual(textBox(at: CGPoint(x: 300, y: 728), on: page).font?.fontName, "Georgia")
+        // Between the lines, nearer the small print's top (y 691) than the heading's foot (y 720).
+        XCTAssertEqual(textBox(at: CGPoint(x: 100, y: 703), on: page).font?.fontName, "Helvetica-Bold")
+    }
+
+    func testTextBoxTakesTheRunNearestTheClickWithinALine() {
+        let line = NSMutableAttributedString(string: "Total due: ", attributes: [.font: NSFont(name: "Georgia", size: 14)!])
+        line.append(NSAttributedString(string: "R 1 250,00", attributes: [.font: NSFont(name: "Helvetica-Bold", size: 14)!]))
+        let page = makePDF(styled: [[line]]).page(at: 0)!
+        XCTAssertEqual(textBox(at: CGPoint(x: 400, y: 725), on: page).font?.fontName, "Helvetica-Bold")
+        XCTAssertEqual(textBox(at: CGPoint(x: 60, y: 725), on: page).font?.fontName, "Georgia")
+    }
+
+    func testTextBoxWordsSitOnTheLinesBaseline() {
+        let page = makePDF([["Name:"]]).page(at: 0)!, box = textBox(at: CGPoint(x: 300, y: 725), on: page)
+        box.contents = "HHHH"
+        box.bounds = fit(box.bounds, around: "HHHH", in: box.font!)
+        page.addAnnotation(box)
+        // Neither "Name:" nor "HHHH" reaches below the baseline.
+        XCTAssertEqual(inkBottom(page, in: CGRect(x: 290, y: 700, width: 150, height: 60)),
+                       inkBottom(page, in: CGRect(x: 60, y: 700, width: 150, height: 60)), accuracy: 0.5)
     }
 
     func testTextBoxOnAPageWithNoText() {
@@ -134,16 +155,27 @@ final class AnnotationTests: XCTestCase {
 
     /// The pixels of `rect` on the page, at four a point, that are darker than mid grey.
     private func darkPixels(_ page: PDFPage, in rect: CGRect) -> Int {
-        let width = Int(rect.width) * 4, height = Int(rect.height) * 4
+        gray(page, in: rect, scale: 4).joined().filter { $0 < 128 }.count
+    }
+
+    /// The lowest inked point in `rect` on the page, to a tenth of a point.
+    private func inkBottom(_ page: PDFPage, in rect: CGRect) -> CGFloat {
+        let rows = gray(page, in: rect, scale: 10)
+        return rect.minY + CGFloat(rows.count - 1 - rows.lastIndex { $0.contains { $0 < 128 } }!) / 10
+    }
+
+    /// `rect` on the page drawn in grey at `scale` pixels a point, as rows of pixels from the top.
+    private func gray(_ page: PDFPage, in rect: CGRect, scale: CGFloat) -> [[UInt8]] {
+        let width = Int(rect.width * scale), height = Int(rect.height * scale)
         let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width,
                                 space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)!
         context.setFillColor(gray: 1, alpha: 1)
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        context.scaleBy(x: 4, y: 4)
+        context.scaleBy(x: scale, y: scale)
         context.translateBy(x: -rect.minX, y: -rect.minY)
         page.draw(with: .mediaBox, to: context)
         let pixels = context.data!.assumingMemoryBound(to: UInt8.self)
-        return (0..<width * height).filter { pixels[$0] < 128 }.count
+        return (0..<height).map { row in (0..<width).map { pixels[row * context.bytesPerRow + $0] } }
     }
 
     func testAddRemoveAndRecolourUndo() {
