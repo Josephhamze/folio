@@ -25,6 +25,12 @@ struct FolioCommands: Commands {
     @FocusedValue(\.searchFocus) private var searchFocus
 
     var body: some Commands {
+        // SwiftUI shows Save As only while Option is held, in Duplicate's place.
+        CommandGroup(after: .saveItem) {
+            Button("Save As…") { NSApp.sendAction(#selector(NSDocument.saveAs(_:)), to: nil, from: nil) }
+                .keyboardShortcut("s", modifiers: [.command, .shift, .option])
+                .disabled(viewer == nil)
+        }
         CommandGroup(replacing: .printItem) {
             Button("Print…") { viewer?.canvas.print(with: .shared, autoRotate: true, pageScaling: .pageScaleToFit) }
                 .keyboardShortcut("p")
