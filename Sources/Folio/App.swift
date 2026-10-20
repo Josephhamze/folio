@@ -3,8 +3,15 @@ import SwiftUI
 @main
 struct FolioApp: App {
     var body: some Scene {
-        DocumentGroup(newDocument: { FolioDocument() }) { DocumentView(doc: $0.document) }
+        DocumentGroup(newDocument: { FolioDocument() }) { DocumentView(doc: $0.document, url: $0.fileURL) }
             .commands { FolioCommands() }
+            // The home window opens at launch, not the Open panel.
+            .defaultLaunchBehavior(.suppressed)
+        Window("Home", id: "home") { Home() }
+            .defaultLaunchBehavior(.presented)
+            .restorationBehavior(.disabled)
+            .windowStyle(.hiddenTitleBar)
+            .defaultSize(width: 760, height: 520)
     }
 }
 

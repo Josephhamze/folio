@@ -113,12 +113,17 @@ final class Viewer {
 
 struct DocumentView: View {
     @State var viewer: Viewer
+    /// Where the document is saved, if it is.
+    let url: URL?
     @State private var columns = NavigationSplitViewVisibility.all
     @FocusState private var searching: Bool
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
-    init(doc: FolioDocument) {
+    init(doc: FolioDocument, url: URL?) {
         _viewer = State(initialValue: Viewer(doc: doc))
+        self.url = url
     }
 
     var body: some View {
@@ -166,7 +171,12 @@ struct DocumentView: View {
         .focusedSceneValue(\.viewer, viewer)
         .focusedSceneValue(\.searchFocus, $searching)
         .frame(minWidth: 700, minHeight: 500)
-        .onAppear { viewer.doc.undo = undoManager }
+        .onAppear {
+            viewer.doc.undo = undoManager
+            dismissWindow(id: "home")
+        }
+        // With no document left, Folio goes back to its home window rather than sit with none, once this one is gone.
+        .onDisappear { DispatchQueue.main.async { if NSDocumentController.shared.documents.isEmpty { openWindow(id: "home") } } }
         .onChange(of: undoManager) { viewer.doc.undo = undoManager }
     }
 }
