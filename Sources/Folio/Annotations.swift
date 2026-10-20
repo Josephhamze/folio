@@ -44,6 +44,32 @@ enum Tool: String, CaseIterable, Identifiable {
         case .redact: "rectangle.fill"
         }
     }
+
+    /// The key that picks the tool while the page has the keyboard.
+    var key: String {
+        switch self {
+        case .select: "v"
+        case .highlight: "h"
+        case .underline: "u"
+        case .strike: "k"
+        case .note: "n"
+        case .text: "t"
+        case .rect: "r"
+        case .oval: "o"
+        case .line: "l"
+        case .arrow: "a"
+        case .pen: "p"
+        case .sign: "s"
+        case .initial: "i"
+        case .editText: "e"
+        case .redact: "x"
+        }
+    }
+
+    init?(key: String) {
+        guard let tool = Self.allCases.first(where: { $0.key == key }) else { return nil }
+        self = tool
+    }
 }
 
 /// One highlight, underline or strike-through for each line of the selection.

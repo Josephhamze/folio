@@ -39,6 +39,8 @@ final class Viewer {
     }
     var tool = Tool.select
     var color = NSColor.systemYellow
+    /// The index of the page in view.
+    var pageIndex = 0
     /// A note just added, whose comment field takes the keys.
     var focusNote: PDFAnnotation?
     var query = ""
@@ -67,6 +69,27 @@ final class Viewer {
         guard matches.indices.contains(match) else { return canvas.clearSelection() }
         canvas.setCurrentSelection(matches[match], animate: true)
         canvas.go(to: matches[match])
+    }
+
+    /// Goes to the page with this number, counting from 1; past either end, to that end.
+    func go(toPage number: Int) {
+        let count = doc.pdf.pageCount
+        guard count > 0, let page = doc.pdf.page(at: min(max(number, 1), count) - 1) else { return }
+        canvas.go(to: page)
+    }
+
+    /// The page this file was left on.
+    static func lastPage(of url: URL) -> Int? {
+        (UserDefaults.standard.dictionary(forKey: "pages") as? [String: Int])?[url.path]
+    }
+
+    /// Remembers the page this file was left on, to reopen it there. Only recent files keep theirs, so the list never
+    /// outgrows File › Open Recent.
+    static func remember(page index: Int, of url: URL) {
+        let recent = Set(NSDocumentController.shared.recentDocumentURLs.map(\.path))
+        var pages = (UserDefaults.standard.dictionary(forKey: "pages") as? [String: Int] ?? [:]).filter { recent.contains($0.key) }
+        pages[url.path] = index
+        UserDefaults.standard.set(pages, forKey: "pages")
     }
 
     var matchLabel: String { query.isEmpty ? "" : matches.isEmpty ? "No matches" : "\(match + 1) of \(matches.count)" }
@@ -116,6 +139,8 @@ struct DocumentView: View {
     /// Where the document is saved, if it is.
     let url: URL?
     @State private var columns = NavigationSplitViewVisibility.all
+    /// The page the file was left on last time, to open it there.
+    @State private var resume: Int?
     @FocusState private var searching: Bool
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
@@ -123,6 +148,7 @@ struct DocumentView: View {
 
     init(doc: FolioDocument, url: URL?) {
         _viewer = State(initialValue: Viewer(doc: doc))
+        _resume = State(initialValue: url.flatMap(Viewer.lastPage))
         self.url = url
     }
 
@@ -135,7 +161,19 @@ struct DocumentView: View {
                 .overlay(alignment: .top) { Bars(viewer: viewer) }
                 .safeAreaInset(edge: .top, spacing: 0) { if !viewer.readMode { ToolBar(viewer: viewer) } }
         }
-        .toolbar { ToolbarItem { Text(viewer.matchLabel).foregroundStyle(.secondary).monospacedDigit() } }
+        .toolbar {
+            ToolbarItem {
+                if !viewer.doc.pdf.isLocked {
+                    HStack(spacing: 4) {
+                        TextField("Page", value: Binding(get: { viewer.pageIndex + 1 }, set: { viewer.go(toPage: $0) }), format: .number)
+                            .frame(width: 40)
+                            .multilineTextAlignment(.trailing)
+                        Text("of \(viewer.doc.pdf.pageCount)").foregroundStyle(.secondary).monospacedDigit()
+                    }
+                }
+            }
+            ToolbarItem { Text(viewer.matchLabel).foregroundStyle(.secondary).monospacedDigit() }
+        }
         .toolbar(viewer.readMode ? .hidden : .visible, for: .windowToolbar)
         .searchable(text: $viewer.query, placement: .toolbar, prompt: "Find")
         .searchFocused($searching)
@@ -148,6 +186,8 @@ struct DocumentView: View {
             }
         }
         .onChange(of: viewer.tool) { viewer.canvas.selected = nil }
+        .task { if let resume { viewer.go(toPage: resume + 1) } }
+        .onChange(of: viewer.pageIndex) { if let url { Viewer.remember(page: viewer.pageIndex, of: url) } }
         .onChange(of: viewer.doc.revision) {
             viewer.canvas.outlineSelection()
             viewer.canvas.sharpenAnnotations()
@@ -188,7 +228,7 @@ struct ToolBar: View {
     var body: some View {
         HStack {
             Picker("Tool", selection: $viewer.tool) {
-                ForEach(Tool.allCases) { Label($0.name, systemImage: $0.symbol).help($0.name) }
+                ForEach(Tool.allCases) { Label($0.name, systemImage: $0.symbol).help("\($0.name) (\($0.key.uppercased()))") }
             }
             .pickerStyle(.segmented)
             .labelStyle(.iconOnly)

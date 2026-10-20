@@ -46,6 +46,7 @@ final class Canvas: PDFView {
             NotificationCenter.default.addObserver(self, selector: #selector(endedEditing), name: name, object: nil)
         }
         NotificationCenter.default.addObserver(self, selector: #selector(textChanged), name: NSControl.textDidChangeNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(pageChanged), name: .PDFViewPageChanged, object: self)
         for name in [Notification.Name.PDFViewScaleChanged, .PDFViewDisplayModeChanged] {
             NotificationCenter.default.addObserver(self, selector: #selector(outlineSelection), name: name, object: self)
         }
@@ -202,10 +203,32 @@ final class Canvas: PDFView {
         }
     }
 
+    @objc private func pageChanged() {
+        viewer.pageIndex = currentPage.flatMap { document?.index(for: $0) } ?? 0
+    }
+
+    /// With a mark selected, the arrows nudge it a point, or ten with Shift, and Delete deletes it. Esc puts down the mark
+    /// or the tool; with neither it falls through, to leave Read Mode. A letter picks its tool.
     override func keyDown(with event: NSEvent) {
-        guard let selected, viewer.doc.canEdit, [51, 117].contains(event.keyCode) else { return super.keyDown(with: event) }
-        viewer.doc.remove(selected)
-        self.selected = nil
+        guard viewer.doc.canEdit else { return super.keyDown(with: event) }
+        let step: CGFloat = event.modifierFlags.contains(.shift) ? 10 : 1
+        let nudges: [UInt16: CGVector] = [123: CGVector(dx: -step, dy: 0), 124: CGVector(dx: step, dy: 0),
+                                          125: CGVector(dx: 0, dy: -step), 126: CGVector(dx: 0, dy: step)]
+        if let selected, let by = nudges[event.keyCode] {
+            let from = selected.bounds, to = from.offsetBy(dx: by.dx, dy: by.dy)
+            viewer.doc.change("Move", do: { selected.bounds = to }, undo: { selected.bounds = from })
+        } else if let selected, [51, 117].contains(event.keyCode) {
+            viewer.doc.remove(selected)
+            self.selected = nil
+        } else if event.keyCode == 53, selected != nil || viewer.tool != .select {
+            selected = nil
+            viewer.tool = .select
+        } else if event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
+                  let tool = event.charactersIgnoringModifiers.flatMap({ Tool(key: $0.lowercased()) }) {
+            viewer.tool = tool
+        } else {
+            super.keyDown(with: event)
+        }
     }
 
     /// Puts the outline around the selected annotation, or takes it away when there is none on a page.

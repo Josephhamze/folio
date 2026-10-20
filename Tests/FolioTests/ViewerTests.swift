@@ -77,6 +77,63 @@ final class ViewerTests: XCTestCase {
         XCTAssertEqual(undo.undoActionName, "Edit Text")
     }
 
+    func testKeysPickToolsNudgeAndDeselect() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        viewer.canvas.document = viewer.doc.pdf
+        press("t", 17, on: viewer)
+        XCTAssertEqual(viewer.tool, .text)
+        press("v", 9, on: viewer)
+        XCTAssertEqual(viewer.tool, .select)
+        let box = shape(.rect, from: CGPoint(x: 100, y: 100), to: CGPoint(x: 150, y: 150), color: .red)
+        page.addAnnotation(box)
+        viewer.canvas.selected = box
+        act(undo) { press("\u{F703}", 124, on: viewer) }   // →
+        XCTAssertEqual(box.bounds.minX, 101)
+        act(undo) { press("\u{F700}", 126, [.shift], on: viewer) }   // ⇧↑
+        XCTAssertEqual(box.bounds.minY, 110)
+        undo.undo()
+        XCTAssertEqual(box.bounds.minY, 100)
+        viewer.tool = .pen
+        press("\u{1B}", 53, on: viewer)
+        XCTAssertNil(viewer.canvas.selected)
+        XCTAssertEqual(viewer.tool, .select)
+        press("t", 17, [.command], on: viewer)
+        XCTAssertEqual(viewer.tool, .select)
+        // A locked file can't be marked up, so its keys pick nothing.
+        let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "pw", .ownerPasswordOption: "pw"])!
+        let locked = Viewer(doc: FolioDocument(pdf: PDFDocument(data: data)!))
+        press("t", 17, on: locked)
+        XCTAssertEqual(locked.tool, .select)
+    }
+
+    private func press(_ key: String, _ code: UInt16, _ flags: NSEvent.ModifierFlags = [], on viewer: Viewer) {
+        viewer.canvas.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0,
+                                                     context: nil, characters: key, charactersIgnoringModifiers: key, isARepeat: false, keyCode: code)!)
+    }
+
+    func testPageBoxGoesAndClamps() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"], ["B"], ["C"]]))), p = viewer.doc.pages
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.go(toPage: 2)
+        XCTAssertEqual(viewer.canvas.currentPage, p[1])
+        XCTAssertEqual(viewer.pageIndex, 1)
+        viewer.go(toPage: 99)
+        XCTAssertEqual(viewer.canvas.currentPage, p[2])
+        viewer.go(toPage: 0)
+        XCTAssertEqual(viewer.canvas.currentPage, p[0])
+        XCTAssertEqual(viewer.pageIndex, 0)
+    }
+
+    func testLastPageKeepsOnlyRecentFiles() {
+        defer { UserDefaults.standard.removeObject(forKey: "pages") }
+        let a = URL(fileURLWithPath: "/tmp/a.pdf"), b = URL(fileURLWithPath: "/tmp/b.pdf")
+        Viewer.remember(page: 3, of: a)
+        Viewer.remember(page: 5, of: b)
+        // The test runner has no recent files, so only the file just remembered keeps its page.
+        XCTAssertNil(Viewer.lastPage(of: a))
+        XCTAssertEqual(Viewer.lastPage(of: b), 5)
+    }
+
     func testClickSelectsTogglesAndExtends() {
         let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"], ["B"], ["C"], ["D"]]))), p = viewer.doc.pages
         viewer.click(p[1], modifiers: [])
