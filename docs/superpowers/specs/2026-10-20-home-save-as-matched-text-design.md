@@ -21,7 +21,8 @@ Then the build goes into the owner's `/Applications/Folio.app`. Nothing is pushe
 
 **Open, Save, Save As**
 - Open… ⌘O, Open Recent and Save ⌘S stay as the system provides them, with autosave and versions.
-- File › Save As… ⇧⌘S, the shortcut Acrobat and Office use. It writes the document to a new file, and the window then shows the new file. Duplicate stays in the menu.
+- File › Save As… ⌥⇧⌘S, always visible. It writes the document to a new file, and the window then shows the new file. Duplicate keeps ⇧⌘S.
+  - Changed during the build: the design gave Save As ⇧⌘S, the shortcut Acrobat and Office use. But SwiftUI's own Duplicate holds ⇧⌘S, and SwiftUI's Save As appears only while Option is held. Its menu items can't be retargeted, and replacing the whole save group also drops Close, Share and Revert To.
 
 **Matched text**
 - A click with the Text Box tool starts a box in the font, size and colour of the document text nearest the click: the closest run of one font and colour.
