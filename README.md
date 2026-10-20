@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Josephhamze/folio/releases/latest/download/Folio.dmg"><img src="https://img.shields.io/badge/Download-Folio.dmg-2ea44f?logo=apple&logoColor=white" alt="Download Folio.dmg"></a>
   <img src="https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white" alt="macOS 26 or later">
   <img src="https://img.shields.io/badge/Swift-SwiftUI%20%2B%20PDFKit-F05138?logo=swift&logoColor=white" alt="Swift, SwiftUI and PDFKit">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -29,7 +30,9 @@
 
 ## Install
 
-Folio isn't notarised, so you build it from source. You need macOS 26 or later on Apple Silicon, and Xcode.
+[Download Folio.dmg](https://github.com/Josephhamze/folio/releases/latest/download/Folio.dmg), open it and drag Folio to Applications. You need macOS 26 or later on an Apple Silicon Mac. Folio is signed and notarised by Apple, so it opens like any other app.
+
+To build it yourself instead, you need Xcode:
 
 ```sh
 git clone https://github.com/Josephhamze/folio.git
@@ -43,6 +46,7 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 
 - `swift test` runs the tests.
 - `./build.sh` builds the app without opening it. It signs the app with your Apple Development certificate if you have one, and ad hoc if you don't.
+- `./build.sh dmg` makes `build/Folio.dmg` for a release, signed with your Developer ID and notarised. It needs a notarytool keychain profile named `notary`.
 - `swift icon/icon.swift` draws the icon from code, into `icon/Folio.icns` and `icon/logo.png`.
 - The design and the build plan are in [`docs/superpowers`](docs/superpowers).
 
