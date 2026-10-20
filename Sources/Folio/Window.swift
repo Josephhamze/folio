@@ -78,6 +78,20 @@ final class Viewer {
         canvas.go(to: page)
     }
 
+    /// The page to open at when the pages first show: where the file was left last time.
+    @ObservationIgnored var resume: Int?
+
+    /// Puts the pages in the page view, unless the file is locked: PDFKit would ask for its password a second time.
+    func showPages() {
+        let pdf = doc.pdf.isLocked ? nil : doc.pdf
+        guard canvas.document !== pdf else { return }
+        canvas.document = pdf
+        guard pdf != nil, let resume else { return }
+        self.resume = nil
+        // Once PDFKit has laid the pages out, which would put the first back in view.
+        DispatchQueue.main.async { self.go(toPage: resume + 1) }
+    }
+
     /// The page this file was left on.
     static func lastPage(of url: URL) -> Int? {
         (UserDefaults.standard.dictionary(forKey: "pages") as? [String: Int])?[url.path]
@@ -139,16 +153,15 @@ struct DocumentView: View {
     /// Where the document is saved, if it is.
     let url: URL?
     @State private var columns = NavigationSplitViewVisibility.all
-    /// The page the file was left on last time, to open it there.
-    @State private var resume: Int?
     @FocusState private var searching: Bool
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
     init(doc: FolioDocument, url: URL?) {
-        _viewer = State(initialValue: Viewer(doc: doc))
-        _resume = State(initialValue: url.flatMap(Viewer.lastPage))
+        let viewer = Viewer(doc: doc)
+        viewer.resume = url.flatMap(Viewer.lastPage)
+        _viewer = State(initialValue: viewer)
         self.url = url
     }
 
@@ -186,7 +199,6 @@ struct DocumentView: View {
             }
         }
         .onChange(of: viewer.tool) { viewer.canvas.selected = nil }
-        .task { if let resume { viewer.go(toPage: resume + 1) } }
         .onChange(of: viewer.pageIndex) { if let url { Viewer.remember(page: viewer.pageIndex, of: url) } }
         .onChange(of: viewer.doc.revision) {
             viewer.canvas.outlineSelection()
@@ -251,9 +263,7 @@ struct PageView: NSViewRepresentable {
 
     func updateNSView(_ canvas: Canvas, context: Context) {
         let _ = viewer.doc.revision
-        // A locked file stays out of the page view, which would ask for its password a second time.
-        let pdf = viewer.doc.pdf.isLocked ? nil : viewer.doc.pdf
-        if canvas.document !== pdf { canvas.document = pdf }
+        viewer.showPages()
     }
 }
 

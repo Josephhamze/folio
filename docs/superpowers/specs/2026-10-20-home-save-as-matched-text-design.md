@@ -26,16 +26,16 @@ Then the build goes into the owner's `/Applications/Folio.app`. Nothing is pushe
 
 **Matched text**
 - A click with the Text Box tool starts a box in the font, size and colour of the document text nearest the click: the closest run of one font and colour.
-- A click beside a line of text, at that line's height, puts the box on the line. It sits the way an Edit Text cover sits, so it shares the line's baseline. That makes flat forms ("Name: ______") look typed. Elsewhere the box is centred on the click.
+- A click beside a line of text, at that line's height, puts the box on the line, with its words on the line's baseline. That makes flat forms ("Name: ______") look typed. Elsewhere the box is centred on the click.
 - On a page with no text, such as a scan, the box uses Helvetica 12 in black. Helvetica is one of the 14 base PDF fonts, so other apps show it the same way. The old default was 14 pt system font in the highlighter's colour, often yellow.
 - A font that is only embedded in the PDF, and not installed, comes back from PDFKit as Helvetica at the right size. That is the fallback.
-- The box starts empty, with the caret where you clicked, and grows as you type. Return or a click elsewhere ends the typing. The box joins the document only then, with its words, as one "Add Text" undo step. A box left empty is not added. Edit Text covers work the same way: a cover is added only if the words changed, and it may be emptied to blank out the line.
-- Tools › Show Fonts ⌘T opens the system Fonts panel. It sets the selected text box's font and size, as one undoable change, and the box grows to fit.
+- The box starts empty, with the caret where you clicked, and grows as you type. Return or a click elsewhere ends the typing, and so does saving, duplicating or closing the document by any route, so the words are kept. The box joins the document only then, with its words, as one "Add Text" undo step. A box left empty is not added. Edit Text covers work the same way: a cover is added only if the words changed, and it may be emptied to blank out the line.
+- Tools › Show Fonts ⌘T opens the system Fonts panel. It sets the selected text box's font and size, as one undoable change, and the box grows to fit. Used while typing, it first ends the typing, so the words join and the box is selected.
 
 **Conveniences**
 - A page box in the window's toolbar shows "3 of 12". Type a page number and press Return to go to that page; numbers out of range go to the first or last page.
 - Each recent file reopens at the page you left it on. The pages are kept for the files in the recent list only, so the store never grows past that list.
-- Single keys pick tools while the page has the keyboard: V Select, H Highlight, U Underline, K Strike Through, N Note, T Text Box, R Rectangle, O Oval, L Line, A Arrow, P Pen, S Sign, I Initial, E Edit Text, X Redact. Each tool's help tag shows its key.
+- Single keys, with no ⌘, ⌥ or ⌃, pick tools while the page has the keyboard and Read Mode is off: V Select, H Highlight, U Underline, K Strike Through, N Note, T Text Box, R Rectangle, O Oval, L Line, A Arrow, P Pen, S Sign, I Initial, E Edit Text, X Redact. Each tool's help tag shows its key.
 - With a mark selected, the arrow keys nudge it 1 pt, or 10 pt with Shift. Each nudge can be undone.
 - Esc deselects and returns to the Select tool. When nothing is selected and Select is the tool, Esc still leaves Read Mode.
 

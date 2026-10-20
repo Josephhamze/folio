@@ -93,11 +93,17 @@ final class ViewerTests: XCTestCase {
         XCTAssertEqual(box.bounds.minY, 110)
         undo.undo()
         XCTAssertEqual(box.bounds.minY, 100)
+        press("\u{F703}", 124, [.command], on: viewer)   // ⌘→ is the page view's, not a nudge
+        XCTAssertEqual(box.bounds.minX, 101)
         viewer.tool = .pen
         press("\u{1B}", 53, on: viewer)
         XCTAssertNil(viewer.canvas.selected)
         XCTAssertEqual(viewer.tool, .select)
         press("t", 17, [.command], on: viewer)
+        XCTAssertEqual(viewer.tool, .select)
+        // Read Mode has no tools.
+        viewer.readMode = true
+        press("h", 4, on: viewer)
         XCTAssertEqual(viewer.tool, .select)
         // A locked file can't be marked up, so its keys pick nothing.
         let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "pw", .ownerPasswordOption: "pw"])!
@@ -109,6 +115,70 @@ final class ViewerTests: XCTestCase {
     private func press(_ key: String, _ code: UInt16, _ flags: NSEvent.ModifierFlags = [], on viewer: Viewer) {
         viewer.canvas.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0,
                                                      context: nil, characters: key, charactersIgnoringModifiers: key, isARepeat: false, keyCode: code)!)
+    }
+
+    func testFontsPanelSetsTheBoxBeingTyped() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Name:"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        viewer.canvas.document = viewer.doc.pdf
+        let box = textBox(at: CGPoint(x: 300, y: 725), on: page)
+        viewer.canvas.edit(box, on: page, adding: "Add Text")
+        viewer.canvas.editor!.field.stringValue = "Jo"
+        // Format › Font › Bigger, which the Fonts panel's size works through too.
+        let bigger = NSMenuItem()
+        bigger.tag = Int(NSFontAction.sizeUpFontAction.rawValue)
+        act(undo) { NSFontManager.shared.modifyFont(bigger) }
+        XCTAssertEqual(page.annotations.map { $0.contents ?? "" }, ["Jo"])
+        XCTAssertEqual(box.font?.pointSize, 19)
+        XCTAssertTrue(viewer.canvas.selected === box)
+        XCTAssertNil(NSFontManager.shared.target)
+    }
+
+    func testClosingKeepsTheWordsBeingTyped() throws {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Name:"]]))), page = viewer.doc.pages[0]
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("typing.pdf")
+        try Data().write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let document = try Autosaving(contentsOf: file, ofType: "com.adobe.pdf")
+        let window = NSWindow(contentRect: CGRect(x: -4000, y: -4000, width: 600, height: 400), styleMask: .borderless, backing: .buffered, defer: false)
+        document.addWindowController(NSWindowController(window: window))
+        window.contentView = viewer.canvas
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.doc.undo = document.undoManager
+        viewer.canvas.edit(textBox(at: CGPoint(x: 300, y: 725), on: page), on: page, adding: "Add Text")
+        let typing = try XCTUnwrap(viewer.canvas.editor?.field.currentEditor() as? NSTextView)
+        typing.insertText("Jo", replacementRange: NSRange(location: NSNotFound, length: 0))
+        // As the close button, ⌘W and ⌘Q do.
+        document.canClose(withDelegate: self, shouldClose: #selector(document(_:shouldClose:contextInfo:)), contextInfo: nil)
+        for _ in 0..<20 where closes == nil { RunLoop.main.run(until: Date() + 0.05) }
+        XCTAssertEqual(closes, true)
+        XCTAssertEqual(page.annotations.map { $0.contents ?? "" }, ["Jo"])
+        XCTAssertTrue(document.saved)
+    }
+
+    private var closes: Bool?
+    @objc private func document(_ document: NSDocument, shouldClose: Bool, contextInfo: UnsafeMutableRawPointer?) { closes = shouldClose }
+
+    private final class Autosaving: NSDocument {
+        var saved = false
+        override class var autosavesInPlace: Bool { true }
+        override func read(from data: Data, ofType typeName: String) throws {}
+        override func data(ofType typeName: String) throws -> Data {
+            saved = true
+            return Data()
+        }
+    }
+
+    func testALockedFileOpensAtItsLastPageOnceUnlocked() {
+        let data = makePDF([["A"], ["B"], ["C"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "pw", .ownerPasswordOption: "pw"])!
+        let viewer = Viewer(doc: FolioDocument(pdf: PDFDocument(data: data)!))
+        viewer.resume = 2
+        viewer.showPages()
+        XCTAssertNil(viewer.canvas.document)
+        XCTAssertTrue(viewer.doc.unlock("pw"))
+        viewer.showPages()
+        for _ in 0..<20 where viewer.pageIndex != 2 { RunLoop.main.run(until: Date() + 0.05) }
+        XCTAssertEqual(viewer.canvas.currentPage, viewer.doc.pages[2])
+        XCTAssertEqual(viewer.pageIndex, 2)
     }
 
     func testPageBoxGoesAndClamps() {

@@ -34,6 +34,8 @@ final class Canvas: PDFView {
     private var fields: [PDFAnnotation: Field] = [:]
     /// The field over a text box being typed into. A box `adding` names isn't on its page yet.
     private(set) var editor: (field: NSTextField, box: PDFAnnotation, page: PDFPage, adding: String?)?
+    /// The window's document, which has the typing committed before it saves, duplicates or closes.
+    private weak var editing: NSDocument?
     private static var warned = false
 
     init(viewer: Viewer) {
@@ -210,7 +212,9 @@ final class Canvas: PDFView {
     /// With a mark selected, the arrows nudge it a point, or ten with Shift, and Delete deletes it. Esc puts down the mark
     /// or the tool; with neither it falls through, to leave Read Mode. A letter picks its tool.
     override func keyDown(with event: NSEvent) {
-        guard viewer.doc.canEdit else { return super.keyDown(with: event) }
+        guard viewer.doc.canEdit, !viewer.readMode, event.modifierFlags.isDisjoint(with: [.command, .option, .control]) else {
+            return super.keyDown(with: event)
+        }
         let step: CGFloat = event.modifierFlags.contains(.shift) ? 10 : 1
         let nudges: [UInt16: CGVector] = [123: CGVector(dx: -step, dy: 0), 124: CGVector(dx: step, dy: 0),
                                           125: CGVector(dx: 0, dy: -step), 126: CGVector(dx: 0, dy: step)]
@@ -223,8 +227,7 @@ final class Canvas: PDFView {
         } else if event.keyCode == 53, selected != nil || viewer.tool != .select {
             selected = nil
             viewer.tool = .select
-        } else if event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
-                  let tool = event.charactersIgnoringModifiers.flatMap({ Tool(key: $0.lowercased()) }) {
+        } else if let tool = event.charactersIgnoringModifiers.flatMap({ Tool(key: $0.lowercased()) }) {
             viewer.tool = tool
         } else {
             super.keyDown(with: event)
@@ -258,6 +261,10 @@ final class Canvas: PDFView {
         documentView.addSubview(field)
         window?.makeFirstResponder(field)
         editor = (field, box, page, name)
+        editing = window?.windowController?.document as? NSDocument
+        editing?.objectDidBeginEditing(self)
+        // The field editor would take the Fonts panel's choice for itself.
+        NSFontManager.shared.target = self
     }
 
     /// Widens the field to its words as they're typed.
@@ -273,13 +280,19 @@ final class Canvas: PDFView {
     }
 
     /// Writes the edited words into the text box as one change, and grows the box to fit them. A box not on its page yet joins
-    /// it only if its words changed: a text box left empty is never added, and an emptied cover blanks out its line.
+    /// it only if its words changed: a text box left empty is never added, and an emptied cover blanks out its line. With the
+    /// Select tool the box is then selected, for the Fonts panel.
     func finishEditing() {
         guard let (field, box, page, adding) = editor else { return }
         editor = nil
+        editing?.objectDidEndEditing(self)
+        NSFontManager.shared.target = nil
+        // Ending the field's editing puts the words still in its field editor into it.
+        if field.currentEditor() != nil { window?.makeFirstResponder(self) }
         field.removeFromSuperview()
         let text = field.stringValue, oldText = box.contents, oldBounds = box.bounds
         let bounds = fit(oldBounds, around: text, in: box.font ?? .systemFont(ofSize: 14))
+        defer { if box.page != nil, viewer.tool == .select { selected = box } }
         if let adding {
             guard text != oldText ?? "" else { return }
             (box.contents, box.bounds) = (text, bounds)
@@ -289,8 +302,9 @@ final class Canvas: PDFView {
         viewer.doc.change("Edit Text", do: { box.contents = text; box.bounds = bounds }, undo: { box.contents = oldText; box.bounds = oldBounds })
     }
 
-    /// The Fonts panel's choice, for the selected text box.
+    /// The Fonts panel's choice, for the selected text box, or the one being typed once its words are in.
     @objc func changeFont(_ sender: NSFontManager?) {
+        finishEditing()
         guard let sender, let box = selected, box.type == "FreeText", viewer.doc.canEdit else { return }
         viewer.doc.setFont(sender.convert(box.font ?? NSFont(name: "Helvetica", size: 12)!), of: box)
     }
@@ -315,5 +329,25 @@ final class Canvas: PDFView {
             self.fields = values
         }
         viewer.doc.change("Fill Form", do: { fill(new) }, undo: { fill(old) })
+    }
+}
+
+/// NSDocument has the editors registered with it commit before it saves, duplicates or closes, by any route: the close
+/// button, the menus or quitting.
+extension Canvas: NSEditor {
+    func commitEditing() -> Bool {
+        finishEditing()
+        return true
+    }
+
+    func commitEditingWithoutPresentingError() throws { finishEditing() }
+
+    func discardEditing() { finishEditing() }
+
+    func commitEditing(withDelegate delegate: Any?, didCommit selector: Selector?, contextInfo: UnsafeMutableRawPointer?) {
+        finishEditing()
+        guard let delegate = delegate as? NSObject, let selector else { return }
+        typealias DidCommit = @convention(c) (NSObject, Selector, AnyObject, ObjCBool, UnsafeMutableRawPointer?) -> Void
+        unsafeBitCast(delegate.method(for: selector), to: DidCommit.self)(delegate, selector, self, true, contextInfo)
     }
 }
