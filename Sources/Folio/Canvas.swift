@@ -11,6 +11,8 @@ final class Canvas: PDFView {
             oldValue?.isHighlighted = false
             selected?.isHighlighted = true
             outlineSelection()
+            // So the Fonts panel shows, and changes, the selected text box's font.
+            if selected?.type == "FreeText", let font = selected?.font { NSFontManager.shared.setSelectedFont(font, isMultiple: false) }
         }
     }
     /// A frame around the selection: PDFKit draws `isHighlighted` only on form fields.
@@ -262,6 +264,12 @@ final class Canvas: PDFView {
         }
         guard text != oldText || bounds != oldBounds else { return }
         viewer.doc.change("Edit Text", do: { box.contents = text; box.bounds = bounds }, undo: { box.contents = oldText; box.bounds = oldBounds })
+    }
+
+    /// The Fonts panel's choice, for the selected text box.
+    @objc func changeFont(_ sender: NSFontManager?) {
+        guard let sender, let box = selected, box.type == "FreeText", viewer.doc.canEdit else { return }
+        viewer.doc.setFont(sender.convert(box.font ?? NSFont(name: "Helvetica", size: 12)!), of: box)
     }
 
     /// Remembers the page's form fields, so the fill that follows can be undone as one change.

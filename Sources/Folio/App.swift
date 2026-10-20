@@ -48,6 +48,8 @@ struct FolioCommands: Commands {
         CommandMenu("Tools") {
             Button("Edit Signature…") { viewer?.sheet = .signature(.sign) }.disabled(viewer == nil)
             Button("Edit Initials…") { viewer?.sheet = .signature(.initial) }.disabled(viewer == nil)
+            Divider()
+            Button("Show Fonts") { NSFontManager.shared.orderFrontFontPanel(nil) }.keyboardShortcut("t").disabled(viewer == nil)
         }
     }
 }
