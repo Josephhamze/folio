@@ -30,7 +30,8 @@ final class Canvas: PDFView {
     private var draft: PDFAnnotation?
     /// Each form field's text and state when last committed.
     private var fields: [PDFAnnotation: Field] = [:]
-    private var editor: (field: NSTextField, box: PDFAnnotation)?
+    /// The field over a text box being typed into. A box `adding` names isn't on its page yet.
+    private(set) var editor: (field: NSTextField, box: PDFAnnotation, page: PDFPage, adding: String?)?
     private static var warned = false
 
     init(viewer: Viewer) {
@@ -42,6 +43,7 @@ final class Canvas: PDFView {
         for name in [NSControl.textDidEndEditingNotification, NSText.didEndEditingNotification] {
             NotificationCenter.default.addObserver(self, selector: #selector(endedEditing), name: name, object: nil)
         }
+        NotificationCenter.default.addObserver(self, selector: #selector(textChanged), name: NSControl.textDidChangeNotification, object: nil)
         for name in [Notification.Name.PDFViewScaleChanged, .PDFViewDisplayModeChanged] {
             NotificationCenter.default.addObserver(self, selector: #selector(outlineSelection), name: name, object: self)
         }
@@ -101,7 +103,7 @@ final class Canvas: PDFView {
             if let hit, !["Widget", "Link", "Popup"].contains(hit.type ?? "") {
                 selected = hit
                 origin = hit.bounds
-                if event.clickCount == 2, hit.type == "FreeText" { edit(hit) }
+                if event.clickCount == 2, hit.type == "FreeText" { edit(hit, on: page) }
                 return
             }
             selected = nil
@@ -118,25 +120,16 @@ final class Canvas: PDFView {
             viewer.focusNote = note
             viewer.tool = .select
         case .text:
-            let box = PDFAnnotation(bounds: CGRect(x: at.x, y: at.y - 12, width: 120, height: 24), forType: .freeText, withProperties: nil)
-            box.contents = "Text"
-            box.font = .systemFont(ofSize: 14)
-            box.fontColor = viewer.color
-            box.color = .clear
-            box.border = PDFBorder()
-            box.border?.lineWidth = 0
-            viewer.doc.add(box, to: page, name: "Add Text")
-            // Placing is one-shot, so the click that ends the edit selects rather than adding another box.
+            // Placing is one-shot, so the click that ends the typing selects rather than starting another box.
             viewer.tool = .select
-            edit(box)
+            edit(textBox(at: at, on: page), on: page, adding: "Add Text")
         case .editText:
             guard let cover = coverLine(at: at, on: page) else { return }
-            viewer.doc.add(cover, to: page, name: "Edit Text")
             if !Self.warned {
                 Self.warned = true
                 viewer.message = "The original text stays underneath in the file."
             }
-            edit(cover)
+            edit(cover, on: page, adding: "Edit Text")
         case .sign, .initial:
             if Signature[viewer.tool] == nil {
                 start = nil
@@ -220,21 +213,33 @@ final class Canvas: PDFView {
         if outline.superview !== documentView { documentView.addSubview(outline) }
     }
 
-    /// Puts a text field over the text box, at the page's zoom, to edit its words.
-    func edit(_ box: PDFAnnotation) {
-        guard let page = box.page, let documentView else { return }
+    /// Puts a text field over the text box, at the page's zoom, to edit its words. A box `adding` names isn't on the page yet:
+    /// it joins it under that name when the typing ends.
+    func edit(_ box: PDFAnnotation, on page: PDFPage, adding name: String? = nil) {
+        guard let documentView else { return }
         let font = box.font ?? .systemFont(ofSize: 14)
         let field = NSTextField(string: box.contents ?? "")
         field.font = font.withSize(font.pointSize * scaleFactor)
         field.textColor = box.fontColor ?? .black
-        field.backgroundColor = .white
+        // A cover's white hides the line it replaces; a text box shows the page through.
+        field.backgroundColor = box.color
         field.isBezeled = false
         field.focusRingType = .none
+        field.wantsLayer = true
+        field.layer?.borderColor = NSColor.controlAccentColor.cgColor
+        field.layer?.borderWidth = 1
         field.frame = convert(convert(box.bounds, from: page), to: documentView)
         field.frame.size.width = max(field.frame.width, field.cell?.cellSize.width ?? 0)
         documentView.addSubview(field)
         window?.makeFirstResponder(field)
-        editor = (field, box)
+        editor = (field, box, page, name)
+    }
+
+    /// Widens the field to its words as they're typed.
+    @objc private func textChanged(_ note: Notification) {
+        guard let field = editor?.field, note.object as? NSTextField === field, let font = field.font else { return }
+        let width = ((field.currentEditor()?.string ?? "") as NSString).size(withAttributes: [.font: font]).width + 12
+        field.frame.size.width = max(field.frame.width, width)
     }
 
     @objc private func endedEditing(_ note: Notification) {
@@ -242,16 +247,19 @@ final class Canvas: PDFView {
         if view === editor?.field { finishEditing() } else { commitFields() }
     }
 
-    /// Writes the edited words into the text box as one change, and grows the box to fit them.
-    private func finishEditing() {
-        guard let (field, box) = editor else { return }
+    /// Writes the edited words into the text box as one change, and grows the box to fit them. A box not on its page yet joins
+    /// it only if its words changed: a text box left empty is never added, and an emptied cover blanks out its line.
+    func finishEditing() {
+        guard let (field, box, page, adding) = editor else { return }
         editor = nil
         field.removeFromSuperview()
         let text = field.stringValue, oldText = box.contents, oldBounds = box.bounds
-        let size = (text as NSString).size(withAttributes: [.font: box.font ?? NSFont.systemFont(ofSize: 14)])
-        // Only grow: an Edit Text cover that shrank would uncover the line beneath it.
-        let width = max(oldBounds.width, size.width + 8), height = max(oldBounds.height, size.height + 4)
-        let bounds = CGRect(x: oldBounds.minX, y: oldBounds.maxY - height, width: width, height: height)
+        let bounds = fit(oldBounds, around: text, in: box.font ?? .systemFont(ofSize: 14))
+        if let adding {
+            guard text != oldText ?? "" else { return }
+            (box.contents, box.bounds) = (text, bounds)
+            return viewer.doc.add(box, to: page, name: adding)
+        }
         guard text != oldText || bounds != oldBounds else { return }
         viewer.doc.change("Edit Text", do: { box.contents = text; box.bounds = bounds }, undo: { box.contents = oldText; box.bounds = oldBounds })
     }

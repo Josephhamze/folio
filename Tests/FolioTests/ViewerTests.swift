@@ -54,6 +54,29 @@ final class ViewerTests: XCTestCase {
         XCTAssertEqual(viewer.doc.revision, revision)   // nothing new since the last commit
     }
 
+    func testNewTextBoxJoinsTheDocumentOnlyWithWords() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Name:"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        viewer.canvas.document = viewer.doc.pdf
+        let words = { page.annotations.map { $0.contents ?? "" } }
+        viewer.canvas.edit(textBox(at: CGPoint(x: 300, y: 725), on: page), on: page, adding: "Add Text")
+        viewer.canvas.editor!.field.stringValue = "Jo"
+        act(undo) { viewer.canvas.finishEditing() }
+        XCTAssertEqual(words(), ["Jo"])
+        XCTAssertEqual(undo.undoActionName, "Add Text")
+        undo.undo()
+        XCTAssertEqual(words(), [])
+        // Left empty, a box is never added.
+        viewer.canvas.edit(textBox(at: CGPoint(x: 300, y: 725), on: page), on: page, adding: "Add Text")
+        act(undo) { viewer.canvas.finishEditing() }
+        XCTAssertEqual(words(), [])
+        // An emptied cover blanks out its line.
+        viewer.canvas.edit(coverLine(at: CGPoint(x: 90, y: 725), on: page)!, on: page, adding: "Edit Text")
+        viewer.canvas.editor!.field.stringValue = ""
+        act(undo) { viewer.canvas.finishEditing() }
+        XCTAssertEqual(words(), [""])
+        XCTAssertEqual(undo.undoActionName, "Edit Text")
+    }
+
     func testClickSelectsTogglesAndExtends() {
         let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"], ["B"], ["C"], ["D"]]))), p = viewer.doc.pages
         viewer.click(p[1], modifiers: [])
