@@ -27,7 +27,7 @@ What goes into App Store Connect for Folio on iPhone and iPad.
 
 ### Description
 
-Folio is a PDF editor for iPhone and iPad, built on PDFKit, the engine behind Apple's own PDF tools. No account, no subscription, no ads.
+Folio is a PDF editor for iPhone and iPad. No account, no subscription, no ads.
 
 MARK UP
 • Highlight, underline and strike through text with a finger or Apple Pencil.
