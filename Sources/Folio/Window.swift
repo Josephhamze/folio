@@ -119,6 +119,12 @@ final class Viewer {
         UserDefaults.standard.set(pages, forKey: "pages")
     }
 
+    /// Ends the typing and records the form fills, for when the document closes or the app leaves the screen.
+    func settle() {
+        canvas.finishEditing()
+        canvas.commitFields()
+    }
+
     var matchLabel: String { query.isEmpty ? "" : matches.isEmpty ? "No matches" : "\(match + 1) of \(matches.count)" }
 
     /// The pages that page commands act on: the selected ones while organizing, otherwise the one in view.

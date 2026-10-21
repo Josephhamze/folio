@@ -6,4 +6,5 @@ typealias NSColor = UIColor
 typealias NSFont = UIFont
 typealias NSImage = UIImage
 typealias NSBezierPath = UIBezierPath
+typealias NSView = UIView
 #endif

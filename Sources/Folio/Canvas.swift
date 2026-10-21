@@ -42,7 +42,7 @@ final class Canvas: PDFView {
     }()
     #endif
     /// Where the drag began, in its page's space.
-    private var start: (point: CGPoint, page: PDFPage)?
+    private(set) var start: (point: CGPoint, page: PDFPage)?
     /// The selected annotation's bounds when the drag began.
     private var origin: CGRect?
     /// The pen's points so far, and what the drag would add, shown without undo until the mouse goes up.
@@ -57,6 +57,11 @@ final class Canvas: PDFView {
     private weak var editing: NSDocument?
     #endif
     private static var warned = false
+    #if os(iOS)
+    /// The one-finger drag the tools take, and the tap: see Touch.swift.
+    let pan = UIPanGestureRecognizer(), tap = UITapGestureRecognizer()
+    private lazy var gestures = Gestures(canvas: self)
+    #endif
 
     init(viewer: Viewer) {
         self.viewer = viewer
@@ -71,6 +76,16 @@ final class Canvas: PDFView {
         NotificationCenter.default.addObserver(self, selector: #selector(textChanged), name: NSControl.textDidChangeNotification, object: nil)
         #else
         backgroundColor = .secondarySystemBackground
+        pan.maximumNumberOfTouches = 1
+        pan.addTarget(self, action: #selector(dragged))
+        tap.addTarget(self, action: #selector(touched))
+        for recognizer in [pan, tap] {
+            recognizer.delegate = gestures
+            addGestureRecognizer(recognizer)
+        }
+        for name in [UITextField.textDidEndEditingNotification, UITextView.textDidEndEditingNotification] {
+            NotificationCenter.default.addObserver(self, selector: #selector(endedEditing), name: name, object: nil)
+        }
         #endif
         NotificationCenter.default.addObserver(self, selector: #selector(pageChanged), name: .PDFViewPageChanged, object: self)
         for name in [Notification.Name.PDFViewScaleChanged, .PDFViewDisplayModeChanged] {
@@ -302,6 +317,10 @@ final class Canvas: PDFView {
     @objc func outlineSelection() {
         guard let selected, let page = selected.page, let documentView else { return outline.removeFromSuperview() }
         outline.frame = convert(convert(selected.bounds, from: page), to: documentView).insetBy(dx: -3, dy: -3)
+        #if os(iOS)
+        // The page view zooms what's in it, so the frame is drawn thinner by the same amount, to stay one width.
+        outline.layer.borderWidth = 1.5 / scaleFactor
+        #endif
         if outline.superview !== documentView { documentView.addSubview(outline) }
     }
 
@@ -317,13 +336,17 @@ final class Canvas: PDFView {
         field.wantsLayer = true
         field.layer?.borderColor = NSColor.controlAccentColor.cgColor
         field.layer?.borderWidth = 1
+        field.font = font.withSize(font.pointSize * scaleFactor)
         #else
         let field = UITextField()
         field.text = box.contents
         field.layer.borderColor = UIColor.tintColor.cgColor
-        field.layer.borderWidth = 1
+        // The page view zooms what's in it: the words take the page's size, and the frame stays one width.
+        field.layer.borderWidth = 1 / scaleFactor
+        field.font = font
+        field.addTarget(self, action: #selector(finishEditing), for: .editingDidEndOnExit)
+        field.addTarget(self, action: #selector(widen), for: .editingChanged)
         #endif
-        field.font = font.withSize(font.pointSize * scaleFactor)
         field.textColor = box.fontColor ?? .black
         // A cover's white hides the line it replaces; a text box shows the page through.
         field.backgroundColor = box.color
@@ -337,7 +360,7 @@ final class Canvas: PDFView {
         // The field editor would take the Fonts panel's choice for itself.
         NSFontManager.shared.target = self
         #else
-        field.frame.size.width = max(field.frame.width, field.intrinsicContentSize.width)
+        widen(field)
         field.becomeFirstResponder()
         #endif
         editor = (field, box, page, name)
@@ -350,17 +373,22 @@ final class Canvas: PDFView {
         let width = ((field.currentEditor()?.string ?? "") as NSString).size(withAttributes: [.font: font]).width + 12
         field.frame.size.width = max(field.frame.width, width)
     }
+    #else
+    /// Widens the field to its words as they're typed.
+    @objc private func widen(_ field: UITextField) {
+        field.frame.size.width = max(field.frame.width, field.intrinsicContentSize.width + 12)
+    }
+    #endif
 
     @objc private func endedEditing(_ note: Notification) {
         guard let view = note.object as? NSView, view.isDescendant(of: self) else { return }
         if view === editor?.field { finishEditing() } else { commitFields() }
     }
-    #endif
 
     /// Writes the edited words into the text box as one change, and grows the box to fit them. A box not on its page yet joins
     /// it only if its words changed: a text box left empty is never added, and an emptied cover blanks out its line. With the
     /// Select tool the box is then selected, for the Fonts panel.
-    func finishEditing() {
+    @objc func finishEditing() {
         guard let (field, box, page, adding) = editor else { return }
         editor = nil
         #if os(macOS)
