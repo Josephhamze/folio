@@ -77,6 +77,106 @@ final class ViewerTests: XCTestCase {
         XCTAssertEqual(undo.undoActionName, "Edit Text")
     }
 
+    func testDraggedShapeIsOneUndoStep() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Hi"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.tool = .rect
+        act(undo) {
+            XCTAssertTrue(viewer.canvas.begin(at: CGPoint(x: 100, y: 100), on: page))
+            XCTAssertTrue(viewer.canvas.extend(to: CGPoint(x: 150, y: 130)))
+            viewer.canvas.end(at: CGPoint(x: 150, y: 130))
+        }
+        let squares = { page.annotations.filter { $0.type == "Square" } }
+        XCTAssertEqual(squares().map(\.bounds), [CGRect(x: 100, y: 100, width: 50, height: 30)])
+        XCTAssertEqual(undo.undoActionName, "Add Shape")
+        undo.undo()
+        XCTAssertEqual(squares().count, 0)
+    }
+
+    func testTapPlacesSignatureAtTheUsualSize() {
+        let saved = Signature[.sign]
+        defer { Signature[.sign] = saved }
+        Signature[.sign] = .typed("Jo")
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Hi"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.tool = .sign
+        act(undo) {
+            XCTAssertTrue(viewer.canvas.begin(at: CGPoint(x: 300, y: 400), on: page))
+            viewer.canvas.end(at: CGPoint(x: 300, y: 400))
+        }
+        let stamps = page.annotations.filter { $0.type == "Stamp" }
+        XCTAssertEqual(stamps.count, 1)
+        XCTAssertTrue(CGRect(x: 210, y: 377.5, width: 180, height: 45).insetBy(dx: -0.01, dy: -0.01).contains(stamps[0].bounds))
+        XCTAssertEqual(viewer.tool, .select)
+    }
+
+    func testSelectedMarkMovesAsOneStep() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Hi"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        viewer.canvas.document = viewer.doc.pdf
+        let box = shape(.rect, from: CGPoint(x: 100, y: 100), to: CGPoint(x: 150, y: 130), color: .red)
+        page.addAnnotation(box)
+        act(undo) {
+            XCTAssertTrue(viewer.canvas.begin(at: CGPoint(x: 110, y: 110), on: page))
+            XCTAssertTrue(viewer.canvas.extend(to: CGPoint(x: 130, y: 140)))
+            viewer.canvas.end(at: CGPoint(x: 130, y: 140))
+        }
+        XCTAssertEqual(box.bounds.origin, CGPoint(x: 120, y: 130))
+        XCTAssertEqual(undo.undoActionName, "Move")
+    }
+
+    func testMouseDrivesTheTools() {
+        let saved = Signature[.sign]
+        defer { Signature[.sign] = saved }
+        Signature[.sign] = .typed("Jo")
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Highlight me"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        let window = NSWindow(contentRect: CGRect(x: -4000, y: -4000, width: 700, height: 900), styleMask: .borderless, backing: .buffered, defer: false)
+        window.contentView = viewer.canvas
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.canvas.layoutDocumentView()
+        // A press, a drag and a release between page points, as the mouse sends them.
+        let drag = { (from: CGPoint, to: CGPoint) in
+            let event = { (type: NSEvent.EventType, at: CGPoint) in
+                NSEvent.mouseEvent(with: type, location: viewer.canvas.convert(viewer.canvas.convert(at, from: page), to: nil), modifierFlags: [],
+                                   timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+            }
+            act(undo) {
+                viewer.canvas.mouseDown(with: event(.leftMouseDown, from))
+                if from != to { viewer.canvas.mouseDragged(with: event(.leftMouseDragged, to)) }
+                viewer.canvas.mouseUp(with: event(.leftMouseUp, to))
+            }
+        }
+        let types = { page.annotations.map { $0.type ?? "" } }
+        viewer.tool = .rect
+        drag(CGPoint(x: 100, y: 100), CGPoint(x: 150, y: 130))
+        XCTAssertEqual(types(), ["Square"])
+        viewer.tool = .select
+        drag(CGPoint(x: 110, y: 110), CGPoint(x: 130, y: 140))
+        let moved = page.annotations[0].bounds.origin   // through the view's coordinates, so not exact
+        XCTAssertEqual(hypot(moved.x - 120, moved.y - 130), 0, accuracy: 0.01)
+        XCTAssertEqual(undo.undoActionName, "Move")
+        // A markup's press goes to PDFKit, which waits on the real mouse, so its selection is made here.
+        viewer.tool = .highlight
+        act(undo) { viewer.canvas.markUp(page.selection(for: page.bounds(for: .mediaBox))!) }
+        XCTAssertEqual(types(), ["Square", "Highlight"])
+        XCTAssertEqual(undo.undoActionName, "Highlight")
+        viewer.tool = .sign
+        drag(CGPoint(x: 300, y: 400), CGPoint(x: 300, y: 400))
+        XCTAssertEqual(types(), ["Square", "Highlight", "Stamp"])
+        viewer.tool = .text
+        drag(CGPoint(x: 300, y: 600), CGPoint(x: 300, y: 600))
+        XCTAssertNotNil(viewer.canvas.editor)
+    }
+
+    func testLockedFileTakesNoTool() throws {
+        let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "pw", .ownerPasswordOption: "pw"])!
+        let viewer = Viewer(doc: FolioDocument(pdf: PDFDocument(data: data)!)), page = try XCTUnwrap(viewer.doc.pdf.page(at: 0))
+        viewer.tool = .pen
+        XCTAssertFalse(viewer.canvas.begin(at: CGPoint(x: 100, y: 100), on: page))
+        XCTAssertFalse(viewer.canvas.extend(to: CGPoint(x: 150, y: 150)))
+        viewer.canvas.end(at: CGPoint(x: 150, y: 150))
+        XCTAssertTrue(page.annotations.isEmpty)
+    }
+
     func testKeysPickToolsNudgeAndDeselect() {
         let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
         viewer.canvas.document = viewer.doc.pdf

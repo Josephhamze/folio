@@ -22,6 +22,8 @@ final class Viewer {
     let doc: FolioDocument
     @ObservationIgnored lazy var canvas = Canvas(viewer: self)
     var pane = Pane.thumbnails
+    /// Whether the panes show, on iOS, where they're an inspector.
+    var showsPanes = false
     var organizing = false
     var selection: Set<PDFPage> = []
     var readMode = false
@@ -38,6 +40,8 @@ final class Viewer {
         }
     }
     var tool = Tool.select
+    /// The mark the select tool picked, for the views: the page view's `selected`.
+    var mark: PDFAnnotation?
     var color = NSColor.systemYellow
     /// The index of the page in view.
     var pageIndex = 0

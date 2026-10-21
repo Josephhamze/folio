@@ -16,13 +16,14 @@ final class Canvas: PDFView {
             oldValue?.isHighlighted = false
             selected?.isHighlighted = true
             outlineSelection()
+            viewer.mark = selected
             #if os(macOS)
             // So the Fonts panel shows, and changes, the selected text box's font.
             if selected?.type == "FreeText", let font = selected?.font { NSFontManager.shared.setSelectedFont(font, isMultiple: false) }
             #endif
         }
     }
-    /// A frame around the selection: PDFKit draws `isHighlighted` only on form fields.
+    // A frame around the selection: PDFKit draws `isHighlighted` only on form fields.
     #if os(macOS)
     private let outline: NSView = {
         let view = NSView()
@@ -118,51 +119,39 @@ final class Canvas: PDFView {
         }
     }
 
-    #if os(macOS)
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        window?.tabbingMode = .preferred
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        // PDFView takes the keys only in its own mouseDown, which the tools often skip.
-        window?.makeFirstResponder(self)
-        finishEditing()
-        commitFields()
-        start = nil
-        let point = convert(event.locationInWindow, from: nil)
-        guard viewer.doc.canEdit, let page = page(for: point, nearest: false) else { return super.mouseDown(with: event) }
-        let at = convert(point, to: page)
-        start = (at, page)
-        stroke = [at]
+    /// What the tool does where a press lands, at `point` in the page's space. False when the press is PDFKit's: on a file
+    /// that can't be edited, with a markup tool, whose drag selects text, and with Select on no mark.
+    func begin(at point: CGPoint, on page: PDFPage) -> Bool {
+        guard viewer.doc.canEdit else { return false }
+        start = (point, page)
+        stroke = [point]
         switch viewer.tool {
         case .select:
-            let hit = page.annotation(at: at)
+            let hit = page.annotation(at: point)
             if let hit, !["Widget", "Link", "Popup"].contains(hit.type ?? "") {
                 selected = hit
                 origin = hit.bounds
-                if event.clickCount == 2, hit.type == "FreeText" { edit(hit, on: page) }
-                return
+                return true
             }
             selected = nil
             if hit?.type == "Widget" { snapshotFields(on: page) }
-            super.mouseDown(with: event)
-            commitFields()
+            return false
         case .highlight, .underline, .strike:
-            super.mouseDown(with: event)
+            return false
         case .note:
-            let note = PDFAnnotation(bounds: CGRect(x: at.x - 12, y: at.y - 12, width: 24, height: 24), forType: .text, withProperties: nil)
+            let note = PDFAnnotation(bounds: CGRect(x: point.x - 12, y: point.y - 12, width: 24, height: 24), forType: .text, withProperties: nil)
             note.color = viewer.color
             viewer.doc.add(note, to: page, name: "Add Note")
             viewer.pane = .comments
+            viewer.showsPanes = true
             viewer.focusNote = note
             viewer.tool = .select
         case .text:
-            // Placing is one-shot, so the click that ends the typing selects rather than starting another box.
+            // Placing is one-shot, so the press that ends the typing selects rather than starting another box.
             viewer.tool = .select
-            edit(textBox(at: at, on: page), on: page, adding: "Add Text")
+            edit(textBox(at: point, on: page), on: page, adding: "Add Text")
         case .editText:
-            guard let cover = coverLine(at: at, on: page) else { return }
+            guard let cover = coverLine(at: point, on: page) else { return true }
             if !Self.warned {
                 Self.warned = true
                 viewer.message = "The original text stays underneath in the file."
@@ -176,54 +165,44 @@ final class Canvas: PDFView {
         case .rect, .oval, .line, .arrow, .pen, .redact:
             break
         }
+        return true
     }
 
-    override func mouseDragged(with event: NSEvent) {
-        guard let (from, page) = start else { return super.mouseDragged(with: event) }
-        let at = convert(convert(event.locationInWindow, from: nil), to: page)
+    /// Carries the press on to `point`, in its page's space: moves the picked mark, or redraws what the drag draws. False when
+    /// the tool drags nothing.
+    func extend(to point: CGPoint) -> Bool {
+        guard let (from, page) = start else { return false }
         switch viewer.tool {
         case .select:
-            guard let selected, let origin else { return super.mouseDragged(with: event) }
-            selected.bounds = origin.offsetBy(dx: at.x - from.x, dy: at.y - from.y)
+            guard let selected, let origin else { return false }
+            selected.bounds = origin.offsetBy(dx: point.x - from.x, dy: point.y - from.y)
             outlineSelection()
         case .rect, .oval, .line, .arrow, .redact, .pen, .sign, .initial:
-            stroke.append(at)
+            stroke.append(point)
             draft.map(page.removeAnnotation)
             draft = switch viewer.tool {
             case .pen: ink([stroke], color: viewer.color, width: 2)
-            case .sign, .initial: Signature[viewer.tool]?.annotation(in: CGRect(origin: from, size: .zero).union(CGRect(origin: at, size: .zero)))
-            default: shape(viewer.tool, from: from, to: at, color: viewer.color)
+            case .sign, .initial: Signature[viewer.tool]?.annotation(in: CGRect(origin: from, size: .zero).union(CGRect(origin: point, size: .zero)))
+            default: shape(viewer.tool, from: from, to: point, color: viewer.color)
             }
             draft.map(page.addAnnotation)
             sharpenAnnotations()
         default:
-            super.mouseDragged(with: event)
+            return false
         }
+        return true
     }
 
-    override func mouseUp(with event: NSEvent) {
+    /// Ends the press at `point`, in its page's space: a moved mark, a drawn shape or a placed signature becomes one change.
+    /// A signature placed without a drag gets the usual size.
+    func end(at point: CGPoint) {
         defer { (start, origin, draft) = (nil, nil, nil) }
-        guard let (_, page) = start else { return super.mouseUp(with: event) }
-        let at = convert(convert(event.locationInWindow, from: nil), to: page)
+        guard let (_, page) = start else { return }
         switch viewer.tool {
         case .select:
-            if let selected, let origin {
-                let moved = selected.bounds
-                if moved != origin { viewer.doc.change("Move", do: { selected.bounds = moved }, undo: { selected.bounds = origin }) }
-            } else {
-                super.mouseUp(with: event)
-                commitFields()
-            }
-        case .highlight, .underline, .strike:
-            super.mouseUp(with: event)
-            guard let selection = currentSelection else { return }
-            let type: PDFAnnotationSubtype = viewer.tool == .highlight ? .highlight : viewer.tool == .underline ? .underline : .strikeOut
-            let marks = markups(selection, type: type, color: viewer.color)
-            if !marks.isEmpty {
-                viewer.doc.change(viewer.tool.name, do: { marks.forEach { $0.page.addAnnotation($0.annotation) } },
-                                  undo: { marks.forEach { $0.page.removeAnnotation($0.annotation) } })
-            }
-            clearSelection()
+            guard let selected, let origin, selected.bounds != origin else { return }
+            let moved = selected.bounds
+            viewer.doc.change("Move", do: { selected.bounds = moved }, undo: { selected.bounds = origin })
         case .rect, .oval, .line, .arrow, .redact, .pen:
             guard let draft else { return }
             page.removeAnnotation(draft)
@@ -231,13 +210,61 @@ final class Canvas: PDFView {
         case .sign, .initial:
             guard let signature = Signature[viewer.tool] else { return }
             draft.map(page.removeAnnotation)
-            viewer.doc.add(draft ?? signature.annotation(in: CGRect(x: at.x - 90, y: at.y - 22.5, width: 180, height: 45)), to: page, name: viewer.tool.name)
+            viewer.doc.add(draft ?? signature.annotation(in: CGRect(x: point.x - 90, y: point.y - 22.5, width: 180, height: 45)), to: page, name: viewer.tool.name)
             viewer.tool = .select
         default:
             break
         }
     }
 
+    /// One highlight, underline or strike-through for each line of the selection, in the tool's colour, as one change.
+    func markUp(_ selection: PDFSelection) {
+        let type: PDFAnnotationSubtype = viewer.tool == .highlight ? .highlight : viewer.tool == .underline ? .underline : .strikeOut
+        let marks = markups(selection, type: type, color: viewer.color)
+        guard !marks.isEmpty else { return }
+        viewer.doc.change(viewer.tool.name, do: { marks.forEach { $0.page.addAnnotation($0.annotation) } },
+                          undo: { marks.forEach { $0.page.removeAnnotation($0.annotation) } })
+    }
+
+    #if os(macOS)
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.tabbingMode = .preferred
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        // PDFView takes the keys only in its own mouseDown, which the tools often skip.
+        window?.makeFirstResponder(self)
+        finishEditing()
+        commitFields()
+        start = nil
+        let tool = viewer.tool, point = convert(event.locationInWindow, from: nil)
+        guard let page = page(for: point, nearest: false), begin(at: convert(point, to: page), on: page) else {
+            super.mouseDown(with: event)
+            return commitFields()
+        }
+        if event.clickCount == 2, tool == .select, let selected, selected.type == "FreeText" { edit(selected, on: page) }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        if let page = start?.page, extend(to: convert(convert(event.locationInWindow, from: nil), to: page)) { return }
+        super.mouseDragged(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard let page = start?.page else { return super.mouseUp(with: event) }
+        if [.highlight, .underline, .strike].contains(viewer.tool) {
+            super.mouseUp(with: event)
+            if let selection = currentSelection {
+                markUp(selection)
+                clearSelection()
+            }
+        } else if viewer.tool == .select, selected == nil || origin == nil {
+            super.mouseUp(with: event)
+            commitFields()
+        }
+        end(at: convert(convert(event.locationInWindow, from: nil), to: page))
+    }
     #endif
 
     @objc private func pageChanged() {
