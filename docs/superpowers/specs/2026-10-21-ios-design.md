@@ -35,7 +35,7 @@ Mainland China is left out at launch: its App Store needs an ICP filing, which n
   - Note: tap. The comments open with the note's field ready to type.
   - Text Box: tap and type. The words take the font, size and colour of the nearest text, and sit on its line, by the Mac's rules. Return, or a tap elsewhere, ends the typing. Leaving the document or the app keeps the words.
   - Edit Text: tap a line to type over it.
-- With the Select tool, a tap selects a mark and outlines it. Drag it to move it, Delete deletes it, the colour well recolours it, and a double tap on a text box edits its words. Form fields fill with PDFKit's own controls, each fill one undo step.
+- With the Select tool, a tap selects a mark and outlines it. Drag it to move it, Delete deletes it, the colour well recolours it, and a tap on a selected text box edits its words. Form fields fill with PDFKit's own controls, each fill one undo step.
 - Every change can be undone: the bar's buttons, the system's undo gestures, and iPad's Edit menu.
 
 **Sharing and printing**
