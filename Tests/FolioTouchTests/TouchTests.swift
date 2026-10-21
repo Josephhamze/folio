@@ -112,6 +112,7 @@ final class TouchTests: XCTestCase {
         XCTAssertEqual(note.bounds.midY, 500, accuracy: 0.5)
         XCTAssertTrue(viewer.showsPanes)
         XCTAssertEqual(viewer.tool, .select)
+        XCTAssertTrue(canvas.selected === note)
     }
 
     func testTextBoxJoinsOnlyWithWords() throws {
@@ -162,6 +163,26 @@ final class TouchTests: XCTestCase {
         XCTAssertEqual(square.bounds.minX, 120, accuracy: 0.5)
         XCTAssertEqual(square.bounds.minY, 310, accuracy: 0.5)
         XCTAssertEqual(undo.undoActionName, "Move")
+    }
+
+    /// A placed signature is selected, so a drag moves it straight away, rather than scrolling the page.
+    func testPlacedSignatureDragsStraightAway() throws {
+        let saved = Signature[.sign]
+        defer { Signature[.sign] = saved }
+        Signature[.sign] = .typed("Jo")
+        let (viewer, undo) = host(makePDF([["Hi"]]))
+        let canvas = viewer.canvas, page = viewer.doc.pages[0], at = { (point: CGPoint) in canvas.convert(point, from: page) }
+        viewer.tool = .sign
+        act(undo) { canvas.tapped(at: at(CGPoint(x: 300, y: 300))) }
+        let signature = try XCTUnwrap(page.annotations.first)
+        XCTAssertTrue(canvas.pans(at: at(CGPoint(x: 300, y: 300))))
+        act(undo) { drag(canvas, at(CGPoint(x: 300, y: 300)), at(CGPoint(x: 320, y: 280))) }
+        XCTAssertEqual(signature.bounds.midX, 320, accuracy: 0.5)
+        XCTAssertEqual(signature.bounds.midY, 280, accuracy: 0.5)
+        XCTAssertEqual(undo.undoActionName, "Move")
+        act(undo) { canvas.deleteMark() }
+        XCTAssertTrue(page.annotations.isEmpty)
+        XCTAssertNil(viewer.mark)
     }
 
     /// A tap that slips a little, as a finger's does, places the usual signature, not one the size of the slip.

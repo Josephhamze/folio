@@ -153,7 +153,7 @@ final class Canvas: PDFView {
         switch viewer.tool {
         case .select:
             let hit = page.annotation(at: point)
-            if let hit, !["Widget", "Link", "Popup"].contains(hit.type ?? "") {
+            if let hit, hit.isMark {
                 selected = hit
                 origin = hit.bounds
                 return true
@@ -170,6 +170,7 @@ final class Canvas: PDFView {
             viewer.show(.comments)
             viewer.focusNote = note
             viewer.tool = .select
+            selected = note
         case .text:
             // Placing is one-shot, so the press that ends the typing selects rather than starting another box.
             viewer.tool = .select
@@ -220,7 +221,7 @@ final class Canvas: PDFView {
 
     /// Ends the press at `point`, in its page's space: a moved mark, a drawn shape or a placed signature becomes one change.
     /// A signature placed without a drag gets the usual size, as does one dragged less than 20 points, as a finger's tap
-    /// often slips.
+    /// often slips. It's then selected, to move or delete straight away.
     func end(at point: CGPoint) {
         defer { (start, origin, draft) = (nil, nil, nil) }
         guard let (from, page) = start else { return }
@@ -237,8 +238,10 @@ final class Canvas: PDFView {
             guard let signature = Signature[viewer.tool] else { return }
             draft.map(page.removeAnnotation)
             let sized = hypot(point.x - from.x, point.y - from.y) < 20 ? nil : draft?.bounds
-            viewer.doc.add(signature.annotation(in: sized ?? CGRect(x: point.x - 90, y: point.y - 22.5, width: 180, height: 45)), to: page, name: viewer.tool.name)
+            let placed = signature.annotation(in: sized ?? CGRect(x: point.x - 90, y: point.y - 22.5, width: 180, height: 45))
+            viewer.doc.add(placed, to: page, name: viewer.tool.name)
             viewer.tool = .select
+            selected = placed
         default:
             break
         }
@@ -251,6 +254,18 @@ final class Canvas: PDFView {
         guard !marks.isEmpty else { return }
         viewer.doc.change(viewer.tool.name, do: { marks.forEach { $0.page.addAnnotation($0.annotation) } },
                           undo: { marks.forEach { $0.page.removeAnnotation($0.annotation) } })
+    }
+
+    /// Deletes the selected mark, once the words being typed are in: the tool bar's Delete, and on the Mac the Delete key,
+    /// Edit › Delete and a mark's menu.
+    #if os(macOS)
+    @objc(delete:)
+    #endif
+    func deleteMark(_ sender: Any? = nil) {
+        viewer.settle()
+        guard let selected else { return }
+        viewer.doc.remove(selected)
+        self.selected = nil
     }
 
     #if os(macOS)
@@ -311,9 +326,8 @@ final class Canvas: PDFView {
         if let selected, let by = nudges[event.keyCode] {
             let from = selected.bounds, to = from.offsetBy(dx: by.dx, dy: by.dy)
             viewer.doc.change("Move", do: { selected.bounds = to }, undo: { selected.bounds = from })
-        } else if let selected, [51, 117].contains(event.keyCode) {
-            viewer.doc.remove(selected)
-            self.selected = nil
+        } else if selected != nil, [51, 117].contains(event.keyCode) {
+            deleteMark()
         } else if event.keyCode == 53, selected != nil || viewer.tool != .select {
             selected = nil
             viewer.tool = .select
@@ -322,6 +336,28 @@ final class Canvas: PDFView {
         } else {
             super.keyDown(with: event)
         }
+    }
+
+    /// A right click on a mark selects it, with the Select tool whatever the tool was, and puts Delete first in the page
+    /// view's menu.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu(), point = convert(event.locationInWindow, from: nil)
+        guard viewer.doc.canEdit, let page = page(for: point, nearest: false), let mark = page.annotation(at: convert(point, to: page)),
+              mark.isMark else { return menu }
+        viewer.settle()
+        viewer.tool = .select
+        selected = mark
+        // Its own target: sent down the responder chain, Delete would go to a text field that has the keys.
+        let delete = NSMenuItem(title: "Delete", action: #selector(deleteMark), keyEquivalent: "")
+        delete.target = self
+        menu.insertItem(delete, at: 0)
+        menu.insertItem(.separator(), at: 1)
+        return menu
+    }
+
+    /// Edit › Delete is on only while a mark is selected.
+    override func responds(to selector: Selector!) -> Bool {
+        selector == #selector(deleteMark) ? selected != nil : super.responds(to: selector)
     }
     #endif
 

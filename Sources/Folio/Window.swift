@@ -39,7 +39,8 @@ final class Viewer {
             }
         }
     }
-    var tool = Tool.select
+    /// Picking a tool puts down the selected mark: at once, so a tool that places a mark can then select it.
+    var tool = Tool.select { didSet { canvas.selected = nil } }
     /// The mark the select tool picked, for the views: the page view's `selected`.
     var mark: PDFAnnotation?
     var color = NSColor.systemYellow
@@ -204,9 +205,10 @@ struct DocumentView: View {
         layout
             .onChange(of: viewer.query) { viewer.find() }
             .onSubmit(of: .search) { viewer.step(1) }
-            .onChange(of: viewer.tool) { viewer.canvas.selected = nil }
             .onChange(of: viewer.pageIndex) { if let url { Viewer.remember(page: viewer.pageIndex, of: url) } }
             .onChange(of: viewer.doc.revision) {
+                // An undo can take the selected mark off its page.
+                if let mark = viewer.canvas.selected, mark.page == nil { viewer.canvas.selected = nil }
                 viewer.canvas.outlineSelection()
                 viewer.canvas.sharpenAnnotations()
             }
@@ -346,8 +348,8 @@ struct SharedPDF: Transferable {
 }
 #endif
 
-/// The tools and the colour, in a bar across the top of the pages. On iOS it's at the bottom, the tools scroll where they
-/// don't fit, and it has Undo, Redo, and Delete while a mark is selected.
+/// The tools, the colour and Delete for the selected mark, in a bar across the top of the pages. On iOS it's at the bottom,
+/// the tools scroll where they don't fit, and it has Undo and Redo.
 struct ToolBar: View {
     @Bindable var viewer: Viewer
     #if os(iOS)
@@ -373,28 +375,22 @@ struct ToolBar: View {
             // The undo manager says nothing when it changes; each change bumps the revision.
             let _ = viewer.doc.revision
             // A tap here leaves the words being typed in their field, so they become a change of their own first.
-            Group {
-                Button("Undo", systemImage: "arrow.uturn.backward") {
-                    viewer.settle()
-                    undoManager?.undo()
-                }
-                .disabled(undoManager?.canUndo != true)
-                Button("Redo", systemImage: "arrow.uturn.forward") {
-                    viewer.settle()
-                    undoManager?.redo()
-                }
-                .disabled(undoManager?.canRedo != true)
-                if let mark = viewer.mark {
-                    Button("Delete", systemImage: "trash", role: .destructive) {
-                        viewer.settle()
-                        viewer.doc.remove(mark)
-                        viewer.canvas.selected = nil
-                    }
-                }
+            Button("Undo", systemImage: "arrow.uturn.backward") {
+                viewer.settle()
+                undoManager?.undo()
             }
-            .labelStyle(.iconOnly)
+            .disabled(undoManager?.canUndo != true)
+            Button("Redo", systemImage: "arrow.uturn.forward") {
+                viewer.settle()
+                undoManager?.redo()
+            }
+            .disabled(undoManager?.canRedo != true)
             #endif
+            Button("Delete", systemImage: "trash", role: .destructive) { viewer.canvas.deleteMark() }
+                .help("Delete")
+                .disabled(viewer.mark == nil)
         }
+        .labelStyle(.iconOnly)
         .disabled(!viewer.doc.canEdit)
         .padding(6)
         .frame(maxWidth: .infinity)

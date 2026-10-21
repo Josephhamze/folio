@@ -188,6 +188,9 @@ func fit(_ bounds: CGRect, around text: String, in font: NSFont) -> CGRect {
 extension PDFAnnotation {
     var isRedaction: Bool { value(forAnnotationKey: .name) as? String == "folio-redaction" }
 
+    /// What the Select tool picks: any annotation but a form field, a link or a note's popup.
+    var isMark: Bool { !["Widget", "Link", "Popup"].contains(type ?? "") }
+
     var isComment: Bool {
         !isRedaction && ["Text", "FreeText", "Highlight", "Underline", "StrikeOut", "Square", "Circle", "Line", "Ink"].contains(type ?? "")
     }

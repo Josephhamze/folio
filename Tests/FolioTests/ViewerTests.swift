@@ -108,6 +108,8 @@ final class ViewerTests: XCTestCase {
         XCTAssertEqual(stamps.count, 1)
         XCTAssertTrue(CGRect(x: 210, y: 377.5, width: 180, height: 45).insetBy(dx: -0.01, dy: -0.01).contains(stamps[0].bounds))
         XCTAssertEqual(viewer.tool, .select)
+        // Selected, to move or delete straight away.
+        XCTAssertTrue(viewer.canvas.selected === stamps[0])
     }
 
     func testSelectedMarkMovesAsOneStep() {
@@ -167,6 +169,39 @@ final class ViewerTests: XCTestCase {
         XCTAssertNotNil(viewer.canvas.editor)
     }
 
+    /// A right click on a mark, whatever the tool, selects it with the Select tool and puts Delete first in the menu, which
+    /// Edit › Delete does too while it's selected. Elsewhere the page view's own menu shows.
+    func testRightClickOffersToDeleteAMark() throws {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Hi"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        let window = NSWindow(contentRect: CGRect(x: -4000, y: -4000, width: 700, height: 900), styleMask: .borderless, backing: .buffered, defer: false)
+        window.contentView = viewer.canvas
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.canvas.layoutDocumentView()
+        let box = shape(.rect, from: CGPoint(x: 100, y: 100), to: CGPoint(x: 150, y: 130), color: .red)
+        page.addAnnotation(box)
+        // The menu of the view a right click lands on, at a page point.
+        let menu = { (at: CGPoint) -> NSMenu? in
+            let point = viewer.canvas.convert(viewer.canvas.convert(at, from: page), to: nil)
+            let event = NSEvent.mouseEvent(with: .rightMouseDown, location: point, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+                                           context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+            return window.contentView?.hitTest(point)?.menu(for: event)
+        }
+        let delete = #selector(NSText.delete(_:))
+        viewer.tool = .pen
+        XCTAssertFalse(menu(CGPoint(x: 300, y: 300))?.items.contains { $0.title == "Delete" } ?? true)
+        XCTAssertEqual(viewer.tool, .pen)
+        XCTAssertFalse(viewer.canvas.responds(to: delete))
+        let item = try XCTUnwrap(menu(CGPoint(x: 110, y: 110))?.items.first)
+        XCTAssertEqual(item.title, "Delete")
+        XCTAssertEqual(viewer.tool, .select)
+        XCTAssertTrue(viewer.canvas.selected === box)
+        XCTAssertTrue(viewer.canvas.responds(to: delete))
+        act(undo) { NSApplication.shared.sendAction(item.action!, to: item.target, from: item) }
+        XCTAssertTrue(page.annotations.isEmpty)
+        XCTAssertEqual(undo.undoActionName, "Delete")
+        XCTAssertFalse(viewer.canvas.responds(to: delete))
+    }
+
     func testLockedFileTakesNoTool() throws {
         let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "pw", .ownerPasswordOption: "pw"])!
         let viewer = Viewer(doc: FolioDocument(pdf: PDFDocument(data: data)!)), page = try XCTUnwrap(viewer.doc.pdf.page(at: 0))
@@ -177,7 +212,7 @@ final class ViewerTests: XCTestCase {
         XCTAssertTrue(page.annotations.isEmpty)
     }
 
-    func testKeysPickToolsNudgeAndDeselect() {
+    func testKeysPickToolsNudgeDeleteAndDeselect() {
         let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
         viewer.canvas.document = viewer.doc.pdf
         press("t", 17, on: viewer)
@@ -195,6 +230,9 @@ final class ViewerTests: XCTestCase {
         XCTAssertEqual(box.bounds.minY, 100)
         press("\u{F703}", 124, [.command], on: viewer)   // ⌘→ is the page view's, not a nudge
         XCTAssertEqual(box.bounds.minX, 101)
+        act(undo) { press("\u{7F}", 51, on: viewer) }   // ⌫
+        XCTAssertTrue(page.annotations.isEmpty)
+        XCTAssertNil(viewer.canvas.selected)
         viewer.tool = .pen
         press("\u{1B}", 53, on: viewer)
         XCTAssertNil(viewer.canvas.selected)

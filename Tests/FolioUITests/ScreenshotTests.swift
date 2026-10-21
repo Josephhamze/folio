@@ -28,6 +28,7 @@ final class ScreenshotTests: XCTestCase {
             app.buttons["Save"].tap()
             at(450, 675).tap()
         }
+        at(580, 300).tap()   // in the margin, to put down the signature, which is selected once placed
         shot("1 Mark up")
 
         showPanes()
@@ -70,14 +71,19 @@ final class ScreenshotTests: XCTestCase {
         }
         shot("signature")
 
+        let delete = app.buttons["Delete"]
+        XCTAssertTrue(delete.isEnabled)   // the signature, selected once placed
         undo.tap()
         shot("undone")
+        XCTAssertFalse(delete.isEnabled)
         choose("cursorarrow")
         point(line.maxX - 65, line.minY - 30).tap()
-        XCTAssertTrue(app.buttons["Delete"].waitForExistence(timeout: 5))
+        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: delete)
+        waitForExpectations(timeout: 5)
         shot("selected")
-        app.buttons["Delete"].tap()
+        delete.tap()
         shot("deleted")
+        XCTAssertFalse(delete.isEnabled)
 
         showPanes()
         for pane in ["Thumbnails", "Bookmarks", "Comments"] {
