@@ -18,6 +18,7 @@ cd "$(dirname "$0")"
 # Documents folder, and 9:41 in the status bar until the simulator restarts. The results are in .build/ios/$1.xcresult.
 ios_test() {
 	DEVICE=$(xcrun simctl list devices available | grep -m1 "$1 (" | grep -oE '[0-9A-F-]{36}')
+	[ -n "$DEVICE" ] || { echo "No $1 simulator: add one in Xcode › Window › Devices and Simulators"; exit 1; }
 	xcrun simctl bootstatus "$DEVICE" -b >/dev/null
 	xcrun simctl status_bar "$DEVICE" override --time 9:41 --batteryState charged --batteryLevel 100
 	xcrun simctl uninstall "$DEVICE" com.josephhamze.folio
@@ -55,6 +56,8 @@ if [ "$1" = ios-test ] || [ "$1" = screenshots ]; then
 fi
 
 if [ "$1" = ios-release ]; then
+	# Each build is numbered by its commit, so it's built from one.
+	[ -z "$(git status --porcelain)" ] || { echo "Commit your changes first"; exit 1; }
 	xcodegen --quiet
 	rm -rf build/Folio.xcarchive
 	xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination generic/platform=iOS -archivePath build/Folio.xcarchive \
@@ -67,6 +70,7 @@ fi
 
 if [ "$1" = ios ]; then
 	DEVICE=$(xcrun simctl list devices available | grep -m1 'iPhone 17 Pro (' | grep -oE '[0-9A-F-]{36}')
+	[ -n "$DEVICE" ] || { echo "No iPhone 17 Pro simulator: add one in Xcode › Window › Devices and Simulators"; exit 1; }
 	xcodegen --quiet
 	xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination "id=$DEVICE" -derivedDataPath .build/ios build
 	xcrun simctl bootstatus "$DEVICE" -b >/dev/null
