@@ -369,14 +369,24 @@ struct ToolBar: View {
             // The undo manager says nothing when it changes; each change bumps the revision.
             let _ = viewer.doc.revision
             Group {
-                Button("Undo", systemImage: "arrow.uturn.backward") { undoManager?.undo() }.disabled(undoManager?.canUndo != true)
-                Button("Redo", systemImage: "arrow.uturn.forward") { undoManager?.redo() }.disabled(undoManager?.canRedo != true)
+                Button("Undo", systemImage: "arrow.uturn.backward") {
+                    viewer.settle()
+                    undoManager?.undo()
+                }
+                .disabled(undoManager?.canUndo != true)
+                Button("Redo", systemImage: "arrow.uturn.forward") {
+                    viewer.settle()
+                    undoManager?.redo()
+                }
+                .disabled(undoManager?.canRedo != true)
                 if let mark = viewer.mark {
+            // A tap here leaves the words being typed in their field, so they become a change of their own first.
                     Button("Delete", systemImage: "trash", role: .destructive) {
                         viewer.doc.remove(mark)
                         viewer.canvas.selected = nil
                     }
                 }
+                        viewer.settle()
             }
             .labelStyle(.iconOnly)
             #endif

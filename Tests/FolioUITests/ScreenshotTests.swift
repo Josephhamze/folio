@@ -151,6 +151,22 @@ final class ScreenshotTests: XCTestCase {
         shot("undone by key")
     }
 
+    /// Undo while typing takes back the typing, not the change before it.
+    func testUndoWhileTyping() {
+        openSample()
+        let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
+        choose("rectangle")
+        drag(point(line.minX + 20, line.maxY + 200), point(line.minX + 120, line.maxY + 240))
+        choose("textformat")
+        point(line.minX + 10, line.maxY + 100).tap()
+        app.typeText("Never mind")
+        let undo = app.buttons["arrow.uturn.backward"], redo = app.buttons["arrow.uturn.forward"]   // the bar's, not the keyboard's
+        undo.tap()
+        XCTAssertTrue(redo.isEnabled)
+        XCTAssertTrue(undo.isEnabled)   // the rectangle's still there to undo
+        XCTAssertFalse(app.textFields.matching(NSPredicate(format: "value == 'Never mind'")).firstMatch.exists)
+    }
+
     private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
     /// Shows the panes, unless they show already. A tap as the app comes back on screen can be lost, so where they don't
