@@ -47,6 +47,8 @@ final class Viewer {
     var pageIndex = 0
     /// A note just added, whose comment field takes the keys.
     var focusNote: PDFAnnotation?
+    /// The note whose comment is being typed, and what commits the words.
+    @ObservationIgnored var comment: (note: PDFAnnotation, commit: () -> Void)?
     var query = ""
     private(set) var matches: [PDFSelection] = []
     private(set) var match = 0
@@ -125,10 +127,12 @@ final class Viewer {
         showsPanes = true
     }
 
-    /// Ends the typing and records the form fills, for when the document closes or the app leaves the screen.
+    /// Ends the typing, commits the comment being typed and records the form fills, for when the document closes or the app
+    /// leaves the screen.
     func settle() {
         canvas.finishEditing()
         canvas.commitFields()
+        comment?.commit()
     }
 
     var matchLabel: String { query.isEmpty ? "" : matches.isEmpty ? "No matches" : "\(match + 1) of \(matches.count)" }
@@ -309,14 +313,6 @@ struct DocumentView: View {
 }
 
 #if os(iOS)
-/// The document as it is now, the words being typed included, as a PDF file named after it, for the share sheet.
-struct SharedPDF: Transferable {
-    let viewer: Viewer
-    let name: String
-
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .pdf) { shared in
-            let data = try await MainActor.run {
 /// Shares the document, with its first page for a preview. The preview is drawn again when the document changes, not each
 /// time the window's bar is.
 struct ShareButton: View {
@@ -331,6 +327,14 @@ struct ShareButton: View {
     }
 }
 
+/// The document as it is now, the words being typed included, as a PDF file named after it, for the share sheet.
+struct SharedPDF: Transferable {
+    let viewer: Viewer
+    let name: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .pdf) { shared in
+            let data = try await MainActor.run {
                 shared.viewer.settle()
                 return try shared.viewer.doc.snapshot(contentType: .pdf)
             }
@@ -368,6 +372,7 @@ struct ToolBar: View {
             #if os(iOS)
             // The undo manager says nothing when it changes; each change bumps the revision.
             let _ = viewer.doc.revision
+            // A tap here leaves the words being typed in their field, so they become a change of their own first.
             Group {
                 Button("Undo", systemImage: "arrow.uturn.backward") {
                     viewer.settle()
@@ -380,13 +385,12 @@ struct ToolBar: View {
                 }
                 .disabled(undoManager?.canRedo != true)
                 if let mark = viewer.mark {
-            // A tap here leaves the words being typed in their field, so they become a change of their own first.
                     Button("Delete", systemImage: "trash", role: .destructive) {
+                        viewer.settle()
                         viewer.doc.remove(mark)
                         viewer.canvas.selected = nil
                     }
                 }
-                        viewer.settle()
             }
             .labelStyle(.iconOnly)
             #endif
@@ -546,12 +550,20 @@ struct CommentRow: View {
         .contentShape(Rectangle())
         .onTapGesture { if let page = annotation.page { viewer.canvas.go(to: annotation.bounds, on: page) } }
         .onChange(of: viewer.doc.revision, initial: true) { if !editing { text = annotation.contents ?? "" } }
-        .onChange(of: editing) { if !editing { commit() } }
+        // While the words are typed, settling the document commits them too.
+        .onChange(of: editing) { if editing { viewer.comment = (annotation, commit) } else { stop() } }
+        .onDisappear(perform: stop)
         .task(id: viewer.focusNote) { if viewer.focusNote === annotation { editing = true } }
     }
 
     private func commit() {
         if text != annotation.contents ?? "" { viewer.doc.set(\.contents, of: annotation, to: text, name: "Edit Comment") }
+    }
+
+    /// Commits the words as the typing ends or the row goes, and leaves settling to the next comment typed.
+    private func stop() {
+        commit()
+        if viewer.comment?.note === annotation { viewer.comment = nil }
     }
 
     static let symbols = ["Text": "note.text", "FreeText": "textformat", "Highlight": "highlighter", "Underline": "underline",

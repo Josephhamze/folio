@@ -167,6 +167,63 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertFalse(app.textFields.matching(NSPredicate(format: "value == 'Never mind'")).firstMatch.exists)
     }
 
+    /// Words being typed are kept when the document closes, and the field stays in sight above the keyboard.
+    func testTypingKeptWhenTheDocumentCloses() {
+        openSample()
+        choose("textformat")
+        point(app.frame.midX, app.frame.maxY * 0.72).tap()
+        app.typeText("Kept after closing")
+        let field = app.textFields.matching(NSPredicate(format: "value == 'Kept after closing'")).firstMatch
+        expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: field)
+        waitForExpectations(timeout: 3)
+        app.navigationBars.buttons["BackButton"].tap()
+        let sample = app.cells["Quarterly Brief, pdf"]
+        XCTAssert(sample.waitForExistence(timeout: 10))
+        sample.tap()
+        XCTAssert(app.buttons["highlighter"].waitForExistence(timeout: 10))
+        showPanes()
+        app.buttons["Comments"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "value == 'Kept after closing'")).firstMatch.waitForExistence(timeout: 5))
+    }
+
+    /// A note's comment being typed is kept when the document closes. On iPad the panes leave Back in reach.
+    func testCommentKeptWhenTheDocumentCloses() throws {
+        try XCTSkipUnless(pad, "On iPhone the comments cover Back.")
+        openSample()
+        let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
+        choose("note.text")
+        point(line.minX + 40, line.maxY + 250).tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        app.typeText("Noted before closing")
+        app.navigationBars.buttons["BackButton"].tap()
+        let sample = app.cells["Quarterly Brief, pdf"]
+        XCTAssert(sample.waitForExistence(timeout: 10))
+        sample.tap()
+        XCTAssert(app.buttons["highlighter"].waitForExistence(timeout: 10))
+        showPanes()
+        app.buttons["Comments"].firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "value == 'Noted before closing'")).firstMatch.waitForExistence(timeout: 5))
+    }
+
+    /// A note's comment being typed is kept when the app goes, as if the field had been left.
+    func testCommentKeptWhenTheAppGoes() throws {
+        try XCTSkipUnless(pad, "On iPhone the comments cover the tool bar's Undo.")
+        openSample()
+        let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
+        choose("note.text")
+        point(line.minX + 10, line.maxY + 250).tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        app.typeText("Noted")
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        let undo = app.buttons["arrow.uturn.backward"], redo = app.buttons["arrow.uturn.forward"]
+        undo.tap()
+        XCTAssertTrue(redo.isEnabled)
+        XCTAssertTrue(undo.isEnabled)   // the comment was taken back, and the note's still there
+    }
+
     private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
     /// Shows the panes, unless they show already. A tap as the app comes back on screen can be lost, so where they don't

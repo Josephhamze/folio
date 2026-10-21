@@ -80,6 +80,13 @@ final class Gestures: NSObject, UIGestureRecognizerDelegate {
         canvas.tapped(at: tap.location(in: canvas))
     }
 
+    /// A finger landing on the navigation bar ends the typing before what it touched acts: Back closes the document before the
+    /// words would otherwise become a change, and saves it without them. Only there: the navigation bar stays put as the
+    /// keyboard goes, but the tool bar goes with it, out from under the finger, so its buttons end the typing as they act.
+    @objc func landed(_ press: UILongPressGestureRecognizer) {
+        if press.state == .began { canvas.viewer.settle() }
+    }
+
     func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
         recognizer !== canvas.pan || canvas.pans(at: down)
     }
@@ -89,14 +96,17 @@ final class Gestures: NSObject, UIGestureRecognizerDelegate {
         recognizer === canvas.pan && other === (other.view as? UIScrollView)?.panGestureRecognizer
     }
 
-    /// The tap goes with PDFKit's own, which follow links and fill form fields.
+    /// The tap goes with PDFKit's own, which follow links and fill form fields, and the press with everything.
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
-        recognizer === canvas.tap
+        recognizer !== canvas.pan
     }
 
     /// Touches on the words being typed are the text field's. Any other first has its page's form fields remembered, so a fill
     /// PDFKit makes from it can be undone.
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if recognizer === canvas.press {
+            return touch.view.map { sequence(first: $0, next: \.superview).contains { $0 is UINavigationBar } } ?? false
+        }
         if let field = canvas.editor?.field, field.bounds.contains(touch.location(in: field)) { return false }
         let at = touch.location(in: canvas)
         if recognizer === canvas.pan, recognizer.numberOfTouches == 0 { down = at }

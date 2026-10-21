@@ -58,8 +58,8 @@ final class Canvas: PDFView {
     #endif
     private static var warned = false
     #if os(iOS)
-    /// The one-finger drag the tools take, and the tap: see Touch.swift.
-    let pan = UIPanGestureRecognizer(), tap = UITapGestureRecognizer()
+    /// The one-finger drag the tools take, the tap, and a finger landing on the navigation bar: see Touch.swift.
+    let pan = UIPanGestureRecognizer(), tap = UITapGestureRecognizer(), press = UILongPressGestureRecognizer()
     private lazy var gestures = Gestures(canvas: self)
     #endif
 
@@ -79,10 +79,11 @@ final class Canvas: PDFView {
         pan.maximumNumberOfTouches = 1
         pan.addTarget(gestures, action: #selector(Gestures.dragged))
         tap.addTarget(gestures, action: #selector(Gestures.touched))
-        for recognizer in [pan, tap] {
-            recognizer.delegate = gestures
-            addGestureRecognizer(recognizer)
-        }
+        press.addTarget(gestures, action: #selector(Gestures.landed))
+        press.minimumPressDuration = 0
+        press.cancelsTouchesInView = false
+        for recognizer in [pan, tap, press] { recognizer.delegate = gestures }
+        [pan, tap].forEach(addGestureRecognizer)
         for name in [UITextField.textDidEndEditingNotification, UITextView.textDidEndEditingNotification] {
             NotificationCenter.default.addObserver(self, selector: #selector(endedEditing), name: name, object: nil)
         }
@@ -94,6 +95,15 @@ final class Canvas: PDFView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    #if os(iOS)
+    /// The press watches the whole window.
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        press.view?.removeGestureRecognizer(press)
+        window?.addGestureRecognizer(press)
+    }
+    #endif
 
     /// PDFKit registers its own undo for each form field it changes, which would sit beside "Fill Form".
     override var undoManager: UndoManager? { nil }
