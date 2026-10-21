@@ -1,12 +1,37 @@
 import XCTest
 
-/// Needs Quarterly Brief.pdf, from this folder, in Folio's Documents folder on the simulator.
+/// Needs the PDFs from this folder in Folio's Documents folder on the simulator, which `./build.sh ios-test` puts there.
 final class ScreenshotTests: XCTestCase {
     private let app = XCUIApplication()
 
+    /// The App Store's screenshots, which `./build.sh screenshots` takes: a sample highlighted, noted and signed, the
+    /// signature pad, and the panes.
     func testScreenshots() {
-        openSample()
-        shot("open")
+        openSample("Garden Brief")
+        // A point on the first page, in its 612 by 792 points from the top left.
+        let page = app.textViews.firstMatch.children(matching: .other).firstMatch
+        let at = { (x: CGFloat, y: CGFloat) in page.coordinate(withNormalizedOffset: CGVector(dx: x / 612, dy: y / 792)) }
+
+        choose("highlighter")
+        drag(at(76, 357), at(404, 357))   // the first goal
+        choose("textformat")
+        at(360, 379).tap()   // beside the second
+        app.typeText("Love this!")
+        at(580, 300).tap()   // in the margin
+        choose("signature")
+        at(450, 675).tap()   // under the budget
+        if app.buttons["Type"].waitForExistence(timeout: 2) {
+            app.buttons["Type"].tap()
+            app.textFields["Your name"].tap()
+            app.typeText("Maria Santos")
+            shot("2 Sign")
+            app.buttons["Save"].tap()
+            at(450, 675).tap()
+        }
+        shot("1 Mark up")
+
+        showPanes()
+        shot("3 Pages")
     }
 
     /// Marks up the sample by touch, as a person would, with a screenshot after each step.
@@ -142,16 +167,18 @@ final class ScreenshotTests: XCTestCase {
         if pad { barButton("Panes") } else { point(200, 140).tap() }
     }
 
-    /// Launches Folio and opens the sample from its folder in the document browser.
-    private func openSample() {
+    /// Launches Folio and opens a sample from its folder in the document browser.
+    private func openSample(_ name: String = "Quarterly Brief") {
         app.launch()
         app.buttons["Browse"].firstMatch.tap()   // the tab, or the back button to it
         // Browse opens where it was left: at its locations, in On My iPhone or iPad, or in Folio's folder.
         for place in [app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'On My i'")).firstMatch, app.cells["Folio, Container"]]
         where place.waitForExistence(timeout: 2) {
+            // On a fresh iPad the locations are a sidebar over the folder, put away by a tap beside it.
+            if !place.isHittable { point(app.frame.maxX - 40, app.frame.midY).tap() }
             place.tap()
         }
-        let sample = app.cells["Quarterly Brief, pdf"]
+        let sample = app.cells["\(name), pdf"]
         XCTAssert(sample.waitForExistence(timeout: 10))
         sample.tap()
         XCTAssert(app.buttons["highlighter"].waitForExistence(timeout: 10))

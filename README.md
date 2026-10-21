@@ -50,6 +50,10 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 - `swift test` runs the tests.
 - `./build.sh` builds the app without opening it. It signs the app with your Apple Development certificate if you have one, and ad hoc if you don't.
 - `./build.sh dmg` makes `build/Folio.dmg` for a release, signed with your Developer ID and notarised. It needs a notarytool keychain profile named `notary`. Finder lays out the dmg's window, so macOS asks once to let your terminal control Finder.
+- `./build.sh ios` builds the iPhone and iPad app and runs it in the simulator, on an iPhone 17 Pro. It needs XcodeGen: `brew install xcodegen`.
+- `./build.sh ios-test` runs the iOS tests, on an iPhone 17 Pro and an iPad Pro 13-inch simulator.
+- `./build.sh screenshots` takes the App Store's screenshots, into `build/app-store`.
+- `./build.sh ios-release` uploads a build to App Store Connect. [`docs/app-store.md`](docs/app-store.md) has the one-time setup and the listing.
 - `swift icon/icon.swift` draws the icon and the dmg window's background from code, into `icon/Folio.icns`, `icon/logo.png` and `icon/dmg.png`.
 - The design and the build plan are in [`docs/superpowers`](docs/superpowers).
 
