@@ -29,7 +29,7 @@
 - **Protected files.** Folio asks for a file's password in the window. It respects an author's editing restrictions until you enter the permissions password, and saving keeps the file encrypted.
 - **Save As.** File › Save As… (⌥⇧⌘S) saves the document under a new name, and you keep working in the new file. Like any Mac app, Folio also saves as you go, and File › Revert To goes back to earlier versions.
 - **Undo.** Every change can be undone and redone.
-- **Print**, and open PDFs from Finder's **Open With** menu. Folio doesn't make itself your default PDF app.
+- **Print**, and open PDFs from Finder. Folio asks once to be your default PDF app, and Home offers it while it isn't.
 
 ## Install
 
