@@ -209,10 +209,11 @@ final class Canvas: PDFView {
     }
 
     /// Ends the press at `point`, in its page's space: a moved mark, a drawn shape or a placed signature becomes one change.
-    /// A signature placed without a drag gets the usual size.
+    /// A signature placed without a drag gets the usual size, as does one dragged less than 20 points, as a finger's tap
+    /// often slips.
     func end(at point: CGPoint) {
         defer { (start, origin, draft) = (nil, nil, nil) }
-        guard let (_, page) = start else { return }
+        guard let (from, page) = start else { return }
         switch viewer.tool {
         case .select:
             guard let selected, let origin, selected.bounds != origin else { return }
@@ -225,7 +226,8 @@ final class Canvas: PDFView {
         case .sign, .initial:
             guard let signature = Signature[viewer.tool] else { return }
             draft.map(page.removeAnnotation)
-            viewer.doc.add(signature.annotation(in: draft?.bounds ?? CGRect(x: point.x - 90, y: point.y - 22.5, width: 180, height: 45)), to: page, name: viewer.tool.name)
+            let sized = hypot(point.x - from.x, point.y - from.y) < 20 ? nil : draft?.bounds
+            viewer.doc.add(signature.annotation(in: sized ?? CGRect(x: point.x - 90, y: point.y - 22.5, width: 180, height: 45)), to: page, name: viewer.tool.name)
             viewer.tool = .select
         default:
             break

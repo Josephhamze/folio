@@ -164,6 +164,20 @@ final class TouchTests: XCTestCase {
         XCTAssertEqual(undo.undoActionName, "Move")
     }
 
+    /// A tap that slips a little, as a finger's does, places the usual signature, not one the size of the slip.
+    func testSlippedTapPlacesTheUsualSignature() {
+        let saved = Signature[.sign]
+        defer { Signature[.sign] = saved }
+        Signature[.sign] = .typed("Jo")
+        let (viewer, undo) = host(makePDF([["Hi"]]))
+        let canvas = viewer.canvas, page = viewer.doc.pages[0], at = { (point: CGPoint) in canvas.convert(point, from: page) }
+        viewer.tool = .sign
+        act(undo) { canvas.tapped(at: at(CGPoint(x: 300, y: 300))) }
+        viewer.tool = .sign
+        act(undo) { drag(canvas, at(CGPoint(x: 300, y: 500)), at(CGPoint(x: 308, y: 509))) }
+        XCTAssertEqual(page.annotations.map(\.bounds.size), [page.annotations[0].bounds.size, page.annotations[0].bounds.size])
+    }
+
     func testSignatureLeavesNothingBehindOnTheScreen() {
         let saved = Signature[.sign]
         defer { Signature[.sign] = saved }
