@@ -7,6 +7,9 @@ import UniformTypeIdentifiers
 struct Home: View {
     @Environment(\.openDocument) private var openDocument
     @State private var recents: [URL] = []
+    @State private var isDefault = true
+    @State private var askingToBeDefault = false
+    @AppStorage("askedToBeDefault") private var askedToBeDefault = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -14,6 +17,9 @@ struct Home: View {
                 Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 56, height: 56)
                 Text("Folio").font(.largeTitle.bold())
                 Spacer()
+                if !isDefault {
+                    Button("Make Default PDF App", action: makeDefault).controlSize(.large)
+                }
                 Button("Open…") { NSDocumentController.shared.openDocument(nil) }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
@@ -37,7 +43,33 @@ struct Home: View {
             pdfs.forEach(open)
             return !pdfs.isEmpty
         }
-        .onAppear { recents = NSDocumentController.shared.recentDocumentURLs.filter { FileManager.default.fileExists(atPath: $0.path) } }
+        .onAppear {
+            recents = NSDocumentController.shared.recentDocumentURLs.filter { FileManager.default.fileExists(atPath: $0.path) }
+            isDefault = Self.isDefault
+            // The first time Folio finds it isn't the default, it asks to be, once.
+            if !isDefault, !askedToBeDefault { askingToBeDefault = true; askedToBeDefault = true }
+        }
+        // The default can change in Finder's Get Info while Folio is in the background.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in isDefault = Self.isDefault }
+        .alert("Make Folio your default PDF app?", isPresented: $askingToBeDefault) {
+            Button("Make Default", action: makeDefault)
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("PDFs you open from Finder, Mail and other apps will open in Folio.")
+        }
+    }
+
+    /// Whether PDFs open in Folio when they're opened from Finder.
+    private static var isDefault: Bool {
+        NSWorkspace.shared.urlForApplication(toOpen: .pdf).flatMap { Bundle(url: $0)?.bundleIdentifier } == Bundle.main.bundleIdentifier
+    }
+
+    /// Makes Folio the app PDFs open in. macOS may ask the person to confirm.
+    private func makeDefault() {
+        Task {
+            do { try await NSWorkspace.shared.setDefaultApplication(at: Bundle.main.bundleURL, toOpen: .pdf) } catch { NSApp.presentError(error) }
+            isDefault = Self.isDefault
+        }
     }
 
     private func open(_ url: URL) {
