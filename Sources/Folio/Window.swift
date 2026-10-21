@@ -283,9 +283,7 @@ struct DocumentView: View {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     pageBox
                     Button("Panes", systemImage: "sidebar.right") { viewer.showsPanes.toggle() }
-                    ShareLink(item: SharedPDF(viewer: viewer, name: name), preview: SharePreview(name, image: Image(uiImage:
-                        viewer.doc.pdf.page(at: 0)?.thumbnail(of: CGSize(width: 240, height: 240), for: .mediaBox) ?? UIImage())))
-                        .disabled(viewer.doc.pdf.isLocked)
+                    ShareButton(viewer: viewer, name: name)
                 }
             }
             .searchable(text: $viewer.query, prompt: "Find")
@@ -315,6 +313,20 @@ struct SharedPDF: Transferable {
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(exportedContentType: .pdf) { shared in
             let data = try await MainActor.run {
+/// Shares the document, with its first page for a preview. The preview is drawn again when the document changes, not each
+/// time the window's bar is.
+struct ShareButton: View {
+    let viewer: Viewer
+    let name: String
+
+    var body: some View {
+        let _ = viewer.doc.revision
+        ShareLink(item: SharedPDF(viewer: viewer, name: name), preview: SharePreview(name, image: Image(uiImage:
+            viewer.doc.pdf.page(at: 0)?.thumbnail(of: CGSize(width: 240, height: 240), for: .mediaBox) ?? UIImage())))
+            .disabled(viewer.doc.pdf.isLocked)
+    }
+}
+
                 shared.viewer.settle()
                 return try shared.viewer.doc.snapshot(contentType: .pdf)
             }
