@@ -4,6 +4,7 @@
 # ad-hoc.
 # "./build.sh dmg" builds build/Folio.dmg to publish instead: signed with your Developer ID, notarised and stapled. It
 # needs a notarytool keychain profile named "notary" (or $NOTARY), made once with `xcrun notarytool store-credentials`.
+# Finder lays out the dmg's window, so macOS asks once to let your terminal control Finder.
 set -e
 cd "$(dirname "$0")"
 
@@ -26,8 +27,40 @@ if [ "$1" = dmg ]; then
 	STAGE=$(mktemp -d)
 	cp -R "$APP" "$STAGE"
 	ln -s /Applications "$STAGE/Applications"
-	hdiutil create -volname Folio -srcfolder "$STAGE" -format UDZO -ov build/Folio.dmg
-	rm -rf "$STAGE" build/Folio.zip
+	mkdir "$STAGE/.background"
+	cp icon/dmg.png "$STAGE/.background"
+	cp icon/Folio.icns "$STAGE/.VolumeIcon.icns"
+	rm -f build/Folio-rw.dmg build/Folio.dmg
+	diskutil image create from "$STAGE" build/Folio-rw.dmg --format RAW --volumeName Folio
+	MOUNT=$(diskutil image attach build/Folio-rw.dmg | grep -o '/Volumes/.*')
+	SetFile -a C "$MOUNT"
+	# Finder lays out the window, on icon/dmg.png's arrow, and saves it in the volume's .DS_Store when it ejects it.
+	# The window's 432 points tall: a 32-point title bar over the background's top 400.
+	osascript - "$(basename "$MOUNT")" <<-'EOF'
+		on run {volumeName}
+			tell application "Finder" to tell disk volumeName
+				open
+				tell container window
+					set current view to icon view
+					set toolbar visible to false
+					set statusbar visible to false
+					set pathbar visible to false
+					set bounds to {400, 240, 1040, 672}
+				end tell
+				set opts to icon view options of container window
+				set arrangement of opts to not arranged
+				set icon size of opts to 128
+				set background picture of opts to file ".background:dmg.png"
+				set position of item "Folio.app" to {160, 160}
+				set position of item "Applications" to {480, 160}
+				set extension hidden of item "Folio.app" to true
+				close
+				eject
+			end tell
+		end run
+	EOF
+	diskutil image create from build/Folio-rw.dmg build/Folio.dmg
+	rm -rf "$STAGE" build/Folio.zip build/Folio-rw.dmg
 	codesign --sign "$ID" --timestamp build/Folio.dmg
 	xcrun notarytool submit build/Folio.dmg --keychain-profile "${NOTARY:-notary}" --wait
 	xcrun stapler staple build/Folio.dmg

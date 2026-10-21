@@ -49,8 +49,8 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 
 - `swift test` runs the tests.
 - `./build.sh` builds the app without opening it. It signs the app with your Apple Development certificate if you have one, and ad hoc if you don't.
-- `./build.sh dmg` makes `build/Folio.dmg` for a release, signed with your Developer ID and notarised. It needs a notarytool keychain profile named `notary`.
-- `swift icon/icon.swift` draws the icon from code, into `icon/Folio.icns` and `icon/logo.png`.
+- `./build.sh dmg` makes `build/Folio.dmg` for a release, signed with your Developer ID and notarised. It needs a notarytool keychain profile named `notary`. Finder lays out the dmg's window, so macOS asks once to let your terminal control Finder.
+- `swift icon/icon.swift` draws the icon and the dmg window's background from code, into `icon/Folio.icns`, `icon/logo.png` and `icon/dmg.png`.
 - The design and the build plan are in [`docs/superpowers`](docs/superpowers).
 
 ## Roadmap

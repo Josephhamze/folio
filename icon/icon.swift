@@ -1,5 +1,5 @@
-// Draws Folio's icon: a page with a folded corner, and a highlighter stroke across it.
-// `swift icon/icon.swift` writes icon/Folio.icns and icon/logo.png.
+// Draws Folio's icon: a page with a folded corner, and a highlighter stroke across it. And the dmg window's background.
+// `swift icon/icon.swift` writes icon/Folio.icns, icon/logo.png and icon/dmg.png.
 import AppKit
 import SwiftUI
 
@@ -46,6 +46,49 @@ struct StrokeShape: Shape {
         p.addLine(to: CGPoint(x: r.minX, y: r.maxY))
         p.closeSubpath()
         return p
+    }
+}
+
+/// A pen's arrow from the bottom left to the bottom right, arched up to the middle of the top, with an open head like
+/// the Arrow tool's.
+struct ArrowShape: Shape {
+    func path(in r: CGRect) -> Path {
+        let end = CGPoint(x: r.maxX, y: r.maxY), control = CGPoint(x: r.midX, y: r.minY - r.height)
+        var p = Path()
+        p.move(to: CGPoint(x: r.minX, y: r.maxY))
+        p.addQuadCurve(to: end, control: control)
+        let angle = atan2(end.y - control.y, end.x - control.x)
+        for side in [-1.0, 1.0] {
+            let barb = angle + .pi + side * .pi / 6
+            p.move(to: CGPoint(x: end.x + 18 * cos(barb), y: end.y + 18 * sin(barb)))
+            p.addLine(to: end)
+        }
+        return p
+    }
+}
+
+/// The dmg window's background: a sheet of paper, with an arrow from Folio to Applications and a highlighted line to
+/// say so. build.sh puts Folio's icon at (160, 160) and Applications' at (480, 160). Finder shows the top 400 points;
+/// the rest is spare, in case a title bar is shorter.
+struct DMGBackground: View {
+    static let size = CGSize(width: 640, height: 440)
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color(hex: 0xFCFBF8), Color(hex: 0xEFEDE8)], startPoint: .top, endPoint: .bottom)
+            ArrowShape()
+                .stroke(Color(hex: 0xE5484D), style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                .frame(width: 128, height: 14)
+                .position(x: 320, y: 158)
+            Text("Drag Folio to Applications")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Color(hex: 0x2C2C2E))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 5)
+                .background(StrokeShape().fill(Color(hex: 0xFFD60A).opacity(0.75)).blendMode(.multiply))
+                .position(x: 320, y: 300)
+        }
+        .frame(width: Self.size.width, height: Self.size.height)
     }
 }
 
@@ -109,4 +152,10 @@ MainActor.assumeIsolated {
     try! png(1024).write(to: folder.appendingPathComponent("logo.png"))
     let iconutil = try! Process.run(URL(fileURLWithPath: "/usr/bin/iconutil"), arguments: ["-c", "icns", set.path, "-o", folder.appendingPathComponent("Folio.icns").path])
     iconutil.waitUntilExit()
+    // Twice the pixels, at 144 dpi, so Finder draws it at its size in points and sharp on a Retina screen.
+    let renderer = ImageRenderer(content: DMGBackground())
+    renderer.scale = 2
+    let background = NSBitmapImageRep(cgImage: renderer.cgImage!)
+    background.size = DMGBackground.size
+    try! background.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent("dmg.png"))
 }
