@@ -1,3 +1,4 @@
+#if os(macOS)
 import QuickLookThumbnailing
 import SwiftUI
 import UniformTypeIdentifiers
@@ -84,3 +85,4 @@ struct RecentFile: View {
         }
     }
 }
+#endif

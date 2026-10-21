@@ -53,7 +53,11 @@ final class Viewer {
 
     func find() {
         matches = query.isEmpty ? [] : doc.pdf.findString(query, withOptions: .caseInsensitive)
+        #if os(macOS)
         matches.forEach { $0.color = .findHighlightColor }
+        #else
+        matches.forEach { $0.color = .systemYellow }
+        #endif
         canvas.highlightedSelections = matches
         match = 0
         showMatch()
@@ -97,11 +101,16 @@ final class Viewer {
         (UserDefaults.standard.dictionary(forKey: "pages") as? [String: Int])?[url.path]
     }
 
-    /// Remembers the page this file was left on, to reopen it there. Only recent files keep theirs, so the list never
-    /// outgrows File › Open Recent.
+    /// Remembers the page this file was left on, to reopen it there. On the Mac only recent files keep theirs, so the list
+    /// never outgrows File › Open Recent.
+    /// shortcut: iOS has no recent files, and its sandbox can't see a closed file in another app's storage to tell whether it's
+    /// gone, so there every file keeps its page, a short line each. Prune by count if that ever matters.
     static func remember(page index: Int, of url: URL) {
+        var pages = UserDefaults.standard.dictionary(forKey: "pages") as? [String: Int] ?? [:]
+        #if os(macOS)
         let recent = Set(NSDocumentController.shared.recentDocumentURLs.map(\.path))
-        var pages = (UserDefaults.standard.dictionary(forKey: "pages") as? [String: Int] ?? [:]).filter { recent.contains($0.key) }
+        pages = pages.filter { recent.contains($0.key) }
+        #endif
         pages[url.path] = index
         UserDefaults.standard.set(pages, forKey: "pages")
     }
@@ -113,6 +122,7 @@ final class Viewer {
         organizing ? doc.pages.filter(selection.contains) : [canvas.currentPage].compactMap { $0 }
     }
 
+    #if os(macOS)
     /// Where a ⇧ click's range starts: the page of the last plain or ⌘ click.
     @ObservationIgnored private var anchor: PDFPage?
 
@@ -125,6 +135,7 @@ final class Viewer {
         if modifiers.contains(.command) { selection.formSymmetricDifference([page]) } else { selection = [page] }
         anchor = page
     }
+    #endif
 
     /// Moves the selection, or only the dragged page when it isn't selected, in front of `target`, or to the end.
     func drop(_ dragged: PDFPage, before target: PDFPage?) {
@@ -152,11 +163,13 @@ struct DocumentView: View {
     @State var viewer: Viewer
     /// Where the document is saved, if it is.
     let url: URL?
-    @State private var columns = NavigationSplitViewVisibility.all
     @FocusState private var searching: Bool
     @Environment(\.undoManager) private var undoManager
+    #if os(macOS)
+    @State private var columns = NavigationSplitViewVisibility.all
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
+    #endif
 
     init(doc: FolioDocument, url: URL?) {
         let viewer = Viewer(doc: doc)
@@ -166,6 +179,34 @@ struct DocumentView: View {
     }
 
     var body: some View {
+        layout
+            .onChange(of: viewer.query) { viewer.find() }
+            .onSubmit(of: .search) { viewer.step(1) }
+            .onChange(of: viewer.tool) { viewer.canvas.selected = nil }
+            .onChange(of: viewer.pageIndex) { if let url { Viewer.remember(page: viewer.pageIndex, of: url) } }
+            .onChange(of: viewer.doc.revision) {
+                viewer.canvas.outlineSelection()
+                viewer.canvas.sharpenAnnotations()
+            }
+            .onChange(of: viewer.color) {
+                guard let a = viewer.canvas.selected else { return }
+                if a.type == "FreeText" {
+                    viewer.doc.set(\.fontColor, of: a, to: viewer.color, name: "Change Colour")
+                } else {
+                    viewer.doc.set(\.color, of: a, to: viewer.color, name: "Change Colour")
+                }
+            }
+            .sheet(item: $viewer.sheet) { sheet in
+                if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
+            }
+            .focusedSceneValue(\.viewer, viewer)
+            .focusedSceneValue(\.searchFocus, $searching)
+            .onAppear { viewer.doc.undo = undoManager }
+            .onChange(of: undoManager) { viewer.doc.undo = undoManager }
+    }
+
+    #if os(macOS)
+    private var layout: some View {
         NavigationSplitView(columnVisibility: $columns) {
             Sidebar(viewer: viewer)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220)
@@ -190,47 +231,29 @@ struct DocumentView: View {
         .toolbar(viewer.readMode ? .hidden : .visible, for: .windowToolbar)
         .searchable(text: $viewer.query, placement: .toolbar, prompt: "Find")
         .searchFocused($searching)
-        .onChange(of: viewer.query) { viewer.find() }
-        .onSubmit(of: .search) { viewer.step(1) }
         .onChange(of: viewer.readMode) {
             columns = viewer.readMode ? .detailOnly : .all
             if let window = viewer.canvas.window, window.styleMask.contains(.fullScreen) != viewer.readMode {
                 window.toggleFullScreen(nil)
             }
         }
-        .onChange(of: viewer.tool) { viewer.canvas.selected = nil }
-        .onChange(of: viewer.pageIndex) { if let url { Viewer.remember(page: viewer.pageIndex, of: url) } }
-        .onChange(of: viewer.doc.revision) {
-            viewer.canvas.outlineSelection()
-            viewer.canvas.sharpenAnnotations()
-        }
-        .onChange(of: viewer.color) {
-            guard let a = viewer.canvas.selected else { return }
-            if a.type == "FreeText" {
-                viewer.doc.set(\.fontColor, of: a, to: viewer.color, name: "Change Colour")
-            } else {
-                viewer.doc.set(\.color, of: a, to: viewer.color, name: "Change Colour")
-            }
-        }
-        .sheet(item: $viewer.sheet) { sheet in
-            if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
-        }
         .onExitCommand { viewer.readMode = false }
         // Esc, the green button or ⌃⌘F can end full screen without SwiftUI seeing it.
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) {
             if $0.object as? NSWindow === viewer.canvas.window { viewer.readMode = false }
         }
-        .focusedSceneValue(\.viewer, viewer)
-        .focusedSceneValue(\.searchFocus, $searching)
         .frame(minWidth: 700, minHeight: 500)
-        .onAppear {
-            viewer.doc.undo = undoManager
-            dismissWindow(id: "home")
-        }
+        .onAppear { dismissWindow(id: "home") }
         // With no document left, Folio goes back to its home window rather than sit with none, once this one is gone.
         .onDisappear { DispatchQueue.main.async { if NSDocumentController.shared.documents.isEmpty { openWindow(id: "home") } } }
-        .onChange(of: undoManager) { viewer.doc.undo = undoManager }
     }
+    #else
+    private var layout: some View {
+        PageView(viewer: viewer)
+            .overlay(alignment: .top) { Bars(viewer: viewer) }
+            .safeAreaInset(edge: .bottom, spacing: 0) { ToolBar(viewer: viewer) }
+    }
+    #endif
 }
 
 /// The tools and the colour, in a bar across the top of the pages.
@@ -246,7 +269,13 @@ struct ToolBar: View {
             .labelStyle(.iconOnly)
             .labelsHidden()
             .fixedSize()
-            ColorPicker("Colour", selection: Binding(get: { viewer.color.cgColor }, set: { viewer.color = NSColor(cgColor: $0) ?? .black }))
+            ColorPicker("Colour", selection: Binding(get: { viewer.color.cgColor }, set: {
+                #if os(macOS)
+                viewer.color = NSColor(cgColor: $0) ?? .black
+                #else
+                viewer.color = NSColor(cgColor: $0)
+                #endif
+            }))
                 .labelsHidden()
         }
         .disabled(!viewer.doc.canEdit)
@@ -256,6 +285,7 @@ struct ToolBar: View {
     }
 }
 
+#if os(macOS)
 struct PageView: NSViewRepresentable {
     let viewer: Viewer
 
@@ -266,6 +296,18 @@ struct PageView: NSViewRepresentable {
         viewer.showPages()
     }
 }
+#else
+struct PageView: UIViewRepresentable {
+    let viewer: Viewer
+
+    func makeUIView(context: Context) -> Canvas { viewer.canvas }
+
+    func updateUIView(_ canvas: Canvas, context: Context) {
+        let _ = viewer.doc.revision
+        viewer.showPages()
+    }
+}
+#endif
 
 struct Sidebar: View {
     let viewer: Viewer
@@ -289,6 +331,7 @@ struct Sidebar: View {
     }
 }
 
+#if os(macOS)
 struct Thumbnails: NSViewRepresentable {
     let canvas: Canvas
 
@@ -302,6 +345,22 @@ struct Thumbnails: NSViewRepresentable {
 
     func updateNSView(_ view: PDFThumbnailView, context: Context) {}
 }
+#else
+struct Thumbnails: UIViewRepresentable {
+    let canvas: Canvas
+
+    func makeUIView(context: Context) -> PDFThumbnailView {
+        let view = PDFThumbnailView()
+        view.pdfView = canvas
+        view.layoutMode = .vertical
+        view.thumbnailSize = CGSize(width: 120, height: 160)
+        view.backgroundColor = .clear
+        return view
+    }
+
+    func updateUIView(_ view: PDFThumbnailView, context: Context) {}
+}
+#endif
 
 extension PDFOutline: @retroactive Identifiable {
     /// The children, or nil for a leaf, as `List` wants them.
@@ -349,7 +408,8 @@ struct CommentRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Image(systemName: Self.symbols[annotation.type ?? ""] ?? "questionmark")
-                .foregroundStyle(Color(nsColor: annotation.type == "FreeText" ? annotation.fontColor ?? .labelColor : annotation.color))
+                .foregroundStyle(annotation.type == "FreeText" ? annotation.fontColor.map { Color(cgColor: $0.cgColor) } ?? .primary
+                                                               : Color(cgColor: annotation.color.cgColor))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Page \((annotation.page.map { viewer.doc.pdf.index(for: $0) } ?? 0) + 1)")
                     .font(.caption)

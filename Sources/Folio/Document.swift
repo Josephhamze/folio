@@ -30,9 +30,18 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         self.pdf = pdf
     }
 
+    /// The system's paper size. iOS has none: Letter where the region measures in US units, A4 elsewhere.
+    static var paper: CGSize {
+        #if os(macOS)
+        NSPrintInfo.shared.paperSize
+        #else
+        Locale.current.measurementSystem == .us ? CGSize(width: 612, height: 792) : CGSize(width: 595, height: 842)
+        #endif
+    }
+
     static func blankPage() -> PDFPage {
         let page = PDFPage()
-        page.setBounds(CGRect(origin: .zero, size: NSPrintInfo.shared.paperSize), for: .mediaBox)
+        page.setBounds(CGRect(origin: .zero, size: paper), for: .mediaBox)
         return page
     }
 
@@ -132,10 +141,9 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
                 guard let pdf = PDFDocument(url: url), !pdf.isLocked else { return [] }
                 return (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.copy() as? PDFPage }
             }
-            guard let image = NSImage(contentsOf: url) else { return [] }
-            let paper = NSPrintInfo.shared.paperSize
+            guard let image = NSImage(contentsOfFile: url.path) else { return [] }
             let size = image.size.width > image.size.height ? CGSize(width: paper.height, height: paper.width) : paper
-            return PDFPage(image: image, options: [.mediaBox: NSValue(rect: CGRect(origin: .zero, size: size))]).map { [$0] } ?? []
+            return PDFPage(image: image, options: [.mediaBox: CGRect(origin: .zero, size: size)]).map { [$0] } ?? []
         }
     }
 }

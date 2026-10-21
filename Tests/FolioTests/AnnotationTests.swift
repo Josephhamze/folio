@@ -8,7 +8,15 @@ final class AnnotationTests: XCTestCase {
         let marks = markups(page.selection(for: page.bounds(for: .mediaBox))!, type: .highlight, color: .yellow)
         XCTAssertEqual(marks.count, 2)
         XCTAssertEqual(marks.map { $0.annotation.type }, ["Highlight", "Highlight"])
-        XCTAssertEqual(marks[0].annotation.quadrilateralPoints?.count, 4)
+        // Other apps read the quadrilateral from the file.
+        let b = marks[0].annotation.bounds
+        page.addAnnotation(marks[0].annotation)
+        let saved = PDFDocument(data: pdf.dataRepresentation()!)!.page(at: 0)!.annotations[0]
+        let points = saved.quadrilateralPoints?.map(\.pointValue) ?? []
+        XCTAssertEqual(points.count, 4)
+        for (p, q) in zip(points, [CGPoint(x: 0, y: b.height), CGPoint(x: b.width, y: b.height), .zero, CGPoint(x: b.width, y: 0)]) {
+            XCTAssertEqual(hypot(p.x - q.x, p.y - q.y), 0, accuracy: 0.01)   // the file keeps four decimals
+        }
     }
 
     func testShapes() {

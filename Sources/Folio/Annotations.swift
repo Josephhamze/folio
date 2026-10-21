@@ -82,7 +82,7 @@ func markups(_ selection: PDFSelection, type: PDFAnnotationSubtype, color: NSCol
             mark.color = color
             // Other apps draw text markup from its quadrilateral, top left, top right, bottom left, bottom right.
             mark.quadrilateralPoints = [CGPoint(x: 0, y: bounds.height), CGPoint(x: bounds.width, y: bounds.height),
-                                        .zero, CGPoint(x: bounds.width, y: 0)].map { NSValue(point: $0) }
+                                        .zero, CGPoint(x: bounds.width, y: 0)].map { $0 as NSValue }
             return (page, mark)
         }
     }
@@ -117,12 +117,10 @@ func ink(_ strokes: [[CGPoint]], color: NSColor, width: CGFloat) -> PDFAnnotatio
     a.border = PDFBorder()
     a.border?.lineWidth = width
     for stroke in strokes {
-        let path = NSBezierPath()
+        let line = CGMutablePath()
+        line.addLines(between: stroke.map { CGPoint(x: $0.x - bounds.minX, y: $0.y - bounds.minY) })
+        let path = NSBezierPath(cgPath: line)
         path.lineWidth = width
-        for (index, point) in stroke.enumerated() {
-            let local = CGPoint(x: point.x - bounds.minX, y: point.y - bounds.minY)
-            if index == 0 { path.move(to: local) } else { path.line(to: local) }
-        }
         a.add(path)
     }
     return a

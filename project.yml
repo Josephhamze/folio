@@ -1,0 +1,49 @@
+# The iPhone and iPad app, built from the Mac app's sources. `xcodegen` makes Folio.xcodeproj from this file.
+name: Folio
+options:
+  deploymentTarget:
+    iOS: "26.0"
+settings:
+  base:
+    DEVELOPMENT_TEAM: PP6TZWTTLG
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Folio:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/Folio
+        type: syncedFolder
+      - iOS
+    settings:
+      base:
+        INFOPLIST_FILE: iOS/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.josephhamze.folio
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    scheme:
+      testTargets: [FolioTouchTests, FolioUITests]
+  FolioTouchTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests/FolioTouchTests]
+    dependencies:
+      - target: Folio
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.josephhamze.folio.tests
+  FolioUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests/FolioUITests]
+    dependencies:
+      - target: Folio
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.josephhamze.folio.uitests

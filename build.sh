@@ -5,8 +5,21 @@
 # "./build.sh dmg" builds build/Folio.dmg to publish instead: signed with your Developer ID, notarised and stapled. It
 # needs a notarytool keychain profile named "notary" (or $NOTARY), made once with `xcrun notarytool store-credentials`.
 # Finder lays out the dmg's window, so macOS asks once to let your terminal control Finder.
+# "./build.sh ios" builds the iPhone and iPad app instead, with XcodeGen (brew install xcodegen), and runs it in the
+# simulator on an iPhone 17 Pro.
 set -e
 cd "$(dirname "$0")"
+
+if [ "$1" = ios ]; then
+	DEVICE=$(xcrun simctl list devices available | grep -m1 'iPhone 17 Pro (' | grep -oE '[0-9A-F-]{36}')
+	xcodegen --quiet
+	xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination "id=$DEVICE" -derivedDataPath .build/ios build
+	xcrun simctl bootstatus "$DEVICE" -b >/dev/null
+	open -a DeviceHub 2>/dev/null || open -a Simulator
+	xcrun simctl install "$DEVICE" .build/ios/Build/Products/Debug-iphonesimulator/Folio.app
+	xcrun simctl launch "$DEVICE" com.josephhamze.folio
+	exit
+fi
 
 swift build -c release
 APP=build/Folio.app

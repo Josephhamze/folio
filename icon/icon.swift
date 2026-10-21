@@ -1,5 +1,5 @@
 // Draws Folio's icon: a page with a folded corner, and a highlighter stroke across it. And the dmg window's background.
-// `swift icon/icon.swift` writes icon/Folio.icns, icon/logo.png and icon/dmg.png.
+// `swift icon/icon.swift` writes icon/Folio.icns, icon/logo.png, icon/dmg.png and the iOS app icon.
 import AppKit
 import SwiftUI
 
@@ -92,12 +92,11 @@ struct DMGBackground: View {
     }
 }
 
-/// 1024 points square, on Apple's grid: an 824-point squircle with its shadow.
-struct Icon: View {
+/// The page on Folio's red, 824 points square. iOS shapes the square itself.
+struct Art: View {
     let page = CGSize(width: 480, height: 600), fold: CGFloat = 132
 
     var body: some View {
-        let squircle = RoundedRectangle(cornerRadius: 185.4, style: .continuous)
         ZStack {
             LinearGradient(colors: [Color(hex: 0xE5484D), Color(hex: 0x9E1B25)], startPoint: .top, endPoint: .bottom)
             ZStack(alignment: .topLeading) {
@@ -125,12 +124,20 @@ struct Icon: View {
             .frame(width: page.width, height: page.height)
         }
         .frame(width: 824, height: 824)
-        .clipShape(squircle)
-        .overlay(squircle.strokeBorder(.white.opacity(0.18), lineWidth: 3))
-        // Flattened first, or the shadow falls under every line of text too.
-        .compositingGroup()
-        .shadow(color: .black.opacity(0.28), radius: 12, y: 10)
-        .frame(width: 1024, height: 1024)
+    }
+}
+
+/// 1024 points square, on Apple's grid: the art in an 824-point squircle with its shadow.
+struct Icon: View {
+    var body: some View {
+        let squircle = RoundedRectangle(cornerRadius: 185.4, style: .continuous)
+        Art()
+            .clipShape(squircle)
+            .overlay(squircle.strokeBorder(.white.opacity(0.18), lineWidth: 3))
+            // Flattened first, or the shadow falls under every line of text too.
+            .compositingGroup()
+            .shadow(color: .black.opacity(0.28), radius: 12, y: 10)
+            .frame(width: 1024, height: 1024)
     }
 }
 
@@ -158,4 +165,9 @@ MainActor.assumeIsolated {
     let background = NSBitmapImageRep(cgImage: renderer.cgImage!)
     background.size = DMGBackground.size
     try! background.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent("dmg.png"))
+    let art = ImageRenderer(content: Art())
+    art.scale = 1024.0 / 824
+    art.isOpaque = true
+    try! NSBitmapImageRep(cgImage: art.cgImage!).representation(using: .png, properties: [:])!
+        .write(to: folder.appendingPathComponent("../iOS/Assets.xcassets/AppIcon.appiconset/icon.png"))
 }

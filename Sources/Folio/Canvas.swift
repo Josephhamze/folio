@@ -3,6 +3,11 @@ import PDFKit
 /// The page view, where the tools draw.
 final class Canvas: PDFView {
     typealias Field = (value: String?, state: PDFWidgetCellState)
+    #if os(macOS)
+    typealias Input = NSTextField
+    #else
+    typealias Input = UITextField
+    #endif
 
     unowned let viewer: Viewer
     /// The annotation the select tool picked, shown highlighted.
@@ -11,11 +16,14 @@ final class Canvas: PDFView {
             oldValue?.isHighlighted = false
             selected?.isHighlighted = true
             outlineSelection()
+            #if os(macOS)
             // So the Fonts panel shows, and changes, the selected text box's font.
             if selected?.type == "FreeText", let font = selected?.font { NSFontManager.shared.setSelectedFont(font, isMultiple: false) }
+            #endif
         }
     }
     /// A frame around the selection: PDFKit draws `isHighlighted` only on form fields.
+    #if os(macOS)
     private let outline: NSView = {
         let view = NSView()
         view.wantsLayer = true
@@ -23,6 +31,15 @@ final class Canvas: PDFView {
         view.layer?.borderWidth = 1.5
         return view
     }()
+    #else
+    private let outline: UIView = {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        view.layer.borderColor = UIColor.tintColor.cgColor
+        view.layer.borderWidth = 1.5
+        return view
+    }()
+    #endif
     /// Where the drag began, in its page's space.
     private var start: (point: CGPoint, page: PDFPage)?
     /// The selected annotation's bounds when the drag began.
@@ -33,9 +50,11 @@ final class Canvas: PDFView {
     /// Each form field's text and state when last committed.
     private var fields: [PDFAnnotation: Field] = [:]
     /// The field over a text box being typed into. A box `adding` names isn't on its page yet.
-    private(set) var editor: (field: NSTextField, box: PDFAnnotation, page: PDFPage, adding: String?)?
+    private(set) var editor: (field: Input, box: PDFAnnotation, page: PDFPage, adding: String?)?
+    #if os(macOS)
     /// The window's document, which has the typing committed before it saves, duplicates or closes.
     private weak var editing: NSDocument?
+    #endif
     private static var warned = false
 
     init(viewer: Viewer) {
@@ -43,11 +62,15 @@ final class Canvas: PDFView {
         super.init(frame: .zero)
         autoScales = true
         displayMode = .singlePageContinuous
+        #if os(macOS)
         backgroundColor = .underPageBackgroundColor
         for name in [NSControl.textDidEndEditingNotification, NSText.didEndEditingNotification] {
             NotificationCenter.default.addObserver(self, selector: #selector(endedEditing), name: name, object: nil)
         }
         NotificationCenter.default.addObserver(self, selector: #selector(textChanged), name: NSControl.textDidChangeNotification, object: nil)
+        #else
+        backgroundColor = .secondarySystemBackground
+        #endif
         NotificationCenter.default.addObserver(self, selector: #selector(pageChanged), name: .PDFViewPageChanged, object: self)
         for name in [Notification.Name.PDFViewScaleChanged, .PDFViewDisplayModeChanged] {
             NotificationCenter.default.addObserver(self, selector: #selector(outlineSelection), name: name, object: self)
@@ -71,10 +94,15 @@ final class Canvas: PDFView {
     func sharpenAnnotations() {
         DispatchQueue.main.async { [self] in
             guard let window else { return }
+            #if os(macOS)
+            let screen = window.backingScaleFactor
+            #else
+            let screen = window.traitCollection.displayScale
+            #endif
             func sharpen(_ layer: CALayer) {
                 // PDFKit's own class: if it is ever renamed, annotations are only as blurry as before.
                 if NSStringFromClass(type(of: layer)) == "PDFPageLayerAnnotationEffect" {
-                    let scale = min(scaleFactor * window.backingScaleFactor, 4096 / max(layer.bounds.width, layer.bounds.height, 1))
+                    let scale = min(scaleFactor * screen, 4096 / max(layer.bounds.width, layer.bounds.height, 1))
                     if layer.contentsScale != scale {
                         layer.contentsScale = scale
                         layer.setNeedsDisplay()
@@ -82,10 +110,15 @@ final class Canvas: PDFView {
                 }
                 layer.sublayers?.forEach(sharpen)
             }
+            #if os(macOS)
             layer.map(sharpen)
+            #else
+            sharpen(layer)
+            #endif
         }
     }
 
+    #if os(macOS)
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.tabbingMode = .preferred
@@ -205,10 +238,13 @@ final class Canvas: PDFView {
         }
     }
 
+    #endif
+
     @objc private func pageChanged() {
         viewer.pageIndex = currentPage.flatMap { document?.index(for: $0) } ?? 0
     }
 
+    #if os(macOS)
     /// With a mark selected, the arrows nudge it a point, or ten with Shift, and Delete deletes it. Esc puts down the mark
     /// or the tool; with neither it falls through, to leave Read Mode. A letter picks its tool.
     override func keyDown(with event: NSEvent) {
@@ -233,6 +269,7 @@ final class Canvas: PDFView {
             super.keyDown(with: event)
         }
     }
+    #endif
 
     /// Puts the outline around the selected annotation, or takes it away when there is none on a page.
     @objc func outlineSelection() {
@@ -246,27 +283,40 @@ final class Canvas: PDFView {
     func edit(_ box: PDFAnnotation, on page: PDFPage, adding name: String? = nil) {
         guard let documentView else { return }
         let font = box.font ?? .systemFont(ofSize: 14)
+        #if os(macOS)
         let field = NSTextField(string: box.contents ?? "")
-        field.font = font.withSize(font.pointSize * scaleFactor)
-        field.textColor = box.fontColor ?? .black
-        // A cover's white hides the line it replaces; a text box shows the page through.
-        field.backgroundColor = box.color
         field.isBezeled = false
         field.focusRingType = .none
         field.wantsLayer = true
         field.layer?.borderColor = NSColor.controlAccentColor.cgColor
         field.layer?.borderWidth = 1
+        #else
+        let field = UITextField()
+        field.text = box.contents
+        field.layer.borderColor = UIColor.tintColor.cgColor
+        field.layer.borderWidth = 1
+        #endif
+        field.font = font.withSize(font.pointSize * scaleFactor)
+        field.textColor = box.fontColor ?? .black
+        // A cover's white hides the line it replaces; a text box shows the page through.
+        field.backgroundColor = box.color
         field.frame = convert(convert(box.bounds, from: page), to: documentView)
-        field.frame.size.width = max(field.frame.width, field.cell?.cellSize.width ?? 0)
         documentView.addSubview(field)
+        #if os(macOS)
+        field.frame.size.width = max(field.frame.width, field.cell?.cellSize.width ?? 0)
         window?.makeFirstResponder(field)
-        editor = (field, box, page, name)
         editing = window?.windowController?.document as? NSDocument
         editing?.objectDidBeginEditing(self)
         // The field editor would take the Fonts panel's choice for itself.
         NSFontManager.shared.target = self
+        #else
+        field.frame.size.width = max(field.frame.width, field.intrinsicContentSize.width)
+        field.becomeFirstResponder()
+        #endif
+        editor = (field, box, page, name)
     }
 
+    #if os(macOS)
     /// Widens the field to its words as they're typed.
     @objc private func textChanged(_ note: Notification) {
         guard let field = editor?.field, note.object as? NSTextField === field, let font = field.font else { return }
@@ -278,6 +328,7 @@ final class Canvas: PDFView {
         guard let view = note.object as? NSView, view.isDescendant(of: self) else { return }
         if view === editor?.field { finishEditing() } else { commitFields() }
     }
+    #endif
 
     /// Writes the edited words into the text box as one change, and grows the box to fit them. A box not on its page yet joins
     /// it only if its words changed: a text box left empty is never added, and an emptied cover blanks out its line. With the
@@ -285,12 +336,17 @@ final class Canvas: PDFView {
     func finishEditing() {
         guard let (field, box, page, adding) = editor else { return }
         editor = nil
+        #if os(macOS)
         editing?.objectDidEndEditing(self)
         NSFontManager.shared.target = nil
         // Ending the field's editing puts the words still in its field editor into it.
         if field.currentEditor() != nil { window?.makeFirstResponder(self) }
+        let text = field.stringValue
+        #else
+        let text = field.text ?? ""
+        #endif
         field.removeFromSuperview()
-        let text = field.stringValue, oldText = box.contents, oldBounds = box.bounds
+        let oldText = box.contents, oldBounds = box.bounds
         let bounds = fit(oldBounds, around: text, in: box.font ?? .systemFont(ofSize: 14))
         defer { if box.page != nil, viewer.tool == .select { selected = box } }
         if let adding {
@@ -302,12 +358,14 @@ final class Canvas: PDFView {
         viewer.doc.change("Edit Text", do: { box.contents = text; box.bounds = bounds }, undo: { box.contents = oldText; box.bounds = oldBounds })
     }
 
+    #if os(macOS)
     /// The Fonts panel's choice, for the selected text box, or the one being typed once its words are in.
     @objc func changeFont(_ sender: NSFontManager?) {
         finishEditing()
         guard let sender, let box = selected, box.type == "FreeText", viewer.doc.canEdit else { return }
         viewer.doc.setFont(sender.convert(box.font ?? NSFont(name: "Helvetica", size: 12)!), of: box)
     }
+    #endif
 
     /// Remembers the page's form fields, so the fill that follows can be undone as one change.
     func snapshotFields(on page: PDFPage) {
@@ -332,6 +390,7 @@ final class Canvas: PDFView {
     }
 }
 
+#if os(macOS)
 /// NSDocument has the editors registered with it commit before it saves, duplicates or closes, by any route: the close
 /// button, the menus or quitting.
 extension Canvas: NSEditor {
@@ -351,3 +410,4 @@ extension Canvas: NSEditor {
         unsafeBitCast(delegate.method(for: selector), to: DidCommit.self)(delegate, selector, self, true, contextInfo)
     }
 }
+#endif
