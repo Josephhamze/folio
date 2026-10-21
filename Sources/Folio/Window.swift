@@ -119,6 +119,12 @@ final class Viewer {
         UserDefaults.standard.set(pages, forKey: "pages")
     }
 
+    /// Shows this pane, in the inspector on iOS.
+    func show(_ pane: Pane) {
+        self.pane = pane
+        showsPanes = true
+    }
+
     /// Ends the typing and records the form fills, for when the document closes or the app leaves the screen.
     func settle() {
         canvas.finishEditing()
@@ -179,6 +185,8 @@ struct DocumentView: View {
     @State private var columns = NavigationSplitViewVisibility.all
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
+    #else
+    @Environment(\.scenePhase) private var scenePhase
     #endif
 
     init(doc: FolioDocument, url: URL?) {
@@ -209,10 +217,27 @@ struct DocumentView: View {
             .sheet(item: $viewer.sheet) { sheet in
                 if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
             }
+            #if os(macOS)
             .focusedSceneValue(\.viewer, viewer)
             .focusedSceneValue(\.searchFocus, $searching)
+            #endif
             .onAppear { viewer.doc.undo = undoManager }
             .onChange(of: undoManager) { viewer.doc.undo = undoManager }
+    }
+
+    /// The page in view, as a number to type over, and the count.
+    @ViewBuilder private var pageBox: some View {
+        if !viewer.doc.pdf.isLocked {
+            HStack(spacing: 4) {
+                TextField("Page", value: Binding(get: { viewer.pageIndex + 1 }, set: { viewer.go(toPage: $0) }), format: .number)
+                    .frame(width: 40)
+                    .multilineTextAlignment(.trailing)
+                    #if os(iOS)
+                    .keyboardType(.numbersAndPunctuation)
+                    #endif
+                Text("of \(viewer.doc.pdf.pageCount)").foregroundStyle(.secondary).monospacedDigit()
+            }
+        }
     }
 
     #if os(macOS)
@@ -226,16 +251,7 @@ struct DocumentView: View {
                 .safeAreaInset(edge: .top, spacing: 0) { if !viewer.readMode { ToolBar(viewer: viewer) } }
         }
         .toolbar {
-            ToolbarItem {
-                if !viewer.doc.pdf.isLocked {
-                    HStack(spacing: 4) {
-                        TextField("Page", value: Binding(get: { viewer.pageIndex + 1 }, set: { viewer.go(toPage: $0) }), format: .number)
-                            .frame(width: 40)
-                            .multilineTextAlignment(.trailing)
-                        Text("of \(viewer.doc.pdf.pageCount)").foregroundStyle(.secondary).monospacedDigit()
-                    }
-                }
-            }
+            ToolbarItem { pageBox }
             ToolbarItem { Text(viewer.matchLabel).foregroundStyle(.secondary).monospacedDigit() }
         }
         .toolbar(viewer.readMode ? .hidden : .visible, for: .windowToolbar)
@@ -259,26 +275,72 @@ struct DocumentView: View {
     }
     #else
     private var layout: some View {
-        PageView(viewer: viewer)
+        let name = url?.deletingPathExtension().lastPathComponent ?? "Untitled"
+        return PageView(viewer: viewer)
             .overlay(alignment: .top) { Bars(viewer: viewer) }
             .safeAreaInset(edge: .bottom, spacing: 0) { ToolBar(viewer: viewer) }
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    pageBox
+                    Button("Panes", systemImage: "sidebar.right") { viewer.showsPanes.toggle() }
+                    ShareLink(item: SharedPDF(viewer: viewer, name: name), preview: SharePreview(name, image: Image(uiImage:
+                        viewer.doc.pdf.page(at: 0)?.thumbnail(of: CGSize(width: 240, height: 240), for: .mediaBox) ?? UIImage())))
+                        .disabled(viewer.doc.pdf.isLocked)
+                }
+            }
+            .searchable(text: $viewer.query, prompt: "Find")
+            .searchFocused($searching)
+            .inspector(isPresented: $viewer.showsPanes) { Sidebar(viewer: viewer).presentationDetents([.medium, .large]) }
+            // Words being typed, and form fills, are kept when the app or the document goes.
+            .onChange(of: scenePhase) { if scenePhase != .active { viewer.settle() } }
+            .onDisappear {
+                viewer.settle()
+                if Front.shared.document?.viewer === viewer { Front.shared.document = nil }
+            }
+            // The menu bar acts on the document in the key window, which the one it opens in is.
+            .onAppear { Front.shared.document = (viewer, $searching) }
+            .onReceive(NotificationCenter.default.publisher(for: UIWindow.didBecomeKeyNotification)) {
+                if $0.object as? UIWindow === viewer.canvas.window { Front.shared.document = (viewer, $searching) }
+            }
     }
     #endif
 }
 
-/// The tools and the colour, in a bar across the top of the pages.
+#if os(iOS)
+/// The document as it is now, the words being typed included, as a PDF file named after it, for the share sheet.
+struct SharedPDF: Transferable {
+    let viewer: Viewer
+    let name: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .pdf) { shared in
+            let data = try await MainActor.run {
+                shared.viewer.settle()
+                return try shared.viewer.doc.snapshot(contentType: .pdf)
+            }
+            let url = URL.temporaryDirectory.appending(path: shared.name + ".pdf")
+            try data.write(to: url)
+            return SentTransferredFile(url)
+        }
+    }
+}
+#endif
+
+/// The tools and the colour, in a bar across the top of the pages. On iOS it's at the bottom, the tools scroll where they
+/// don't fit, and it has Undo, Redo, and Delete while a mark is selected.
 struct ToolBar: View {
     @Bindable var viewer: Viewer
+    #if os(iOS)
+    @Environment(\.undoManager) private var undoManager
+    #endif
 
     var body: some View {
         HStack {
-            Picker("Tool", selection: $viewer.tool) {
-                ForEach(Tool.allCases) { Label($0.name, systemImage: $0.symbol).help("\($0.name) (\($0.key.uppercased()))") }
-            }
-            .pickerStyle(.segmented)
-            .labelStyle(.iconOnly)
-            .labelsHidden()
-            .fixedSize()
+            #if os(macOS)
+            tools
+            #else
+            ScrollView(.horizontal) { tools }.scrollIndicators(.hidden)
+            #endif
             ColorPicker("Colour", selection: Binding(get: { viewer.color.cgColor }, set: {
                 #if os(macOS)
                 viewer.color = NSColor(cgColor: $0) ?? .black
@@ -287,11 +349,36 @@ struct ToolBar: View {
                 #endif
             }))
                 .labelsHidden()
+            #if os(iOS)
+            // The undo manager says nothing when it changes; each change bumps the revision.
+            let _ = viewer.doc.revision
+            Group {
+                Button("Undo", systemImage: "arrow.uturn.backward") { undoManager?.undo() }.disabled(undoManager?.canUndo != true)
+                Button("Redo", systemImage: "arrow.uturn.forward") { undoManager?.redo() }.disabled(undoManager?.canRedo != true)
+                if let mark = viewer.mark {
+                    Button("Delete", systemImage: "trash", role: .destructive) {
+                        viewer.doc.remove(mark)
+                        viewer.canvas.selected = nil
+                    }
+                }
+            }
+            .labelStyle(.iconOnly)
+            #endif
         }
         .disabled(!viewer.doc.canEdit)
         .padding(6)
         .frame(maxWidth: .infinity)
         .background(.bar)
+    }
+
+    private var tools: some View {
+        Picker("Tool", selection: $viewer.tool) {
+            ForEach(Tool.allCases) { Label($0.name, systemImage: $0.symbol).help("\($0.name) (\($0.key.uppercased()))") }
+        }
+        .pickerStyle(.segmented)
+        .labelStyle(.iconOnly)
+        .labelsHidden()
+        .fixedSize()
     }
 }
 
@@ -456,17 +543,35 @@ struct Bars: View {
         let doc = viewer.doc, _ = viewer.doc.revision
         VStack(spacing: 8) {
             if !doc.canEdit {
-                HStack {
+                let lock = HStack {
                     Image(systemName: "lock.fill")
                     Text(doc.pdf.isLocked ? "This document is protected." : "Editing is restricted by the author.")
+                }
+                let field = HStack {
                     SecureField(doc.pdf.isLocked ? "Password" : "Permissions password", text: $password)
                         .frame(width: 180)
                         .onSubmit(unlock)
                     Button("Unlock", action: unlock)
                     if wrong { Text("Wrong password").foregroundStyle(.red) }
                 }
+                // On one line where it fits, as on the Mac; on two on a phone.
+                ViewThatFits(in: .horizontal) {
+                    HStack { lock; field }
+                    VStack { lock; field }
+                }
                 .pill()
             }
+            #if os(iOS)
+            if !viewer.query.isEmpty {
+                HStack(spacing: 16) {
+                    Button("Previous", systemImage: "chevron.left") { viewer.step(-1) }
+                    Text(viewer.matchLabel).monospacedDigit()
+                    Button("Next", systemImage: "chevron.right") { viewer.step(1) }
+                }
+                .labelStyle(.iconOnly)
+                .pill()
+            }
+            #endif
             if let busy = viewer.busy {
                 HStack { ProgressView().controlSize(.small); Text(busy) }.pill()
             }

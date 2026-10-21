@@ -17,12 +17,14 @@ extension Canvas {
     }
 
     /// A tap at `point`, in view coordinates. It ends the typing, then edits the selected text box's words when it lands on
-    /// them, or does what the tool does there.
+    /// them, or does what the tool does there. The page takes the keys, for iPad's Edit menu to send Undo, Redo and Copy to,
+    /// unless a form field there takes them from PDFKit.
     func tapped(at point: CGPoint) {
         finishEditing()
         commitFields()
         guard let page = page(for: point, nearest: false) else { return }
         let at = convert(point, to: page)
+        if page.annotation(at: at)?.type != "Widget" { documentView?.becomeFirstResponder() }
         if viewer.tool == .select, viewer.doc.canEdit, let selected, selected.type == "FreeText", selected.page == page, selected.bounds.contains(at) {
             return edit(selected, on: page)
         }
@@ -31,11 +33,13 @@ extension Canvas {
     }
 
     /// A one-finger drag at `point`, in view coordinates. A markup tool selects the text from where it began to here, and marks
-    /// it up when it ends; any other carries the tool's press on, in the space of the page it began on.
+    /// it up when it ends; any other carries the tool's press on, in the space of the page it began on. The page takes the
+    /// keys, as for a tap.
     func panned(_ state: UIGestureRecognizer.State, at point: CGPoint) {
         if state == .began {
             finishEditing()
             commitFields()
+            documentView?.becomeFirstResponder()
             guard let page = page(for: point, nearest: false) else { return }
             _ = begin(at: convert(point, to: page), on: page)
         }
@@ -54,33 +58,30 @@ extension Canvas {
         end(at: convert(point, to: first))
     }
 
-    /// Where the pan's finger went down: it begins only once the finger has moved a little.
-    func touchDown(of pan: UIPanGestureRecognizer) -> CGPoint {
-        let at = pan.location(in: self), moved = pan.translation(in: self)
-        return CGPoint(x: at.x - moved.x, y: at.y - moved.y)
-    }
-
-    @objc func dragged(_ pan: UIPanGestureRecognizer) {
-        if pan.state == .began { panned(.began, at: touchDown(of: pan)) }
-        panned(pan.state == .began ? .changed : pan.state, at: pan.location(in: self))
-    }
-
-    @objc func touched(_ tap: UITapGestureRecognizer) {
-        tapped(at: tap.location(in: self))
-    }
 }
 
 /// Decides when the canvas's pan and tap take a touch. Not the canvas itself: a PDFView is the delegate of PDFKit's own
 /// gestures, by methods of its own these would replace.
 final class Gestures: NSObject, UIGestureRecognizerDelegate {
     unowned let canvas: Canvas
+    /// Where the pan's finger went down. The pan begins once it has moved a little, and its translation counts from there.
+    private var down = CGPoint.zero
 
     init(canvas: Canvas) {
         self.canvas = canvas
     }
 
+    @objc func dragged(_ pan: UIPanGestureRecognizer) {
+        if pan.state == .began { canvas.panned(.began, at: down) }
+        canvas.panned(pan.state == .began ? .changed : pan.state, at: pan.location(in: canvas))
+    }
+
+    @objc func touched(_ tap: UITapGestureRecognizer) {
+        canvas.tapped(at: tap.location(in: canvas))
+    }
+
     func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
-        recognizer !== canvas.pan || canvas.pans(at: canvas.touchDown(of: canvas.pan))
+        recognizer !== canvas.pan || canvas.pans(at: down)
     }
 
     /// The page scrolls only once the tool has passed on the drag.
@@ -97,7 +98,9 @@ final class Gestures: NSObject, UIGestureRecognizerDelegate {
     /// PDFKit makes from it can be undone.
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         if let field = canvas.editor?.field, field.bounds.contains(touch.location(in: field)) { return false }
-        if canvas.viewer.doc.canEdit, let page = canvas.page(for: touch.location(in: canvas), nearest: false) { canvas.snapshotFields(on: page) }
+        let at = touch.location(in: canvas)
+        if recognizer === canvas.pan, recognizer.numberOfTouches == 0 { down = at }
+        if canvas.viewer.doc.canEdit, let page = canvas.page(for: at, nearest: false) { canvas.snapshotFields(on: page) }
         return true
     }
 }

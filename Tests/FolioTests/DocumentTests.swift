@@ -72,10 +72,10 @@ final class DocumentTests: XCTestCase {
     func testUnlockRedrawsWhatReadCanEdit() {
         let data = makePDF([["Secret"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "pw"])!
         let doc = FolioDocument(pdf: PDFDocument(data: data)!)
-        var told = false
-        withObservationTracking { _ = doc.canEdit } onChange: { told = true }
+        let told = expectation(description: "told")
+        withObservationTracking { _ = doc.canEdit } onChange: { told.fulfill() }
         XCTAssertTrue(doc.unlock("pw"))
-        XCTAssertTrue(told)
+        wait(for: [told], timeout: 0)
     }
 
     func testChangeUndoesAndRedoes() {

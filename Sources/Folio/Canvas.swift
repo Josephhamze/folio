@@ -77,8 +77,8 @@ final class Canvas: PDFView {
         #else
         backgroundColor = .secondarySystemBackground
         pan.maximumNumberOfTouches = 1
-        pan.addTarget(self, action: #selector(dragged))
-        tap.addTarget(self, action: #selector(touched))
+        pan.addTarget(gestures, action: #selector(Gestures.dragged))
+        tap.addTarget(gestures, action: #selector(Gestures.touched))
         for recognizer in [pan, tap] {
             recognizer.delegate = gestures
             addGestureRecognizer(recognizer)
@@ -157,8 +157,7 @@ final class Canvas: PDFView {
             let note = PDFAnnotation(bounds: CGRect(x: point.x - 12, y: point.y - 12, width: 24, height: 24), forType: .text, withProperties: nil)
             note.color = viewer.color
             viewer.doc.add(note, to: page, name: "Add Note")
-            viewer.pane = .comments
-            viewer.showsPanes = true
+            viewer.show(.comments)
             viewer.focusNote = note
             viewer.tool = .select
         case .text:
@@ -197,7 +196,8 @@ final class Canvas: PDFView {
             draft.map(page.removeAnnotation)
             draft = switch viewer.tool {
             case .pen: ink([stroke], color: viewer.color, width: 2)
-            case .sign, .initial: Signature[viewer.tool]?.annotation(in: CGRect(origin: from, size: .zero).union(CGRect(origin: point, size: .zero)))
+            // As ink while it's sized: iOS's PDFKit leaves the picture of each stamp taken off a page on the screen.
+            case .sign, .initial: Signature[viewer.tool]?.annotation(in: CGRect(origin: from, size: .zero).union(CGRect(origin: point, size: .zero)), type: .ink)
             default: shape(viewer.tool, from: from, to: point, color: viewer.color)
             }
             draft.map(page.addAnnotation)
@@ -225,7 +225,7 @@ final class Canvas: PDFView {
         case .sign, .initial:
             guard let signature = Signature[viewer.tool] else { return }
             draft.map(page.removeAnnotation)
-            viewer.doc.add(draft ?? signature.annotation(in: CGRect(x: point.x - 90, y: point.y - 22.5, width: 180, height: 45)), to: page, name: viewer.tool.name)
+            viewer.doc.add(signature.annotation(in: draft?.bounds ?? CGRect(x: point.x - 90, y: point.y - 22.5, width: 180, height: 45)), to: page, name: viewer.tool.name)
             viewer.tool = .select
         default:
             break

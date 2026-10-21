@@ -243,9 +243,9 @@ enum Signature: Codable, Equatable {
     }
 
     /// The signature fitted into `rect`, keeping its shape.
-    func annotation(in rect: CGRect) -> PDFAnnotation {
+    func annotation(in rect: CGRect, type: PDFAnnotationSubtype = .stamp) -> PDFAnnotation {
         let path = path(in: rect)
-        let a = SignatureAnnotation(bounds: path.boundingBoxOfPath, forType: .stamp, withProperties: nil)
+        let a = SignatureAnnotation(bounds: path.boundingBoxOfPath, forType: type, withProperties: nil)
         var origin = CGAffineTransform(translationX: -a.bounds.minX, y: -a.bounds.minY)
         a.outline = path.copy(using: &origin)!
         a.color = .black
@@ -319,14 +319,25 @@ private func inked(_ stroke: [CGPoint]) -> CGPath {
     return path
 }
 
+extension PDFPage {
+    /// Takes the annotation off the page. iOS's PDFKit leaves a stamp's picture on the screen once it's off, unless it was
+    /// hidden as it went; it's shown again after, for when it comes back.
+    func drop(_ a: PDFAnnotation) {
+        let shown = a.shouldDisplay
+        a.shouldDisplay = false
+        removeAnnotation(a)
+        a.shouldDisplay = shown
+    }
+}
+
 extension FolioDocument {
     func add(_ a: PDFAnnotation, to page: PDFPage, name: String) {
-        change(name, do: { page.addAnnotation(a) }, undo: { page.removeAnnotation(a) })
+        change(name, do: { page.addAnnotation(a) }, undo: { page.drop(a) })
     }
 
     func remove(_ a: PDFAnnotation) {
         guard let page = a.page else { return }
-        change("Delete", do: { page.removeAnnotation(a) }, undo: { page.addAnnotation(a) })
+        change("Delete", do: { page.drop(a) }, undo: { page.addAnnotation(a) })
     }
 
     func set<V>(_ key: ReferenceWritableKeyPath<PDFAnnotation, V>, of a: PDFAnnotation, to value: V, name: String) {

@@ -34,6 +34,18 @@ private func ends(ofLine row: Int, on page: PDFPage, in canvas: Canvas) -> (star
     return (canvas.convert(CGPoint(x: line.minX + 1, y: line.midY), from: page), canvas.convert(CGPoint(x: line.maxX - 1, y: line.midY), from: page))
 }
 
+/// How many marks show once PDFKit has drawn: it draws each in a layer of its own.
+private func shownMarks(_ canvas: Canvas) -> Int {
+    RunLoop.main.run(until: Date() + 0.3)
+    var count = 0
+    func walk(_ layer: CALayer) {
+        if NSStringFromClass(type(of: layer)) == "PDFPageLayerAnnotationEffect", !layer.isHidden { count += 1 }
+        layer.sublayers?.forEach(walk)
+    }
+    walk(canvas.layer)
+    return count
+}
+
 final class TouchTests: XCTestCase {
     /// The page view lays its pages out only in a window, kept for the test.
     private var window: UIWindow?
@@ -150,6 +162,59 @@ final class TouchTests: XCTestCase {
         XCTAssertEqual(square.bounds.minX, 120, accuracy: 0.5)
         XCTAssertEqual(square.bounds.minY, 310, accuracy: 0.5)
         XCTAssertEqual(undo.undoActionName, "Move")
+    }
+
+    func testSignatureLeavesNothingBehindOnTheScreen() {
+        let saved = Signature[.sign]
+        defer { Signature[.sign] = saved }
+        Signature[.sign] = .typed("Jo")
+        let (viewer, undo) = host(makePDF([["Hi"]]))
+        let canvas = viewer.canvas, page = viewer.doc.pages[0], at = { (point: CGPoint) in canvas.convert(point, from: page) }
+        viewer.tool = .sign
+        // Dragged to size, the screen drawn between moves as it is under a finger.
+        act(undo) {
+            canvas.panned(.began, at: at(CGPoint(x: 100, y: 300)))
+            for x: CGFloat in [200, 250, 300] {
+                canvas.panned(.changed, at: at(CGPoint(x: x, y: 380)))
+                XCTAssertEqual(shownMarks(canvas), 1)
+            }
+            canvas.panned(.ended, at: at(CGPoint(x: 300, y: 380)))
+        }
+        XCTAssertEqual(page.annotations.map(\.type), ["Stamp"])
+        XCTAssertEqual(shownMarks(canvas), 1)
+        undo.undo()
+        XCTAssertEqual(shownMarks(canvas), 0)
+        undo.redo()
+        XCTAssertEqual(shownMarks(canvas), 1)
+        act(undo) { viewer.doc.remove(page.annotations[0]) }
+        XCTAssertEqual(shownMarks(canvas), 0)
+    }
+
+    /// Return, a tap or a drag leaves the keys with the page, where iPad's Edit menu sends Undo, Redo and Copy, but not a tap
+    /// on a form field, which PDFKit gives them to.
+    func testPageTakesTheKeys() throws {
+        let (viewer, _) = host(makePDF([["Hi"]]))
+        let canvas = viewer.canvas, page = viewer.doc.pages[0], pages = try XCTUnwrap(canvas.documentView)
+        let at = { (point: CGPoint) in canvas.convert(point, from: page) }
+        viewer.tool = .text
+        canvas.tapped(at: at(CGPoint(x: 300, y: 600)))
+        let field = try XCTUnwrap(canvas.editor).field
+        XCTAssertTrue(field.isFirstResponder)
+        field.sendActions(for: .editingDidEndOnExit)   // Return
+        XCTAssertTrue(pages.isFirstResponder)
+        pages.resignFirstResponder()
+        canvas.tapped(at: at(CGPoint(x: 300, y: 500)))
+        XCTAssertTrue(pages.isFirstResponder)
+        pages.resignFirstResponder()
+        viewer.tool = .rect
+        drag(canvas, at(CGPoint(x: 100, y: 300)), at(CGPoint(x: 200, y: 360)))
+        XCTAssertTrue(pages.isFirstResponder)
+        pages.resignFirstResponder()
+        let widget = PDFAnnotation(bounds: CGRect(x: 100, y: 100, width: 200, height: 30), forType: .widget, withProperties: nil)
+        widget.widgetFieldType = .text
+        page.addAnnotation(widget)
+        canvas.tapped(at: at(CGPoint(x: 150, y: 115)))
+        XCTAssertFalse(pages.isFirstResponder)
     }
 
     /// Restricted by its author, the file shows its pages, which take no marks. A locked file shows none to touch.

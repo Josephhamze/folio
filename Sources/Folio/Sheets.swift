@@ -9,7 +9,11 @@ struct SignatureSheet: View {
     @State private var strokes: [[CGPoint]] = []
     @State private var drawing = false
     @State private var name = ""
+    #if os(macOS)
     private let pad = CGSize(width: 480, height: 160)
+    #else
+    private let pad = CGSize(width: 340, height: 120)
+    #endif
 
     var body: some View {
         VStack(spacing: 16) {

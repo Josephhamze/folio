@@ -2,6 +2,10 @@ import SwiftUI
 
 @main
 struct FolioApp: App {
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor private var delegate: AppDelegate
+    #endif
+
     var body: some Scene {
         DocumentGroup(newDocument: { FolioDocument() }) { DocumentView(doc: $0.document, url: $0.fileURL) }
             .commands { FolioCommands() }
@@ -23,14 +27,34 @@ struct FolioApp: App {
     }
 }
 
+#if os(macOS)
 extension FocusedValues {
     @Entry var viewer: Viewer?
     @Entry var searchFocus: FocusState<Bool>.Binding?
 }
+#else
+/// The document in the key window, for the menu bar: iPad's commands don't see a document's focused values.
+@Observable final class Front {
+    static let shared = Front()
+    var document: (viewer: Viewer, searchFocus: FocusState<Bool>.Binding)?
+}
+
+/// The end of the responder chain, where iPad's own Edit › Find lands with or without a first responder. It takes ⌘F, ⌘G
+/// and ⇧⌘G before Folio's commands can.
+final class AppDelegate: UIResponder, UIApplicationDelegate {
+    override func find(_ sender: Any?) { Front.shared.document?.searchFocus.wrappedValue = true }
+    override func findNext(_ sender: Any?) { Front.shared.document?.viewer.step(1) }
+    override func findPrevious(_ sender: Any?) { Front.shared.document?.viewer.step(-1) }
+}
+#endif
 
 struct FolioCommands: Commands {
+    #if os(macOS)
     @FocusedValue(\.viewer) private var viewer
     @FocusedValue(\.searchFocus) private var searchFocus
+    #else
+    private var viewer: Viewer? { Front.shared.document?.viewer }
+    #endif
 
     var body: some Commands {
         #if os(macOS)
@@ -40,16 +64,26 @@ struct FolioCommands: Commands {
                 .keyboardShortcut("s", modifiers: [.command, .shift, .option])
                 .disabled(viewer == nil)
         }
-        CommandGroup(replacing: .printItem) {
-            Button("Print…") { viewer?.canvas.print(with: .shared, autoRotate: true, pageScaling: .pageScaleToFit) }
-                .keyboardShortcut("p")
-                .disabled(viewer?.doc.pdf.isLocked ?? true)
-        }
-        #endif
+        // iPad's Edit menu has these: see AppDelegate.
         CommandGroup(after: .textEditing) {
             Button("Find…") { searchFocus?.wrappedValue = true }.keyboardShortcut("f")
             Button("Find Next") { viewer?.step(1) }.keyboardShortcut("g")
             Button("Find Previous") { viewer?.step(-1) }.keyboardShortcut("g", modifiers: [.command, .shift])
+        }
+        #endif
+        CommandGroup(replacing: .printItem) {
+            Button("Print…") {
+                #if os(macOS)
+                viewer?.canvas.print(with: .shared, autoRotate: true, pageScaling: .pageScaleToFit)
+                #else
+                guard let viewer else { return }
+                viewer.settle()
+                UIPrintInteractionController.shared.printingItem = try? viewer.doc.snapshot(contentType: .pdf)
+                UIPrintInteractionController.shared.present(animated: true)
+                #endif
+            }
+            .keyboardShortcut("p")
+            .disabled(viewer?.doc.pdf.isLocked ?? true)
         }
         CommandGroup(after: .toolbar) {
             Button("Single Page") { viewer?.canvas.displayMode = .singlePage }
@@ -61,9 +95,9 @@ struct FolioCommands: Commands {
             Button("Actual Size") { viewer?.canvas.scaleFactor = 1 }.keyboardShortcut("0")
             Button("Zoom to Fit") { viewer?.canvas.autoScales = true }.keyboardShortcut("9")
             Divider()
-            Button("Thumbnails") { viewer?.pane = .thumbnails }.keyboardShortcut("1", modifiers: [.command, .option])
-            Button("Bookmarks") { viewer?.pane = .bookmarks }.keyboardShortcut("2", modifiers: [.command, .option])
-            Button("Comments") { viewer?.pane = .comments }.keyboardShortcut("3", modifiers: [.command, .option])
+            Button("Thumbnails") { viewer?.show(.thumbnails) }.keyboardShortcut("1", modifiers: [.command, .option])
+            Button("Bookmarks") { viewer?.show(.bookmarks) }.keyboardShortcut("2", modifiers: [.command, .option])
+            Button("Comments") { viewer?.show(.comments) }.keyboardShortcut("3", modifiers: [.command, .option])
             #if os(macOS)
             Button(viewer?.readMode == true ? "Leave Read Mode" : "Read Mode") { viewer?.readMode.toggle() }
                 .keyboardShortcut("r", modifiers: [.command, .option])
