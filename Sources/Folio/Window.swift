@@ -288,7 +288,11 @@ struct DocumentView: View {
             }
             .searchable(text: $viewer.query, prompt: "Find")
             .searchFocused($searching)
-            .inspector(isPresented: $viewer.showsPanes) { Sidebar(viewer: viewer).presentationDetents([.medium, .large]) }
+            // The inspector only ever closes the panes: once in a while, as a document opened, it set them shown without
+            // showing them, and the next tap on Panes hid them.
+            .inspector(isPresented: Binding { viewer.showsPanes } set: { if !$0 { viewer.showsPanes = false } }) {
+                Sidebar(viewer: viewer).presentationDetents([.medium, .large])
+            }
             // Words being typed, and form fills, are kept when the app or the document goes.
             .onChange(of: scenePhase) { if scenePhase != .active { viewer.settle() } }
             .onDisappear {
