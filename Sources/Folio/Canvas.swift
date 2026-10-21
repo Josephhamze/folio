@@ -55,6 +55,8 @@ final class Canvas: PDFView {
     #if os(macOS)
     /// The window's document, which has the typing committed before it saves, duplicates or closes.
     private weak var editing: NSDocument?
+    /// What watches the scroll wheel for ⌘, to zoom.
+    private var wheel: Any?
     #endif
     private static var warned = false
     #if os(iOS)
@@ -74,6 +76,18 @@ final class Canvas: PDFView {
             NotificationCenter.default.addObserver(self, selector: #selector(endedEditing), name: name, object: nil)
         }
         NotificationCenter.default.addObserver(self, selector: #selector(textChanged), name: NSControl.textDidChangeNotification, object: nil)
+        // ⌘ and the scroll wheel zoom around the pointer, as a pinch does. The pages' scroll view takes the wheel before the
+        // page view would see it, so the app's events are watched for it.
+        wheel = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self, event.modifierFlags.contains(.command), let window, event.window === window,
+                  bounds.contains(convert(event.locationInWindow, from: nil)), let scroll = documentView?.enclosingScrollView else { return event }
+            // A wheel's notch is a line, a trackpad's swipe many points; away from you zooms in, whichever way the pages scroll.
+            let away = event.scrollingDeltaY * (event.isDirectionInvertedFromDevice ? -1 : 1) / (event.hasPreciseScrollingDeltas ? 200 : 10)
+            // PDFKit zooms by its scroll view's magnification. Left on, its fit to the window would undo the zoom on a resize.
+            autoScales = false
+            scroll.setMagnification(scroll.magnification * exp(away), centeredAt: scroll.contentView.convert(event.locationInWindow, from: nil))
+            return nil
+        }
         #else
         backgroundColor = .secondarySystemBackground
         pan.maximumNumberOfTouches = 1
@@ -95,6 +109,10 @@ final class Canvas: PDFView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    #if os(macOS)
+    deinit { wheel.map(NSEvent.removeMonitor) }
+    #endif
 
     #if os(iOS)
     /// The press watches the whole window.

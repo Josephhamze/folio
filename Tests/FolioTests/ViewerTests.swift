@@ -202,6 +202,37 @@ final class ViewerTests: XCTestCase {
         XCTAssertFalse(viewer.canvas.responds(to: delete))
     }
 
+    /// ⌘ and the scroll wheel zoom around the pointer: a notch away zooms in, one back zooms out, and without ⌘ the wheel is
+    /// left to the pages. The wheel goes through the app, as the system's does.
+    func testCommandScrollZoomsAroundThePointer() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"], ["B"]]))), canvas = viewer.canvas, page = viewer.doc.pages[0]
+        let window = NSWindow(contentRect: CGRect(x: -4000, y: -4000, width: 700, height: 900), styleMask: .borderless, backing: .buffered, defer: false)
+        // Lines of the wheel, sent to the window. CGEvent's field 51, which isn't documented, names the window; the event's
+        // point in it can't be set, so the page view goes under wherever it is.
+        let wheel = { (lines: Int32, flags: CGEventFlags) -> NSEvent in
+            let cg = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: lines, wheel2: 0, wheel3: 0)!
+            cg.flags = flags
+            cg.setIntegerValueField(CGEventField(rawValue: 51)!, value: Int64(window.windowNumber))
+            return NSEvent(cgEvent: cg)!
+        }
+        let pointer = wheel(0, []).locationInWindow
+        window.contentView = NSView()
+        canvas.frame = CGRect(x: pointer.x - 300, y: pointer.y - 400, width: 700, height: 900)
+        window.contentView!.addSubview(canvas)
+        canvas.document = viewer.doc.pdf
+        canvas.layoutDocumentView()
+        let fit = canvas.scaleFactor, under = { canvas.convert(canvas.convert(pointer, from: nil), to: page) }, before = under()
+        NSApplication.shared.sendEvent(wheel(3, .maskCommand))
+        XCTAssertEqual(canvas.scaleFactor, fit * exp(0.3), accuracy: 0.001)
+        let after = under()
+        XCTAssertEqual(hypot(after.x - before.x, after.y - before.y), 0, accuracy: 0.5)
+        XCTAssertFalse(canvas.autoScales)
+        NSApplication.shared.sendEvent(wheel(-3, .maskCommand))
+        XCTAssertEqual(canvas.scaleFactor, fit, accuracy: 0.001)
+        NSApplication.shared.sendEvent(wheel(-3, []))
+        XCTAssertEqual(canvas.scaleFactor, fit, accuracy: 0.001)
+    }
+
     func testLockedFileTakesNoTool() throws {
         let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "pw", .ownerPasswordOption: "pw"])!
         let viewer = Viewer(doc: FolioDocument(pdf: PDFDocument(data: data)!)), page = try XCTUnwrap(viewer.doc.pdf.page(at: 0))
