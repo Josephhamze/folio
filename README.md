@@ -27,7 +27,7 @@
 - **Sign.** Draw or type your signature and initials once. Then place them with a click, or drag a box to size them. They're saved as vector outlines, so they stay sharp at any zoom and in other PDF apps.
 - **Fill in forms.** You can also fix a line of text by typing over it. The original text stays underneath in the file, and Folio tells you so.
 - **Protected files.** Folio asks for a file's password in the window. It respects an author's editing restrictions until you enter the permissions password, and saving keeps the file encrypted.
-- **Save As.** File › Save As… (⌥⇧⌘S) saves the document under a new name, and you keep working in the new file. Like any Mac app, Folio also saves as you go, and File › Revert To goes back to earlier versions.
+- **Save.** Your changes stay out of the file until you save them with ⌘S. Closing or quitting with unsaved changes asks whether to save them. File › Save As… (⌥⇧⌘S) saves the document under a new name, and you keep working in the new file.
 - **Undo.** Every change can be undone and redone.
 - **Print**, and open PDFs from Finder. Folio asks once to be your default PDF app, and Home offers it while it isn't.
 

@@ -233,12 +233,14 @@ final class ViewerTests: XCTestCase {
         XCTAssertNil(NSFontManager.shared.target)
     }
 
-    func testClosingKeepsTheWordsBeingTyped() throws {
+    /// Closing with changes asks whether to save them, and writes nothing until Save, which saves the words being typed too.
+    func testClosingAsksToSaveTheWordsBeingTyped() throws {
         let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Name:"]]))), page = viewer.doc.pages[0]
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("typing.pdf")
         try Data().write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
-        let document = try Autosaving(contentsOf: file, ofType: "com.adobe.pdf")
+        let document = try Asking(contentsOf: file, ofType: "com.adobe.pdf")
+        document.doc = viewer.doc
         let window = NSWindow(contentRect: CGRect(x: -4000, y: -4000, width: 600, height: 400), styleMask: .borderless, backing: .buffered, defer: false)
         document.addWindowController(NSWindowController(window: window))
         window.contentView = viewer.canvas
@@ -247,25 +249,40 @@ final class ViewerTests: XCTestCase {
         viewer.canvas.edit(textBox(at: CGPoint(x: 300, y: 725), on: page), on: page, adding: "Add Text")
         let typing = try XCTUnwrap(viewer.canvas.editor?.field.currentEditor() as? NSTextView)
         typing.insertText("Jo", replacementRange: NSRange(location: NSNotFound, length: 0))
-        // As the close button, ⌘W and ⌘Q do.
-        document.canClose(withDelegate: self, shouldClose: #selector(document(_:shouldClose:contextInfo:)), contextInfo: nil)
-        for _ in 0..<20 where closes == nil { RunLoop.main.run(until: Date() + 0.05) }
+        // Closes as the close button, ⌘W and ⌘Q do, and answers the question.
+        let close = { (answer: String) in
+            self.closes = nil
+            document.canClose(withDelegate: self, shouldClose: #selector(self.document(_:shouldClose:contextInfo:)), contextInfo: nil)
+            for _ in 0..<20 where window.attachedSheet == nil { RunLoop.main.run(until: Date() + 0.05) }
+            func buttons(in view: NSView) -> [NSButton] { [view as? NSButton].compactMap { $0 } + view.subviews.flatMap(buttons) }
+            let choices = (window.attachedSheet?.contentView).map(buttons) ?? []
+            XCTAssertEqual(choices.map(\.title), ["Save", "Don’t Save", "Cancel"])
+            choices.first { $0.title == answer }?.performClick(nil)
+            for _ in 0..<20 where self.closes == nil { RunLoop.main.run(until: Date() + 0.05) }
+        }
+        close("Cancel")
+        XCTAssertEqual(closes, false)
+        XCTAssertEqual(try Data(contentsOf: file), Data())
+        close("Save")
         XCTAssertEqual(closes, true)
-        XCTAssertEqual(page.annotations.map { $0.contents ?? "" }, ["Jo"])
-        XCTAssertTrue(document.saved)
+        XCTAssertEqual(PDFDocument(url: file)?.page(at: 0)?.annotations.map { $0.contents ?? "" }, ["Jo"])
     }
 
     private var closes: Bool?
     @objc private func document(_ document: NSDocument, shouldClose: Bool, contextInfo: UnsafeMutableRawPointer?) { closes = shouldClose }
 
-    private final class Autosaving: NSDocument {
-        var saved = false
-        override class var autosavesInPlace: Bool { true }
+    /// As Folio's documents are: saved only when asked.
+    private final class Asking: NSDocument {
+        var doc: FolioDocument?
+        override class var autosavesInPlace: Bool { false }
         override func read(from data: Data, ofType typeName: String) throws {}
-        override func data(ofType typeName: String) throws -> Data {
-            saved = true
-            return Data()
-        }
+        override func data(ofType typeName: String) throws -> Data { try doc!.snapshot(contentType: .pdf) }
+    }
+
+    /// SwiftUI's documents save as they change; Folio's wait to be saved.
+    func testDocumentsWaitToBeSaved() {
+        _ = FolioApp()
+        XCTAssertEqual((NSClassFromString("SwiftUI.FileWrapperPlatformDocument") as? NSDocument.Type)?.autosavesInPlace, false)
     }
 
     func testALockedFileOpensAtItsLastPageOnceUnlocked() {

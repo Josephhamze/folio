@@ -4,6 +4,16 @@ import SwiftUI
 struct FolioApp: App {
     #if os(iOS)
     @UIApplicationDelegateAdaptor private var delegate: AppDelegate
+    #else
+    /// SwiftUI's documents save themselves as they change, with no switch to stop it. Folio's wait for ⌘S, so closing or
+    /// quitting with changes asks whether to save them.
+    /// shortcut: this replaces the answer of SwiftUI's document class, found by its name; were it renamed, Folio would save as
+    /// it goes again. Give Folio an NSDocument of its own if that happens.
+    init() {
+        guard let documents = NSClassFromString("SwiftUI.PlatformDocument") else { return }
+        let never: @convention(block) (AnyClass) -> Bool = { _ in false }
+        class_replaceMethod(object_getClass(documents), #selector(getter: NSDocument.autosavesInPlace), imp_implementationWithBlock(never), "B@:")
+    }
     #endif
 
     var body: some Scene {
