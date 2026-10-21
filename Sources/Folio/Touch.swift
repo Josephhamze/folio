@@ -91,9 +91,11 @@ final class Gestures: NSObject, UIGestureRecognizerDelegate {
         recognizer !== canvas.pan || canvas.pans(at: down)
     }
 
-    /// The page scrolls only once the tool has passed on the drag.
+    /// The page scrolls only once the tool has passed on the drag. Where the tool drags, a finger held still before it moves
+    /// is the tool's too, not a long press's, which would select the text under it.
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
-        recognizer === canvas.pan && other === (other.view as? UIScrollView)?.panGestureRecognizer
+        recognizer === canvas.pan && (other === (other.view as? UIScrollView)?.panGestureRecognizer
+            || other is UILongPressGestureRecognizer && canvas.pans(at: down))
     }
 
     /// The tap goes with PDFKit's own, which follow links and fill form fields, and the press with everything.

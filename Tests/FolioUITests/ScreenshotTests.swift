@@ -119,6 +119,28 @@ final class ScreenshotTests: XCTestCase {
         shot("pen pinch")
     }
 
+    /// A finger held still before it drags sizes the signature, rather than selecting the text under it; with Select, a long
+    /// press still selects text.
+    func testHeldDragSizesTheSignature() {
+        openSample()
+        let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 3.'")).firstMatch.frame
+        choose("signature")
+        point(line.midX, line.minY - 30).tap()   // none saved yet: the pad
+        XCTAssertTrue(app.buttons["Type"].waitForExistence(timeout: 2))
+        app.buttons["Type"].tap()
+        app.textFields["Your name"].tap()
+        app.typeText("Joseph Hamze")
+        app.buttons["Save"].tap()
+        point(line.minX + 20, line.minY + 10).press(forDuration: 1, thenDragTo: point(line.minX + 250, line.maxY + 60), withVelocity: .slow,
+                                                     thenHoldForDuration: 0.1)
+        shot("held drag")
+        XCTAssertTrue(app.buttons["arrow.uturn.backward"].isEnabled)
+        XCTAssertFalse(app.menuItems["Copy"].exists)
+        point(line.minX + 20, line.minY + 10).press(forDuration: 1)
+        XCTAssertTrue(app.menuItems["Copy"].waitForExistence(timeout: 3))
+        shot("long press")
+    }
+
     /// iPad's menu bar and its keys act on the document in front, ⌘Z included.
     func testMenuBarActsOnTheDocument() throws {
         try XCTSkipUnless(pad, "The menu bar is iPad's.")
