@@ -24,8 +24,8 @@ func makePDF(styled pages: [[NSAttributedString]], size: CGSize = CGSize(width: 
     return PDFDocument(data: data as Data)!
 }
 
-/// Two blank pages and a bookmark, "Second", to the second, written out by hand: PDFKit saves the bookmarks of a file it
-/// read as the file had them, not ones added to it.
+/// Two blank pages, titled "Q3", with a bookmark, "Second", to the second, written out by hand: PDFKit saves the bookmarks
+/// of a file it read as the file had them, not ones added to it.
 func outlinedPDF() -> Data {
     let objects = [
         "<< /Type /Catalog /Pages 2 0 R /Outlines 5 0 R >>",
@@ -34,6 +34,7 @@ func outlinedPDF() -> Data {
         "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>",
         "<< /Type /Outlines /First 6 0 R /Last 6 0 R /Count 1 >>",
         "<< /Title (Second) /Parent 5 0 R /Dest [4 0 R /XYZ 0 792 0] >>",
+        "<< /Title (Q3) >>",
     ]
     var pdf = "%PDF-1.4\n", offsets: [Int] = []
     for (i, object) in objects.enumerated() {
@@ -42,7 +43,7 @@ func outlinedPDF() -> Data {
     }
     let xref = pdf.utf8.count
     pdf += "xref\n0 \(objects.count + 1)\n0000000000 65535 f \n" + offsets.map { String(format: "%010d 00000 n \n", $0) }.joined()
-    pdf += "trailer\n<< /Size \(objects.count + 1) /Root 1 0 R >>\nstartxref\n\(xref)\n%%EOF\n"
+    pdf += "trailer\n<< /Size \(objects.count + 1) /Root 1 0 R /Info 7 0 R >>\nstartxref\n\(xref)\n%%EOF\n"
     return Data(pdf.utf8)
 }
 
@@ -151,7 +152,6 @@ final class DocumentTests: XCTestCase {
     /// Taking off a file's password keeps its pages, marks, title and bookmarks, each to its page, and undoes.
     func testRemovePasswordKeepsWhatsInTheFileAndUndoes() throws {
         let pdf = try XCTUnwrap(PDFDocument(data: outlinedPDF()))
-        pdf.documentAttributes = [PDFDocumentAttribute.titleAttribute: "Q3"]
         pdf.page(at: 1)!.addAnnotation(shape(.rect, from: .zero, to: CGPoint(x: 20, y: 20), color: .red))
         let data = try XCTUnwrap(pdf.dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "a", .ownerPasswordOption: "a"]))
         let doc = FolioDocument(pdf: try XCTUnwrap(PDFDocument(data: data))), undo = manualUndo(doc)

@@ -67,7 +67,9 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 
 ## Roadmap
 
-- **Combine and split files:** combine PDFs and pictures into a new document, and split one into files of a few pages each. The document side of this is built and tested. The screens aren't built yet.
+- **Split files:** split a document into files of a few pages each. The document side of this is built and tested. The screen isn't built yet. (Organize Pages already combines PDFs and pictures, with Insert from File…, and takes pages out, with Extract Pages….)
+- **Scan with the camera:** scan paper into a document on iPhone and iPad, then Recognize Text makes it searchable.
+- **French and Chinese:** Folio's menus, buttons and messages in French and Chinese.
 - **Restrictions and properties:** restrict printing, copying and changes with a permissions password, and a sheet for the title, author and keywords.
 
 ## License
