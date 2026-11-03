@@ -86,6 +86,22 @@ final class DocumentTests: XCTestCase {
         XCTAssertTrue(PDFDocument(data: try! doc.snapshot(contentType: .pdf))!.isEncrypted)
     }
 
+    /// A file its author kept from being copied or printed, open without the permissions password, takes marks but gives no
+    /// pages to another file, which would go without what the author forbids. The permissions password lifts that.
+    func testRestrictedFileGivesNoPages() throws {
+        let editable: PDFAccessPermissions = [.allowsDocumentChanges, .allowsDocumentAssembly, .allowsCommenting, .allowsFormFieldEntry]
+        let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.ownerPasswordOption: "pw", .accessPermissionsOption: editable.rawValue])!
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).pdf")
+        try data.write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertEqual(FolioDocument.pages(from: [url]), [])
+        let doc = FolioDocument(pdf: PDFDocument(data: data)!)
+        XCTAssertTrue(doc.canEdit)
+        XCTAssertFalse(doc.pdf.hasFullRights)
+        XCTAssertTrue(doc.unlock("pw"))
+        XCTAssertTrue(doc.pdf.hasFullRights)
+    }
+
     func testPasswordToOpenGoesOnWhenSavedAndUndoes() throws {
         let doc = FolioDocument(pdf: makePDF([["A"]])), undo = manualUndo(doc)
         act(undo) { doc.setPassword("pw") }

@@ -155,9 +155,9 @@ struct ToolsMenu: View {
         #if os(macOS)
         Button("Reduce File Size") { viewer?.reduceFileSize() }.disabled(!idle)
         #endif
-        Button("Password…") { viewer?.sheet = .protect }.disabled(!idle)
+        Button("Password…") { viewer?.sheet = .protect }.disabled(!idle || viewer?.doc.pdf.hasFullRights != true)
         Button("Add to Every Page") { viewer?.addToEveryPage() }.disabled(viewer?.canAddToEveryPage != true)
-        if let viewer, !viewer.doc.pdf.isLocked {
+        if let viewer, !viewer.doc.pdf.isLocked, viewer.doc.pdf.permissionsStatus == .owner || viewer.doc.pdf.allowsCopying {
             ShareLink("Send Page as Picture", item: PagePicture(viewer: viewer), preview: SharePreview("Page \(viewer.pageIndex + 1)"))
         } else {
             Button("Send Page as Picture") {}.disabled(true)

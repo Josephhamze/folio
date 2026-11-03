@@ -479,11 +479,13 @@ final class ViewerTests: XCTestCase {
         XCTAssertTrue(viewer.doc.unlock("a"))
         viewer.organizing = true
         viewer.selection = [viewer.doc.pages[1]]
+        viewer.doc.pages[1].addAnnotation(shape(.rect, from: .zero, to: CGPoint(x: 20, y: 20), color: .red))
         viewer.extract()
         let file = try XCTUnwrap(PDFDocument(data: try XCTUnwrap(viewer.extracted).snapshot(contentType: .pdf)))
         XCTAssertTrue(file.isLocked)
         XCTAssertTrue(file.unlock(withPassword: "a"))
         XCTAssertEqual(texts(file), ["B"])
+        XCTAssertEqual(file.page(at: 0)?.annotations.count, 1)
         viewer.doc.setPassword("b")
         viewer.extract()
         XCTAssertEqual(viewer.extracted?.newPassword, "b")

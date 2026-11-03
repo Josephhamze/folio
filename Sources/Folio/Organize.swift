@@ -90,7 +90,7 @@ struct PageActions: View {
             .disabled(!idle)
         Button("Extract Pages…", systemImage: "square.and.arrow.up") { viewer?.extract() }
             .help("Extract Pages…")
-            .disabled(!chosen)
+            .disabled(!chosen || viewer?.doc.pdf.hasFullRights != true)
         Button("Delete Pages", systemImage: "trash", role: .destructive) { viewer?.deletePages() }
             .help("Delete Pages")
             .disabled(!idle || viewer?.canDelete != true)

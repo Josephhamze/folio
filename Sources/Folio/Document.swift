@@ -175,12 +175,21 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         urls.flatMap { url -> [PDFPage] in
             guard let data = try? Data(contentsOf: url) else { return [] }
             if UTType(filenameExtension: url.pathExtension)?.conforms(to: .pdf) == true {
-                guard let pdf = PDFDocument(data: data), !pdf.isLocked else { return [] }
+                guard let pdf = PDFDocument(data: data), pdf.hasFullRights else { return [] }
                 return (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.copy() as? PDFPage }
             }
             guard let image = NSImage(data: data) else { return [] }
             let size = image.size.width > image.size.height ? CGSize(width: paper.height, height: paper.width) : paper
             return PDFPage(image: image, options: [.mediaBox: CGRect(origin: .zero, size: size)]).map { [$0] } ?? []
         }
+    }
+}
+
+extension PDFDocument {
+    /// False for a file its author restricted, open without the permissions password: pages or a file made from it, or a
+    /// new password, would go without what the author forbids.
+    var hasFullRights: Bool {
+        !isLocked && (permissionsStatus == .owner || allowsPrinting && allowsCopying && allowsContentAccessibility
+            && allowsDocumentChanges && allowsDocumentAssembly && allowsCommenting && allowsFormFieldEntry)
     }
 }
