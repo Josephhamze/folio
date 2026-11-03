@@ -86,16 +86,17 @@ extension FolioDocument {
 
     /// Writes the document again with its pictures as JPEG at the screen's resolution, and keeps the result as one change
     /// when it's smaller: a file of text and lines can grow. It works on a copy, away from the window, and returns the sizes
-    /// before and after, or nil when it changed nothing.
+    /// before and after, or nil when it changed nothing. A change made meanwhile, such as an undo, would be lost to the copy,
+    /// so then it changes nothing either.
     @MainActor func reduceFileSize() async -> (before: Int, after: Int)? {
         guard let before = pdf.dataRepresentation() else { return nil }
-        let password = password, encrypted = pdf.isEncrypted
+        let password = password, encrypted = pdf.isEncrypted, start = revision
         let after = await Task.detached { () -> Data? in
             guard let copy = PDFDocument(data: before), !copy.isLocked || password.map({ copy.unlock(withPassword: $0) }) == true else { return nil }
             return copy.dataRepresentation(options: [PDFDocumentWriteOption.saveImagesAsJPEGOption: true, .optimizeImagesForScreenOption: true])
         }.value
         // Never at the cost of the file's password.
-        guard let after, after.count < before.count, let smaller = PDFDocument(data: after), smaller.isEncrypted == encrypted,
+        guard revision == start, let after, after.count < before.count, let smaller = PDFDocument(data: after), smaller.isEncrypted == encrypted,
               !smaller.isLocked || password.map({ smaller.unlock(withPassword: $0) }) == true else { return nil }
         let old = pdf
         change("Reduce File Size", do: { self.pdf = smaller }, undo: { self.pdf = old })
