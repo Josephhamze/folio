@@ -120,6 +120,7 @@ final class DocumentTests: XCTestCase {
         let data = pdf.dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "a", .ownerPasswordOption: "a"])!
         let doc = FolioDocument(pdf: PDFDocument(data: data)!), undo = manualUndo(doc)
         XCTAssertTrue(doc.unlock("a"))
+        XCTAssertEqual(doc.pdf.outlineRoot?.child(at: 0)?.label, "Second")
         act(undo) { doc.setPassword(nil) }
         let file = try reopened(doc)
         XCTAssertFalse(file.isEncrypted)

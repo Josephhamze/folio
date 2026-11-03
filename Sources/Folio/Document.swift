@@ -98,8 +98,18 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
             from.removePage(at: 0)
             to.insert(page, at: to.pageCount)
         }
-        to.outlineRoot = from.outlineRoot
+        // A document saves only bookmarks made for it.
+        to.outlineRoot = from.outlineRoot.map(copied)
         to.documentAttributes = from.documentAttributes
+    }
+
+    /// A copy of the bookmarks, to the same pages.
+    private static func copied(_ outline: PDFOutline) -> PDFOutline {
+        let copy = PDFOutline()
+        (copy.label, copy.isOpen) = (outline.label, outline.isOpen)
+        if let action = outline.action { copy.action = action } else { copy.destination = outline.destination }
+        for i in 0..<outline.numberOfChildren { outline.child(at: i).map { copy.insertChild(copied($0), at: copy.numberOfChildren) } }
+        return copy
     }
 
     // MARK: Pages
