@@ -124,8 +124,10 @@ extension FolioDocument {
     /// Burns in the redaction marks, as one change. Each page with marks becomes a picture of itself at 300 dpi with the
     /// marked areas black, so what was under them is gone from the file. It gets back the words read from the picture, so
     /// the rest can still be found, and its marks but those that overlap a redaction, which could tell what it hid. It
-    /// returns how many pages it redacted, or nil, having changed nothing, when a page couldn't be.
+    /// returns how many pages it redacted, or nil, having changed nothing, when a page couldn't be, or the document changed
+    /// meanwhile: a mark moved would leave black where it was, and the words where it is.
     @MainActor func applyRedactions() async -> Int? {
+        let start = revision
         var new: [PDFPage: PDFPage] = [:]
         for page in pages {
             let marks = page.annotations.filter(\.isRedaction).map(\.bounds)
@@ -137,6 +139,7 @@ extension FolioDocument {
             for a in redacted.annotations where a.isRedaction || marks.contains(where: a.bounds.intersects) { redacted.removeAnnotation(a) }
             new[page] = redacted
         }
+        guard revision == start else { return nil }
         if !new.isEmpty { setPages(pages.map { new[$0] ?? $0 }, name: "Apply Redactions") }
         return new.count
     }

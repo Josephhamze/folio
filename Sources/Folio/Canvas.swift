@@ -348,7 +348,7 @@ final class Canvas: PDFView {
     /// With a mark selected, the arrows nudge it a point, or ten with Shift, and Delete deletes it. Esc puts down the mark
     /// or the tool; with neither it falls through, to leave Read Mode. A letter picks its tool.
     override func keyDown(with event: NSEvent) {
-        guard viewer.doc.canEdit, !viewer.readMode, event.modifierFlags.isDisjoint(with: [.command, .option, .control]) else {
+        guard viewer.isIdle, !viewer.readMode, event.modifierFlags.isDisjoint(with: [.command, .option, .control]) else {
             return super.keyDown(with: event)
         }
         let step: CGFloat = event.modifierFlags.contains(.shift) ? 10 : 1

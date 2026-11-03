@@ -509,6 +509,18 @@ final class ViewerTests: XCTestCase {
         XCTAssertEqual(viewer.canvas.currentPage, blank)
     }
 
+    /// Applying redactions puts the pages back, and stays on the page in view.
+    func testApplyRedactionsStaysOnThePage() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"], ["B"], ["C"]]))), page = viewer.doc.pages[1]
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.go(toPage: 2)
+        page.addAnnotation(shape(.redact, from: CGPoint(x: 72, y: 700), to: CGPoint(x: 120, y: 730), color: .red))
+        viewer.applyRedactions()
+        for _ in 0..<600 where viewer.busy != nil { RunLoop.main.run(until: Date() + 0.05) }
+        XCTAssertNotEqual(viewer.doc.pages[1], page)
+        XCTAssertEqual(viewer.canvas.currentPage, viewer.doc.pages[1])
+    }
+
     func testAnnotationsAreDrawnAtTheScreensPixels() {
         let viewer = Viewer(doc: FolioDocument(pdf: makePDF([[]]))), page = viewer.doc.pages[0]
         page.addAnnotation(Signature.typed("Jo").annotation(in: CGRect(x: 100, y: 600, width: 100, height: 50)))

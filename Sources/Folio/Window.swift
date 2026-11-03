@@ -231,25 +231,30 @@ final class Viewer {
         message = count == 1 ? "Added to 1 more page" : "Added to \(count) more pages"
     }
 
-    /// Reads the words on the pages that have no text, showing how far it's got, then says how it went.
+    /// Reads the words on the pages that have no text, showing how far it's got, then says how it went. It stays on the page:
+    /// the pages it puts back would show the first.
     func recognizeText() {
         settle()
         busy = "Recognizing text…"
+        let at = pageIndex
         Task { @MainActor in
             let (read, of) = await doc.recognizeText { done, count in self.busy = "Recognizing text… \(done + 1) of \(count)" }
             busy = nil
+            go(toPage: at + 1)
             message = of == 0 ? "Every page has its text already" : read == 0 ? "Found no text to recognize"
                 : read == 1 ? "Recognized the text on 1 page" : "Recognized the text on \(read) pages"
         }
     }
 
-    /// Burns in the redaction marks, showing it's at work, then says how it went.
+    /// Burns in the redaction marks, showing it's at work, then says how it went, staying on the page.
     func applyRedactions() {
         settle()
         busy = "Applying redactions…"
+        let at = pageIndex
         Task { @MainActor in
             let count = await doc.applyRedactions()
             busy = nil
+            go(toPage: at + 1)
             message = count.map { $0 == 1 ? "Redacted 1 page" : "Redacted \($0) pages" } ?? "Couldn't apply the redactions"
         }
     }

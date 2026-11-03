@@ -162,7 +162,11 @@ final class ToolsTests: XCTestCase {
     /// Applying redactions leaves no trace of the words under the marks, in the window or the saved file, and blacks them
     /// out. It keeps the rest, drops marks that overlap a redaction, keeps the page's turn, and undoes.
     func testApplyRedactionsTakesOutWhatsUnderTheMarks() async throws {
-        let doc = FolioDocument(pdf: makePDF([["Delivery note 2026-41", "Bank account 99-1234"], ["Page two"]])), undo = manualUndo(doc)
+        // As some files have it: the page's box away from the origin, and cropped.
+        let file = makePDF([["Delivery note 2026-41", "Bank account 99-1234"], ["Page two"]])
+        file.page(at: 0)!.setBounds(CGRect(x: -100, y: -50, width: 712, height: 842), for: .mediaBox)
+        file.page(at: 0)!.setBounds(CGRect(x: 0, y: 0, width: 612, height: 792), for: .cropBox)
+        let doc = FolioDocument(pdf: try XCTUnwrap(file.dataRepresentation().flatMap(PDFDocument.init(data:)))), undo = manualUndo(doc)
         let page = doc.pages[0], secret = try XCTUnwrap(doc.pdf.findString("Bank account 99-1234", withOptions: []).first).bounds(for: page)
         let mark = secret.insetBy(dx: -2, dy: -2)
         page.addAnnotation(shape(.redact, from: mark.origin, to: CGPoint(x: mark.maxX, y: mark.maxY), color: .red))
@@ -182,9 +186,10 @@ final class ToolsTests: XCTestCase {
         XCTAssertFalse(doc.hasRedactions)
         XCTAssertEqual(doc.pages[0].annotations.count, 1)
         XCTAssertEqual(doc.pages[0].rotation, 90)
-        // The words' box is black: the picture's rows run down from the top.
-        let image = try XCTUnwrap(render(doc.pages[0], dpi: 72))
-        let x = Int(secret.minX) + 2..<Int(secret.maxX) - 2, y = 792 - Int(secret.maxY) + 2..<792 - Int(secret.minY) - 2
+        // The words' box is black: the picture is of the page's box, its rows running down from the top.
+        let image = try XCTUnwrap(render(doc.pages[0], dpi: 72)), box = doc.pages[0].bounds(for: .mediaBox)
+        XCTAssertEqual(box, CGRect(x: -100, y: -50, width: 712, height: 842))
+        let x = Int(secret.minX - box.minX) + 2..<Int(secret.maxX - box.minX) - 2, y = Int(box.maxY - secret.maxY) + 2..<Int(box.maxY - secret.minY) - 2
         XCTAssertGreaterThan(Double(count(image, x: x, y: y) { $0 < 64 && $1 < 64 && $2 < 64 }), 0.98 * Double(x.count * y.count))
         undo.undo()
         XCTAssertEqual(doc.pdf.findString("99-1234", withOptions: []).count, 1)
