@@ -198,10 +198,12 @@ final class Viewer {
         if organizing { selection = Set(pages) }
     }
 
-    /// Copies the target pages into a document of their own, for the window to save.
+    /// Copies the target pages into a document of their own, for the window to save. Pages of a protected file stay
+    /// protected: by its new password, or the one that opened it.
     func extract() {
         settle()
         extracted = FolioDocument(pdf: doc.extract(targetPages))
+        extracted?.newPassword = doc.newPassword ?? (doc.pdf.isEncrypted ? doc.password : nil)
     }
 
     /// A PDF can't be saved without a page, so the last ones stay.

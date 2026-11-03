@@ -473,6 +473,22 @@ final class ViewerTests: XCTestCase {
         XCTAssertEqual(texts(viewer.doc.pdf), ["C", "A", "B"])
     }
 
+    func testExtractedPagesKeepTheFilesPassword() throws {
+        let data = makePDF([["A"], ["B"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "a", .ownerPasswordOption: "a"])!
+        let viewer = Viewer(doc: FolioDocument(pdf: PDFDocument(data: data)!))
+        XCTAssertTrue(viewer.doc.unlock("a"))
+        viewer.organizing = true
+        viewer.selection = [viewer.doc.pages[1]]
+        viewer.extract()
+        let file = try XCTUnwrap(PDFDocument(data: try XCTUnwrap(viewer.extracted).snapshot(contentType: .pdf)))
+        XCTAssertTrue(file.isLocked)
+        XCTAssertTrue(file.unlock(withPassword: "a"))
+        XCTAssertEqual(texts(file), ["B"])
+        viewer.doc.setPassword("b")
+        viewer.extract()
+        XCTAssertEqual(viewer.extracted?.newPassword, "b")
+    }
+
     func testOrganizingSelectsWhatItInsertsAndEndsOnTheFirstSelectedPage() {
         let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"], ["B"], ["C"]]))), p = viewer.doc.pages
         viewer.canvas.document = viewer.doc.pdf
