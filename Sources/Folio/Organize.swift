@@ -20,12 +20,18 @@ struct Organizer: View {
                             #endif
                         }
                         .draggable(viewer.dragged(page))
-                        .dropDestination(for: String.self) { items, _ in items.first.map { viewer.drop($0, before: page) } ?? false }
+                        .dropDestination(for: String.self) { items, _ in
+                            guard let item = items.first else { return false }
+                            return viewer.drop(item, before: page)
+                        }
                 }
             }
             .padding()
         }
-        .dropDestination(for: String.self) { items, _ in items.first.map { viewer.drop($0, before: nil) } ?? false }
+        .dropDestination(for: String.self) { items, _ in
+            guard let item = items.first else { return false }
+            return viewer.drop(item, before: nil)
+        }
         .background(.background)
     }
 }

@@ -200,20 +200,22 @@ final class ScreenshotTests: XCTestCase {
         app.buttons["Cancel"].tap()
     }
 
-    /// Organizing the pages: a tap selects one, the bar deletes it, and Undo puts it back.
+    /// Organizing the pages: a tap selects one, the bar deletes it, and Undo puts it back. Pages are named by their place, so
+    /// with one of the sample's three gone, the last name goes.
     func testOrganizePages() {
         openSample()
         barButton("Organize Pages")
-        let second = app.buttons["Page 2"]
-        XCTAssertTrue(second.waitForExistence(timeout: 5))
+        let second = app.buttons["Page 2"], third = app.buttons["Page 3"]
+        XCTAssertTrue(third.waitForExistence(timeout: 5))
         second.tap()
         XCTAssertTrue(second.isSelected)
-        app.buttons["Delete Pages"].tap()
-        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: second)
-        waitForExpectations(timeout: 5)
         shot("organize")
+        app.buttons["Delete Pages"].tap()
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: third)
+        waitForExpectations(timeout: 5)
+        XCTAssertFalse(second.isSelected)
         app.buttons["arrow.uturn.backward"].tap()
-        XCTAssertTrue(second.waitForExistence(timeout: 5))
+        XCTAssertTrue(third.waitForExistence(timeout: 5))
     }
 
     /// Undo while typing takes back the typing, not the change before it.
