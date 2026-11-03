@@ -74,9 +74,8 @@ func rebuilt(_ page: PDFPage, text: [(text: String, box: CGRect)]) -> PDFPage? {
     return new
 }
 
-/// The page as it shows, its crop, turn and marks included, as a JPEG on white at `dpi`: to send in a chat app, where a
-/// picture shows at once and a PDF is a file to download.
-func picture(of page: PDFPage, dpi: CGFloat = 144) -> Data? {
+/// The page as it shows, its crop, turn and marks included, on white at `dpi`.
+func shown(_ page: PDFPage, dpi: CGFloat) -> CGImage? {
     let box = page.bounds(for: .cropBox), scale = dpi / 72, turned = page.rotation % 180 != 0
     let width = Int((turned ? box.height : box.width) * scale), height = Int((turned ? box.width : box.height) * scale)
     guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -85,8 +84,14 @@ func picture(of page: PDFPage, dpi: CGFloat = 144) -> Data? {
     context.fill(CGRect(x: 0, y: 0, width: width, height: height))
     context.scaleBy(x: scale, y: scale)
     page.draw(with: .cropBox, to: context)   // turned and cropped as it shows
+    return context.makeImage()
+}
+
+/// The page as it shows, as a JPEG at `dpi`: to send in a chat app, where a picture shows at once and a PDF is a file to
+/// download.
+func picture(of page: PDFPage, dpi: CGFloat = 144) -> Data? {
     let data = NSMutableData()
-    guard let image = context.makeImage(), let file = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return nil }
+    guard let image = shown(page, dpi: dpi), let file = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return nil }
     CGImageDestinationAddImage(file, image, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
     return CGImageDestinationFinalize(file) ? data as Data : nil
 }

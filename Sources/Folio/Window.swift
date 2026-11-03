@@ -26,6 +26,10 @@ final class Viewer {
     var showsPanes = false
     var organizing = false
     var selection: Set<PDFPage> = []
+    /// Whether Insert from File… is choosing its files.
+    var choosingPages = false
+    /// The pages Extract Pages… copied out, while the window saves them.
+    var extracted: FolioDocument?
     var readMode = false
     var sheet: Sheet?
     var busy: String?
@@ -165,10 +169,39 @@ final class Viewer {
         doc.move(moving, to: target.flatMap { doc.pages.firstIndex(of: $0) } ?? doc.pdf.pageCount)
     }
 
-    /// Puts pages after the last target page.
+    /// What a page carries when it's dragged in the organizer: the document it's in, and its place there.
+    func dragged(_ page: PDFPage) -> String { "\(UInt(bitPattern: ObjectIdentifier(doc))) \(doc.pdf.index(for: page))" }
+
+    /// Moves the page `item` names, dragged in this window's organizer, as a dragged page moves. Other text dropped there, or
+    /// a page from another window, moves nothing.
+    func drop(_ item: String, before target: PDFPage?) -> Bool {
+        let parts = item.split(separator: " "), pages = doc.pages
+        guard isIdle, parts.count == 2, parts[0] == "\(UInt(bitPattern: ObjectIdentifier(doc)))", let index = Int(parts[1]),
+              pages.indices.contains(index) else { return false }
+        drop(pages[index], before: target)
+        return true
+    }
+
+    /// Starts organizing, with no page selected, or ends it showing the first selected page.
+    func organize() {
+        settle()
+        canvas.selected = nil   // out of sight, it would still take the Delete key
+        if organizing, let first = targetPages.first { canvas.go(to: first) }
+        selection = []
+        organizing.toggle()
+    }
+
+    /// Puts pages after the last target page, selected while organizing.
     func insert(_ pages: [PDFPage]) {
         guard !pages.isEmpty else { return }
         doc.insert(pages, at: (targetPages.last.flatMap { doc.pages.firstIndex(of: $0) } ?? doc.pdf.pageCount - 1) + 1)
+        if organizing { selection = Set(pages) }
+    }
+
+    /// Copies the target pages into a document of their own, for the window to save.
+    func extract() {
+        settle()
+        extracted = FolioDocument(pdf: doc.extract(targetPages))
     }
 
     /// A PDF can't be saved without a page, so the last ones stay.
@@ -273,12 +306,35 @@ struct DocumentView: View {
             .sheet(item: $viewer.sheet) { sheet in
                 if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
             }
+            .fileImporter(isPresented: $viewer.choosingPages, allowedContentTypes: [.pdf, .image], allowsMultipleSelection: true) { result in
+                guard let urls = try? result.get().sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }),
+                      !urls.isEmpty else { return }
+                let opened = urls.map { $0.startAccessingSecurityScopedResource() }
+                let pages = FolioDocument.pages(from: urls)
+                for (url, isOpen) in zip(urls, opened) where isOpen { url.stopAccessingSecurityScopedResource() }
+                if pages.isEmpty { viewer.message = "Found no pages to insert" } else { viewer.insert(pages) }
+            }
+            // On a view of its own: a second file dialog on the same view never shows.
+            .background {
+                Color.clear.fileExporter(isPresented: Binding { viewer.extracted != nil } set: { if !$0 { viewer.extracted = nil } },
+                                         document: viewer.extracted, contentType: .pdf,
+                                         defaultFilename: "\(url?.deletingPathExtension().lastPathComponent ?? "Untitled") pages") { result in
+                    if case .success(let saved) = result { viewer.message = "Saved \(saved.lastPathComponent)" }
+                }
+            }
             #if os(macOS)
             .focusedSceneValue(\.viewer, viewer)
             .focusedSceneValue(\.searchFocus, $searching)
             #endif
             .onAppear { viewer.doc.undo = undoManager }
             .onChange(of: undoManager) { viewer.doc.undo = undoManager }
+    }
+
+    /// Starts organizing the pages, and ends it.
+    private var organizeButton: some View {
+        Button("Organize Pages", systemImage: viewer.organizing ? "square.grid.2x2.fill" : "square.grid.2x2") { viewer.organize() }
+            .help("Organize Pages")
+            .disabled(viewer.doc.pdf.isLocked)
     }
 
     /// The page in view, as a number to type over, and the count.
@@ -303,10 +359,12 @@ struct DocumentView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         } detail: {
             PageView(viewer: viewer)
+                .overlay { if viewer.organizing { Organizer(viewer: viewer) } }
                 .overlay(alignment: .top) { Bars(viewer: viewer) }
                 .safeAreaInset(edge: .top, spacing: 0) { if !viewer.readMode { ToolBar(viewer: viewer) } }
         }
         .toolbar {
+            ToolbarItem { organizeButton }
             ToolbarItem { pageBox }
             ToolbarItem { Text(viewer.matchLabel).foregroundStyle(.secondary).monospacedDigit() }
         }
@@ -333,12 +391,14 @@ struct DocumentView: View {
     private var layout: some View {
         let name = url?.deletingPathExtension().lastPathComponent ?? "Untitled"
         return PageView(viewer: viewer)
+            .overlay { if viewer.organizing { Organizer(viewer: viewer) } }
             .overlay(alignment: .top) { Bars(viewer: viewer) }
             .safeAreaInset(edge: .bottom, spacing: 0) { ToolBar(viewer: viewer) }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     pageBox
                     Button("Panes", systemImage: "sidebar.right") { viewer.showsPanes.toggle() }
+                    organizeButton
                     // iPhone has no menu bar for the Tools menu.
                     Menu("Tools", systemImage: "ellipsis.circle") { ToolsMenu(viewer: viewer) }
                     ShareButton(viewer: viewer, name: name)
@@ -400,8 +460,9 @@ struct SharedPDF: Transferable {
 }
 #endif
 
-/// The tools, the colour, and Add to Every Page and Delete for the selected mark, in a bar across the top of the pages. On
-/// iOS it's at the bottom, the tools scroll where they don't fit, and it has Undo and Redo.
+/// The tools, the colour, and Add to Every Page and Delete for the selected mark, in a bar across the top of the pages, or
+/// what acts on pages while organizing. On iOS it's at the bottom, the tools scroll where they don't fit, and it has Undo
+/// and Redo.
 struct ToolBar: View {
     @Bindable var viewer: Viewer
     #if os(iOS)
@@ -410,19 +471,24 @@ struct ToolBar: View {
 
     var body: some View {
         HStack {
-            #if os(macOS)
-            tools
-            #else
-            ScrollView(.horizontal) { tools }.scrollIndicators(.hidden)
-            #endif
-            ColorPicker("Colour", selection: Binding(get: { viewer.color.cgColor }, set: {
+            if viewer.organizing {
+                PageActions(viewer: viewer)
+                Spacer()
+            } else {
                 #if os(macOS)
-                viewer.color = NSColor(cgColor: $0) ?? .black
+                tools
                 #else
-                viewer.color = NSColor(cgColor: $0)
+                ScrollView(.horizontal) { tools }.scrollIndicators(.hidden)
                 #endif
-            }))
-                .labelsHidden()
+                ColorPicker("Colour", selection: Binding(get: { viewer.color.cgColor }, set: {
+                    #if os(macOS)
+                    viewer.color = NSColor(cgColor: $0) ?? .black
+                    #else
+                    viewer.color = NSColor(cgColor: $0)
+                    #endif
+                }))
+                    .labelsHidden()
+            }
             #if os(iOS)
             // The undo manager says nothing when it changes; each change bumps the revision.
             let _ = viewer.doc.revision
@@ -438,12 +504,14 @@ struct ToolBar: View {
             }
             .disabled(undoManager?.canRedo != true)
             #endif
-            Button("Add to Every Page", systemImage: "rectangle.portrait.on.rectangle.portrait") { viewer.addToEveryPage() }
-                .help("Add to Every Page")
-                .disabled(!viewer.canAddToEveryPage)
-            Button("Delete", systemImage: "trash", role: .destructive) { viewer.canvas.deleteMark() }
-                .help("Delete")
-                .disabled(viewer.mark == nil)
+            if !viewer.organizing {
+                Button("Add to Every Page", systemImage: "rectangle.portrait.on.rectangle.portrait") { viewer.addToEveryPage() }
+                    .help("Add to Every Page")
+                    .disabled(!viewer.canAddToEveryPage)
+                Button("Delete", systemImage: "trash", role: .destructive) { viewer.canvas.deleteMark() }
+                    .help("Delete")
+                    .disabled(viewer.mark == nil)
+            }
         }
         .labelStyle(.iconOnly)
         .disabled(!viewer.isIdle)

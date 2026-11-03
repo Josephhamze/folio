@@ -463,6 +463,34 @@ final class ViewerTests: XCTestCase {
         viewer.doc.undo?.endUndoGrouping()
     }
 
+    func testDropTakesOnlyPagesDraggedInTheSameWindow() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"], ["B"], ["C"]]))), p = viewer.doc.pages
+        let other = Viewer(doc: FolioDocument(pdf: makePDF([["X"], ["Y"], ["Z"]])))
+        XCTAssertFalse(viewer.drop("2", before: p[0]))
+        XCTAssertFalse(viewer.drop(other.dragged(other.doc.pages[2]), before: p[0]))
+        XCTAssertFalse(viewer.drop(viewer.dragged(p[2]) + "0", before: p[0]))   // past the last page
+        XCTAssertTrue(viewer.drop(viewer.dragged(p[2]), before: p[0]))
+        XCTAssertEqual(texts(viewer.doc.pdf), ["C", "A", "B"])
+    }
+
+    func testOrganizingSelectsWhatItInsertsAndEndsOnTheFirstSelectedPage() {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"], ["B"], ["C"]]))), p = viewer.doc.pages
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.organize()
+        XCTAssertTrue(viewer.organizing)
+        XCTAssertEqual(viewer.targetPages, [])
+        viewer.selection = [p[1]]
+        let blank = FolioDocument.blankPage()
+        viewer.insert([blank])
+        XCTAssertEqual(viewer.doc.pages, [p[0], p[1], blank, p[2]])
+        XCTAssertEqual(viewer.selection, [blank])
+        viewer.selection = [p[2], blank]
+        viewer.organize()
+        XCTAssertFalse(viewer.organizing)
+        XCTAssertEqual(viewer.selection, [])
+        XCTAssertEqual(viewer.canvas.currentPage, blank)
+    }
+
     func testAnnotationsAreDrawnAtTheScreensPixels() {
         let viewer = Viewer(doc: FolioDocument(pdf: makePDF([[]]))), page = viewer.doc.pages[0]
         page.addAnnotation(Signature.typed("Jo").annotation(in: CGRect(x: 100, y: 600, width: 100, height: 50)))

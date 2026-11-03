@@ -134,14 +134,15 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     }
 
     /// Pages from files: copies of a PDF's pages, or an image fitted to a page of the system's paper size, turned
-    /// landscape for a wide image.
+    /// landscape for a wide image. Each file is read whole at once, while a file chosen in a panel may still be read.
     static func pages(from urls: [URL]) -> [PDFPage] {
         urls.flatMap { url -> [PDFPage] in
+            guard let data = try? Data(contentsOf: url) else { return [] }
             if UTType(filenameExtension: url.pathExtension)?.conforms(to: .pdf) == true {
-                guard let pdf = PDFDocument(url: url), !pdf.isLocked else { return [] }
+                guard let pdf = PDFDocument(data: data), !pdf.isLocked else { return [] }
                 return (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.copy() as? PDFPage }
             }
-            guard let image = NSImage(contentsOfFile: url.path) else { return [] }
+            guard let image = NSImage(data: data) else { return [] }
             let size = image.size.width > image.size.height ? CGSize(width: paper.height, height: paper.width) : paper
             return PDFPage(image: image, options: [.mediaBox: CGRect(origin: .zero, size: size)]).map { [$0] } ?? []
         }

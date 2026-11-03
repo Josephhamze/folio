@@ -115,6 +115,13 @@ struct FolioCommands: Commands {
             #endif
             Divider()
         }
+        CommandMenu("Pages") {
+            Button(viewer?.organizing == true ? "Stop Organizing" : "Organize Pages") { viewer?.organize() }
+                .keyboardShortcut("o", modifiers: [.command, .option])
+                .disabled(viewer?.doc.pdf.isLocked ?? true)
+            Divider()
+            PageActions(viewer: viewer)
+        }
         CommandMenu("Tools") { ToolsMenu(viewer: viewer) }
     }
 }
