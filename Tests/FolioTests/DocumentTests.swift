@@ -109,6 +109,8 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual(texts(file), ["A"])
     }
 
+    /// Taking off a file's protection keeps its pages, marks, title and bookmarks. The file here is protected by a permissions
+    /// password alone: PDFKit doesn't show the bookmarks of a file that needs a password to open, even once it's open.
     func testRemovePasswordKeepsWhatsInTheFileAndUndoes() throws {
         let pdf = makePDF([["A"], ["B"]]), outline = PDFOutline(), item = PDFOutline()
         pdf.documentAttributes = [PDFDocumentAttribute.titleAttribute: "Q3"]
@@ -117,8 +119,9 @@ final class DocumentTests: XCTestCase {
         item.destination = PDFDestination(page: pdf.page(at: 1)!, at: .zero)
         outline.insertChild(item, at: 0)
         pdf.outlineRoot = outline
-        let data = pdf.dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "a", .ownerPasswordOption: "a"])!
+        let data = pdf.dataRepresentation(options: [PDFDocumentWriteOption.ownerPasswordOption: "a"])!
         let doc = FolioDocument(pdf: PDFDocument(data: data)!), undo = manualUndo(doc)
+        XCTAssertTrue(doc.pdf.isEncrypted)
         XCTAssertTrue(doc.unlock("a"))
         XCTAssertEqual(doc.pdf.outlineRoot?.child(at: 0)?.label, "Second")
         act(undo) { doc.setPassword(nil) }
