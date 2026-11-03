@@ -5,13 +5,13 @@ import PDFKit
 /// fields and text selection.
 extension Canvas {
     /// Whether a one-finger drag from `point`, in view coordinates, is the tool's rather than a scroll: a markup, shape, pen
-    /// or redaction, a saved signature dragged to size, or the selected mark moved.
+    /// or redaction, a saved signature or stamp dragged to size, or the selected mark moved.
     func pans(at point: CGPoint) -> Bool {
-        guard viewer.doc.canEdit, let page = page(for: point, nearest: false) else { return false }
+        guard viewer.doc.canEdit, viewer.busy == nil, let page = page(for: point, nearest: false) else { return false }
         switch viewer.tool {
         case .select: return selected?.page == page && selected?.bounds.contains(convert(point, to: page)) == true
-        case .sign, .initial: return Signature[viewer.tool] != nil
-        case .note, .text, .editText: return false
+        case .sign, .initial, .stamp: return Signature[viewer.tool] != nil
+        case .note, .text, .date, .editText: return false
         case .highlight, .underline, .strike, .rect, .oval, .line, .arrow, .pen, .redact: return true
         }
     }

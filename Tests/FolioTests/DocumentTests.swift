@@ -24,6 +24,23 @@ func makePDF(styled pages: [[NSAttributedString]], size: CGSize = CGSize(width: 
     return PDFDocument(data: data as Data)!
 }
 
+/// A photo of a company's stamp: a blue ring 200 pixels across, its line 12 thick, on grey paper in poor light, as a JPEG.
+func stampPhoto(ring: Bool = true) -> Data {
+    let context = CGContext(data: nil, width: 400, height: 300, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    context.setFillColor(CGColor(red: 0.8, green: 0.78, blue: 0.75, alpha: 1))
+    context.fill(CGRect(x: 0, y: 0, width: 400, height: 300))
+    if ring {
+        context.setStrokeColor(CGColor(red: 0.1, green: 0.2, blue: 0.7, alpha: 1))
+        context.setLineWidth(12)
+        context.strokeEllipse(in: CGRect(x: 100, y: 50, width: 200, height: 200))
+    }
+    let data = NSMutableData(), file = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil)!
+    CGImageDestinationAddImage(file, context.makeImage()!, nil)
+    CGImageDestinationFinalize(file)
+    return data as Data
+}
+
 /// Each page's text, trimmed.
 func texts(_ pdf: PDFDocument) -> [String] {
     (0..<pdf.pageCount).map { pdf.page(at: $0)!.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "" }

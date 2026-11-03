@@ -161,6 +161,51 @@ final class AnnotationTests: XCTestCase {
         XCTAssertEqual(darkPixels(doc.extract([page]).page(at: 0)!, in: large), darkPixels(page, in: large))
     }
 
+    func testStampLiftsOffItsPaper() throws {
+        let picture = try XCTUnwrap(Signature.lifted(from: stampPhoto()).flatMap(Signature.picture))
+        // Cropped to the ring, 212 pixels across, with two to spare each side.
+        XCTAssertEqual(Double(picture.width), 216, accuracy: 4)
+        XCTAssertEqual(Double(picture.height), 216, accuracy: 4)
+        // The paper inside and around it is clear, and its line solid and as blue as the ink.
+        let pixels = rgba(picture), at = { (x: Int, y: Int) in pixels[(y * picture.width + x) * 4..<(y * picture.width + x) * 4 + 4].map { $0 } }
+        XCTAssertEqual(at(picture.width / 2, picture.height / 2)[3], 0)
+        XCTAssertEqual(at(0, 0)[3], 0)
+        let line = at(8, picture.height / 2)
+        XCTAssertEqual(line[3], 255)
+        XCTAssertGreaterThan(line[2], 200)
+        XCTAssertLessThan(line[0], 60)
+        // Plain paper, or a file that isn't a picture, has no ink.
+        XCTAssertNil(Signature.lifted(from: stampPhoto(ring: false)))
+        XCTAssertNil(Signature.lifted(from: Data("not a picture".utf8)))
+    }
+
+    /// The picture's pixels as red, green, blue and alpha, premultiplied, row by row from the top.
+    private func rgba(_ picture: CGImage) -> [UInt8] {
+        let context = CGContext(data: nil, width: picture.width, height: picture.height, bitsPerComponent: 8, bytesPerRow: picture.width * 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.draw(picture, in: CGRect(x: 0, y: 0, width: picture.width, height: picture.height))
+        return Array(UnsafeBufferPointer(start: context.data!.assumingMemoryBound(to: UInt8.self), count: picture.width * picture.height * 4))
+    }
+
+    func testPictureStampKeepsItsShapeAndIsInTheFile() throws {
+        let png = try XCTUnwrap(Signature.lifted(from: stampPhoto()))
+        let doc = FolioDocument(pdf: makePDF([[]])), page = doc.pages[0]
+        let stamp = Signature.image(png).annotation(in: CGRect(x: 100, y: 300, width: 300, height: 100))
+        // Round, as the ring is, as tall as the box, in its middle.
+        XCTAssertEqual(stamp.type, "Stamp")
+        XCTAssertEqual(stamp.bounds.height, 100, accuracy: 0.01)
+        XCTAssertEqual(stamp.bounds.width, 100, accuracy: 2)
+        XCTAssertEqual(stamp.bounds.midX, 250, accuracy: 0.01)
+        XCTAssertEqual(stamp.bounds.midY, 350, accuracy: 0.01)
+        page.addAnnotation(stamp)
+        let shown = darkPixels(page, in: stamp.bounds)
+        XCTAssertGreaterThan(shown, 5000)
+        // It is drawn into the saved file, and into the pages Extract and Split copy.
+        let saved = PDFDocument(data: try doc.snapshot(contentType: .pdf))!.page(at: 0)!
+        XCTAssertEqual(Double(darkPixels(saved, in: stamp.bounds)), Double(shown), accuracy: Double(shown) / 20)
+        XCTAssertEqual(darkPixels(doc.extract([page]).page(at: 0)!, in: stamp.bounds), shown)
+    }
+
     /// The pixels of `rect` on the page, at four a point, that are darker than mid grey.
     private func darkPixels(_ page: PDFPage, in rect: CGRect) -> Int {
         gray(page, in: rect, scale: 4).joined().filter { $0 < 128 }.count

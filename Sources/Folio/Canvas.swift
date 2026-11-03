@@ -163,9 +163,10 @@ final class Canvas: PDFView {
     }
 
     /// What the tool does where a press lands, at `point` in the page's space. False when the press is PDFKit's: on a file
-    /// that can't be edited, with a markup tool, whose drag selects text, and with Select on no mark.
+    /// that can't be edited or while the document is busy, with a markup tool, whose drag selects text, and with Select on
+    /// no mark.
     func begin(at point: CGPoint, on page: PDFPage) -> Bool {
-        guard viewer.doc.canEdit else { return false }
+        guard viewer.doc.canEdit, viewer.busy == nil else { return false }
         start = (point, page)
         stroke = [point]
         switch viewer.tool {
@@ -193,6 +194,13 @@ final class Canvas: PDFView {
             // Placing is one-shot, so the press that ends the typing selects rather than starting another box.
             viewer.tool = .select
             edit(textBox(at: point, on: page), on: page, adding: "Add Text")
+        case .date:
+            // Today's date as the Text Box tool would type it, then selected, to drag into place.
+            viewer.tool = .select
+            let date = textBox(at: point, on: page), today = Date.now.formatted(date: .numeric, time: .omitted)
+            (date.contents, date.bounds) = (today, fit(date.bounds, around: today, in: date.font ?? .systemFont(ofSize: 12)))
+            viewer.doc.add(date, to: page, name: "Add Date")
+            selected = date
         case .editText:
             guard let cover = coverLine(at: point, on: page) else { return true }
             if !Self.warned {
@@ -200,7 +208,7 @@ final class Canvas: PDFView {
                 viewer.message = "The original text stays underneath in the file."
             }
             edit(cover, on: page, adding: "Edit Text")
-        case .sign, .initial:
+        case .sign, .initial, .stamp:
             if Signature[viewer.tool] == nil {
                 start = nil
                 viewer.sheet = .signature(viewer.tool)
@@ -220,13 +228,13 @@ final class Canvas: PDFView {
             guard let selected, let origin else { return false }
             selected.bounds = origin.offsetBy(dx: point.x - from.x, dy: point.y - from.y)
             outlineSelection()
-        case .rect, .oval, .line, .arrow, .redact, .pen, .sign, .initial:
+        case .rect, .oval, .line, .arrow, .redact, .pen, .sign, .initial, .stamp:
             stroke.append(point)
             draft.map(page.removeAnnotation)
             draft = switch viewer.tool {
             case .pen: ink([stroke], color: viewer.color, width: 2)
             // As ink while it's sized: iOS's PDFKit leaves the picture of each stamp taken off a page on the screen.
-            case .sign, .initial: Signature[viewer.tool]?.annotation(in: CGRect(origin: from, size: .zero).union(CGRect(origin: point, size: .zero)), type: .ink)
+            case .sign, .initial, .stamp: Signature[viewer.tool]?.annotation(in: CGRect(origin: from, size: .zero).union(CGRect(origin: point, size: .zero)), type: .ink)
             default: shape(viewer.tool, from: from, to: point, color: viewer.color)
             }
             draft.map(page.addAnnotation)
@@ -239,7 +247,8 @@ final class Canvas: PDFView {
 
     /// Ends the press at `point`, in its page's space: a moved mark, a drawn shape or a placed signature becomes one change.
     /// A signature placed without a drag gets the usual size, as does one dragged less than 20 points, as a finger's tap
-    /// often slips. It's then selected, to move or delete straight away.
+    /// often slips: 180 by 45 points, or 120 a side for a stamp, about the size of a company's rubber stamp. It's then
+    /// selected, to move or delete straight away.
     func end(at point: CGPoint) {
         defer { (start, origin, draft) = (nil, nil, nil) }
         guard let (from, page) = start else { return }
@@ -252,11 +261,13 @@ final class Canvas: PDFView {
             guard let draft else { return }
             page.removeAnnotation(draft)
             viewer.doc.add(draft, to: page, name: viewer.tool == .pen ? "Draw" : viewer.tool == .redact ? "Mark for Redaction" : "Add Shape")
-        case .sign, .initial:
+        case .sign, .initial, .stamp:
             guard let signature = Signature[viewer.tool] else { return }
             draft.map(page.removeAnnotation)
             let sized = hypot(point.x - from.x, point.y - from.y) < 20 ? nil : draft?.bounds
-            let placed = signature.annotation(in: sized ?? CGRect(x: point.x - 90, y: point.y - 22.5, width: 180, height: 45))
+            let usual = viewer.tool == .stamp ? CGSize(width: 120, height: 120) : CGSize(width: 180, height: 45)
+            let placed = signature.annotation(in: sized ?? CGRect(x: point.x - usual.width / 2, y: point.y - usual.height / 2,
+                                                                         width: usual.width, height: usual.height))
             viewer.doc.add(placed, to: page, name: viewer.tool.name)
             viewer.tool = .select
             selected = placed

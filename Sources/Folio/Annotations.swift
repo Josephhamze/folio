@@ -1,7 +1,9 @@
+import ImageIO
 import PDFKit
+import UniformTypeIdentifiers
 
 enum Tool: String, CaseIterable, Identifiable {
-    case select, highlight, underline, strike, note, text, rect, oval, line, arrow, pen, sign, initial, editText, redact
+    case select, highlight, underline, strike, note, text, rect, oval, line, arrow, pen, sign, initial, stamp, date, editText, redact
 
     var id: Self { self }
 
@@ -20,6 +22,8 @@ enum Tool: String, CaseIterable, Identifiable {
         case .pen: "Pen"
         case .sign: "Sign"
         case .initial: "Initial"
+        case .stamp: "Stamp"
+        case .date: "Date"
         case .editText: "Edit Text"
         case .redact: "Redact"
         }
@@ -40,6 +44,8 @@ enum Tool: String, CaseIterable, Identifiable {
         case .pen: "pencil.tip"
         case .sign: "signature"
         case .initial: "pencil.and.scribble"
+        case .stamp: "seal"
+        case .date: "calendar"
         case .editText: "character.cursor.ibeam"
         case .redact: "rectangle.fill"
         }
@@ -61,6 +67,8 @@ enum Tool: String, CaseIterable, Identifiable {
         case .pen: "p"
         case .sign: "s"
         case .initial: "i"
+        case .stamp: "c"
+        case .date: "d"
         case .editText: "e"
         case .redact: "x"
         }
@@ -196,20 +204,25 @@ extension PDFAnnotation {
     }
 }
 
-/// The user's signature or initials: strokes drawn on the pad, y up, or typed and shown in a script font.
+/// The user's signature, initials or stamp: strokes drawn on the pad, y up; typed and shown in a script font; or a picture,
+/// such as a photo of the company's stamp, kept as a PNG of its ink alone.
 enum Signature: Codable, Equatable {
     case drawn([[CGPoint]])
     case typed(String)
+    case image(Data)
 
-    /// The signature the sign tool places, or the initials for the initial tool.
+    /// The signature the sign tool places, the initials for the initial tool, or the stamp for the stamp tool.
     static subscript(tool: Tool) -> Signature? {
         get { UserDefaults.standard.data(forKey: tool.rawValue).flatMap { try? JSONDecoder().decode(Signature.self, from: $0) } }
         set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: tool.rawValue) }
     }
 
-    /// Its outline, to fill, y up: the strokes in ink, or the name's letters with no line finer than a pen's.
+    /// Its outline, to fill, y up: the strokes in ink, or the name's letters with no line finer than a pen's. A picture has
+    /// none.
     var path: CGPath {
         switch self {
+        case .image:
+            return CGMutablePath()
         case .drawn(let strokes):
             let path = CGMutablePath()
             strokes.forEach { path.addPath(inked($0)) }
@@ -247,6 +260,14 @@ enum Signature: Codable, Equatable {
 
     /// The signature fitted into `rect`, keeping its shape.
     func annotation(in rect: CGRect, type: PDFAnnotationSubtype = .stamp) -> PDFAnnotation {
+        if case .image(let png) = self, let picture = Self.picture(png) {
+            let scale = min(rect.width / CGFloat(picture.width), rect.height / CGFloat(picture.height))
+            let size = CGSize(width: CGFloat(picture.width) * scale, height: CGFloat(picture.height) * scale)
+            let a = SignatureAnnotation(bounds: CGRect(origin: CGPoint(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2), size: size),
+                                        forType: type, withProperties: nil)
+            a.picture = picture
+            return a
+        }
         let path = path(in: rect)
         let a = SignatureAnnotation(bounds: path.boundingBoxOfPath, forType: type, withProperties: nil)
         var origin = CGAffineTransform(translationX: -a.bounds.minX, y: -a.bounds.minY)
@@ -254,26 +275,90 @@ enum Signature: Codable, Equatable {
         a.color = .black
         return a
     }
+
+    /// The picture in a PNG.
+    static func picture(_ png: Data) -> CGImage? {
+        CGImageSourceCreateWithData(png as CFData, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
+    }
+
+    /// A photo or scan of a signature or stamp on paper, as a PNG of its ink alone: the paper made clear, the ink in its own
+    /// colour, turned upright, at most 1,000 pixels a side and cropped to the ink. Nil for a file that isn't a picture, or
+    /// a picture with no ink.
+    static func lifted(from data: Data) -> Data? {
+        let upright = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
+                       kCGImageSourceThumbnailMaxPixelSize: 1000] as CFDictionary
+        let rgb = CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil), let photo = CGImageSourceCreateThumbnailAtIndex(source, 0, upright)
+        else { return nil }
+        let (width, height) = (photo.width, photo.height), all = CGRect(x: 0, y: 0, width: width, height: height)
+        // The photo on white, so a clear background counts as paper.
+        guard let read = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: rgb,
+                                   bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
+              let write = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: rgb,
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        read.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        read.fill(all)
+        read.draw(photo, in: all)
+        write.clear(all)
+        let (from, to) = (read.data!.assumingMemoryBound(to: UInt8.self), write.data!.assumingMemoryBound(to: UInt8.self))
+        // How dark each pixel is, by the darkest of its red, green and blue. The paper is the level 90% of the pixels are
+        // no lighter than, and the ink the level 2% are no lighter than.
+        var counts = [Int](repeating: 0, count: 256)
+        for y in 0..<height {
+            for x in 0..<width { let p = from + y * read.bytesPerRow + x * 4; counts[Int(min(p[0], p[1], p[2]))] += 1 }
+        }
+        let level = { (share: Double) in Double(counts.indices.first { counts[...$0].reduce(0, +) >= Int(share * Double(width * height)) } ?? 255) }
+        let paper = max(level(0.9), 1), ink = level(0.02) / paper
+        // Clear within 15% of the paper; solid 60% of the way to the ink, or darker; partly clear between.
+        let clear = 0.15, solid = max(clear + 0.1, 0.6 * (1 - ink))
+        var inked = (minX: width, minY: height, maxX: -1, maxY: -1)
+        for y in 0..<height {
+            for x in 0..<width {
+                let p = from + y * read.bytesPerRow + x * 4, q = to + y * write.bytesPerRow + x * 4
+                let r = min(Double(p[0]) / paper, 1), g = min(Double(p[1]) / paper, 1), b = min(Double(p[2]) / paper, 1)
+                let alpha = min(max((1 - min(r, g, b) - clear) / (solid - clear), 0), 1)
+                guard alpha > 0 else { continue }
+                // Premultiplied by the ink's share, with the white it lets through taken out.
+                let channel = { (c: Double) in UInt8(min(max(c - 1 + alpha, 0), alpha) * 255) }
+                (q[0], q[1], q[2], q[3]) = (channel(r), channel(g), channel(b), UInt8(alpha * 255))
+                if alpha >= 0.5 { inked = (min(inked.minX, x), min(inked.minY, y), max(inked.maxX, x), max(inked.maxY, y)) }
+            }
+        }
+        let crop = CGRect(x: inked.minX - 2, y: inked.minY - 2, width: inked.maxX - inked.minX + 5, height: inked.maxY - inked.minY + 5)
+        let png = NSMutableData()
+        guard inked.maxX >= 0, let cropped = write.makeImage()?.cropping(to: crop.intersection(all)),
+              let file = CGImageDestinationCreateWithData(png as CFMutableData, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(file, cropped, nil)
+        return CGImageDestinationFinalize(file) ? png as Data : nil
+    }
 }
 
-/// A placed signature: its outline, from the bounds' corner, filled in its colour. PDFKit writes this drawing into the file
-/// as the annotation's appearance, so it is the same sharp picture at any size and zoom, here and in other apps.
+/// A placed signature: its outline, from the bounds' corner, filled in its colour, or its picture filling the bounds. PDFKit
+/// writes this drawing into the file as the annotation's appearance, so it is the same picture at any size and zoom, here
+/// and in other apps.
 final class SignatureAnnotation: PDFAnnotation {
     var outline: CGPath = CGMutablePath()
+    var picture: CGImage?
 
     override func draw(with box: PDFDisplayBox, in context: CGContext) {
         context.saveGState()
-        context.translateBy(x: bounds.minX, y: bounds.minY)
-        context.addPath(outline)
-        context.setFillColor(color.cgColor)
-        context.fillPath()
+        if let picture {
+            context.interpolationQuality = .high
+            context.draw(picture, in: bounds)
+        } else {
+            context.translateBy(x: bounds.minX, y: bounds.minY)
+            context.addPath(outline)
+            context.setFillColor(color.cgColor)
+            context.fillPath()
+        }
         context.restoreGState()
     }
 
-    /// PDFKit copies a page's annotations this way, for Extract and Split, and would leave the outline behind.
+    /// PDFKit copies a page's annotations this way, for Extract and Split, and would leave the outline and picture behind.
     override func copy(with zone: NSZone? = nil) -> Any {
         let copy = super.copy(with: zone) as! SignatureAnnotation
         copy.outline = outline
+        copy.picture = picture
         return copy
     }
 }

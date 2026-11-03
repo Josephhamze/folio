@@ -117,6 +117,7 @@ struct FolioCommands: Commands {
         CommandMenu("Tools") {
             Button("Edit Signature…") { viewer?.sheet = .signature(.sign) }.disabled(viewer == nil)
             Button("Edit Initials…") { viewer?.sheet = .signature(.initial) }.disabled(viewer == nil)
+            Button("Edit Stamp…") { viewer?.sheet = .signature(.stamp) }.disabled(viewer == nil)
             #if os(macOS)
             Divider()
             Button("Show Fonts") { NSFontManager.shared.orderFrontFontPanel(nil) }.keyboardShortcut("t").disabled(viewer == nil)

@@ -12,7 +12,7 @@ final class Viewer {
     }
 
     enum Sheet: Hashable, Identifiable {
-        /// The pad for the sign tool's signature, or the initial tool's initials.
+        /// The pad for the sign tool's signature, the initial tool's initials, or the stamp tool's stamp.
         case signature(Tool)
         case protect, properties, split
 

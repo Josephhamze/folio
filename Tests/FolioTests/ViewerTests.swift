@@ -112,6 +112,49 @@ final class ViewerTests: XCTestCase {
         XCTAssertTrue(viewer.canvas.selected === stamps[0])
     }
 
+    func testTapPlacesAStampAtItsUsualSize() throws {
+        let saved = Signature[.stamp]
+        defer { Signature[.stamp] = saved }
+        Signature[.stamp] = .image(try XCTUnwrap(Signature.lifted(from: stampPhoto())))
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Hi"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.tool = .stamp
+        act(undo) {
+            XCTAssertTrue(viewer.canvas.begin(at: CGPoint(x: 300, y: 400), on: page))
+            viewer.canvas.end(at: CGPoint(x: 300, y: 400))
+        }
+        let stamp = try XCTUnwrap(page.annotations.first)
+        XCTAssertEqual(stamp.type, "Stamp")
+        XCTAssertEqual(max(stamp.bounds.width, stamp.bounds.height), 120, accuracy: 0.01)
+        XCTAssertEqual(min(stamp.bounds.width, stamp.bounds.height), 120, accuracy: 3)
+        XCTAssertEqual(stamp.bounds.midX, 300, accuracy: 0.01)
+        XCTAssertEqual(stamp.bounds.midY, 400, accuracy: 0.01)
+        XCTAssertEqual(undo.undoActionName, "Stamp")
+        XCTAssertTrue(viewer.canvas.selected === stamp)
+    }
+
+    func testDateToolTypesTodayBesideTheLine() throws {
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Date:"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        viewer.canvas.document = viewer.doc.pdf
+        viewer.tool = .date
+        act(undo) {
+            XCTAssertTrue(viewer.canvas.begin(at: CGPoint(x: 300, y: 725), on: page))
+            viewer.canvas.end(at: CGPoint(x: 300, y: 725))
+        }
+        let date = try XCTUnwrap(page.annotations.first)
+        let today = Date.now.formatted(date: .numeric, time: .omitted)
+        XCTAssertEqual(date.type, "FreeText")
+        XCTAssertEqual(date.contents, today)
+        // In the line's font, wide enough for the date, and selected to drag into place.
+        XCTAssertEqual(date.font?.fontName, "Georgia")
+        XCTAssertGreaterThan(date.bounds.width, (today as NSString).size(withAttributes: [.font: date.font!]).width)
+        XCTAssertEqual(viewer.tool, .select)
+        XCTAssertTrue(viewer.canvas.selected === date)
+        XCTAssertEqual(undo.undoActionName, "Add Date")
+        undo.undo()
+        XCTAssertTrue(page.annotations.isEmpty)
+    }
+
     func testSelectedMarkMovesAsOneStep() {
         let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Hi"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
         viewer.canvas.document = viewer.doc.pdf
