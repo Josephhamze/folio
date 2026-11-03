@@ -6,7 +6,8 @@
 # needs a notarytool keychain profile named "notary" (or $NOTARY), made once with `xcrun notarytool store-credentials`.
 # Finder lays out the dmg's window, so macOS asks once to let your terminal control Finder.
 # "./build.sh ios" builds the iPhone and iPad app instead, with XcodeGen (brew install xcodegen), and runs it in the
-# simulator on an iPhone 17 Pro. "./build.sh ios-test" runs its tests on an iPhone 17 Pro and an iPad Pro 13-inch, and
+# simulator on an iPhone 17 Pro. "./build.sh ios-test" runs its tests on an iPhone 17 Pro and an iPad Pro 13-inch, or
+# only the tests named after it, such as FolioTouchTests or FolioUITests/ScreenshotTests/testMarkUpByTouch, and
 # "./build.sh screenshots" takes the App Store's screenshots, on an iPhone 17 Pro Max and an iPad Pro 13-inch, into
 # build/app-store.
 # "./build.sh ios-release" uploads a build to App Store Connect. Xcode signs it with the team's Apple Account, added in
@@ -35,8 +36,8 @@ if [ "$1" = ios-test ] || [ "$1" = screenshots ]; then
 	xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination "generic/platform=iOS Simulator" -derivedDataPath .build/ios \
 		build-for-testing
 	if [ "$1" = ios-test ]; then
-		ios_test "iPhone 17 Pro"
-		ios_test "iPad Pro 13-inch (M5)"
+		ios_test "iPhone 17 Pro" "$2"
+		ios_test "iPad Pro 13-inch (M5)" "$2"
 		echo "The iOS tests passed"
 		exit
 	fi

@@ -1,0 +1,42 @@
+# Runs the tests on GitHub's Mac runners, which cost nothing for a public repository: the Mac's on macOS 27 with Xcode 27,
+# and the iPhone and iPad's on the simulators build.sh names, which the macOS 26 image has. The iOS tests' screenshots are
+# kept with the run. Run it by hand to test one iOS test alone, such as FolioUITests/ScreenshotTests/testScreenshots.
+name: Tests
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: The iOS tests to run alone
+        required: false
+jobs:
+  mac:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - run: swift test
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install xcodegen
+      - run: ./build.sh ios-test $ONLY
+        env:
+          ONLY: ${{ inputs.only }}
+      - name: Export the screenshots
+        if: always()
+        run: |
+          for RESULT in .build/ios/*.xcresult; do
+            [ -e "$RESULT" ] || continue
+            OUT="screenshots/$(basename "$RESULT" .xcresult)"
+            mkdir -p "$OUT"
+            xcrun xcresulttool export attachments --path "$RESULT" --output-path "$OUT" || true
+          done
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: screenshots
+          path: screenshots
+          if-no-files-found: ignore
