@@ -28,6 +28,9 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 **Reduce File Size** (Mac)
 - Tools › Reduce File Size rewrites the document through macOS's own Reduce File Size filter: pictures become JPEG at 144 dpi. It keeps the result only when it is smaller, says the sizes before and after ("4.2 MB → 780 KB"), and is one undo step.
 
+**Send Page as Picture** (added once the rest was built)
+- Tools › Send Page as Picture shares the page in view, with its marks, turn and crop, as a JPEG. Signed and stamped pages mostly travel in WhatsApp and WeChat, where a picture shows at once and a PDF is a file to download.
+
 **Tools on iPhone**
 - The navigation bar gets a Tools menu with what the menu bar's Tools menu has. Without it, a signature saved on an iPhone could never be changed: the pad opened only when none was saved, and only iPad has a menu bar.
 
@@ -59,6 +62,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - **Recognize Text** uses Vision's accurate model, which can't run on GitHub's virtual Macs. There the tests that read text skip themselves, and the tests of the page rebuilt from given lines, which need no Vision, still run. It renders each page without text at 300 dpi (fewer dots for a page past 4,000 pixels a side), in grey, without its annotations, recognizes it with Vision's `RecognizeTextRequest` (accurate, language detected automatically, language correction on), and rebuilds the page: the old page's drawing, then each line as invisible Helvetica, sized to the line's box and stretched to its width, so a selection lands on the words. Fonts are found for other scripts as Core Text finds them. Each new page keeps the old one's rotation, crop box and copies of its annotations, all but popups. Pages are rebuilt at the end, and swapped in with one `setPages`, so undo puts the old pages back. While it runs the tools are off.
 - **Reduce File Size** writes a copy, away from the main thread, with the `QuartzFilter` write option and `/System/Library/Filters/Reduce File Size.qfilter`. It reads the result back and unlocks it with the document's password when it is encrypted. A result that would lose the file's encryption is thrown away, and so is one finished after the document changed. Otherwise it is swapped in with one `change`, and the window stays on its page. PDFKit's own write options, `saveImagesAsJPEGOption` and `optimizeImagesForScreenOption`, were tried for iOS. They shrink only the pictures PDFKit made from photos, not those of a file it read (3.4 MB stayed 3.4 MB, where the filter made 407 KB), so iOS has no Reduce File Size.
 - **The Tools menu** is one view, `ToolsMenu`, in the menu bar's Tools menu and in the iOS navigation bar.
+- **Send Page as Picture** is a `ShareLink` in the Tools menu, whose item makes the JPEG only when it's shared: the page drawn by PDFKit's `draw(with: .cropBox, to:)`, which turns and crops it itself, on white, at 144 dpi, quality 0.85. It's named "Page n".
 - **Tool keys:** C for Stamp (cachet, chop), D for Date.
 
 ## Testing
