@@ -195,6 +195,36 @@ final class Viewer {
         let count = doc.addToEveryPage(mark)
         message = count == 1 ? "Added to 1 more page" : "Added to \(count) more pages"
     }
+
+    /// Reads the words on the pages that have no text, showing how far it's got, then says how it went.
+    func recognizeText() {
+        settle()
+        busy = "Recognizing text…"
+        Task { @MainActor in
+            let (read, of) = await doc.recognizeText { done, count in self.busy = "Recognizing text… \(done + 1) of \(count)" }
+            busy = nil
+            message = of == 0 ? "Every page has its text already" : read == 0 ? "Found no text to recognize"
+                : read == 1 ? "Recognized the text on 1 page" : "Recognized the text on \(read) pages"
+        }
+    }
+
+    /// Rewrites the document smaller, staying on its page, and says by how much, or that it can't be.
+    func reduceFileSize() {
+        settle()
+        busy = "Reducing file size…"
+        Task { @MainActor in
+            resume = pageIndex
+            let sizes = await doc.reduceFileSize()
+            busy = nil
+            guard let sizes else {
+                resume = nil
+                message = "Already as small as it gets"
+                return
+            }
+            let size = { (bytes: Int) in ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file) }
+            message = "\(size(sizes.before)) → \(size(sizes.after))"
+        }
+    }
 }
 
 struct DocumentView: View {
@@ -224,8 +254,9 @@ struct DocumentView: View {
             .onSubmit(of: .search) { viewer.step(1) }
             .onChange(of: viewer.pageIndex) { if let url { Viewer.remember(page: viewer.pageIndex, of: url) } }
             .onChange(of: viewer.doc.revision) {
-                // An undo can take the selected mark off its page.
-                if let mark = viewer.canvas.selected, mark.page == nil { viewer.canvas.selected = nil }
+                // An undo can take the selected mark off its page, and recognizing text or reducing the size puts in new
+                // pages.
+                if let mark = viewer.canvas.selected, mark.page?.document !== viewer.doc.pdf { viewer.canvas.selected = nil }
                 viewer.canvas.outlineSelection()
                 viewer.canvas.sharpenAnnotations()
             }
