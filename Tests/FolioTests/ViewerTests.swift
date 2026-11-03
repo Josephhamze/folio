@@ -213,9 +213,9 @@ final class ViewerTests: XCTestCase {
     }
 
     /// A right click on a mark, whatever the tool, selects it with the Select tool and puts Delete first in the menu, which
-    /// Edit › Delete does too while it's selected. Elsewhere the page view's own menu shows.
+    /// Edit › Delete does too while it's selected, then Add to Every Page. Elsewhere the page view's own menu shows.
     func testRightClickOffersToDeleteAMark() throws {
-        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Hi"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Hi"], ["There"]]))), page = viewer.doc.pages[0], undo = manualUndo(viewer.doc)
         let window = NSWindow(contentRect: CGRect(x: -4000, y: -4000, width: 700, height: 900), styleMask: .borderless, backing: .buffered, defer: false)
         window.contentView = viewer.canvas
         viewer.canvas.document = viewer.doc.pdf
@@ -234,11 +234,14 @@ final class ViewerTests: XCTestCase {
         XCTAssertFalse(menu(CGPoint(x: 300, y: 300))?.items.contains { $0.title == "Delete" } ?? true)
         XCTAssertEqual(viewer.tool, .pen)
         XCTAssertFalse(viewer.canvas.responds(to: delete))
-        let item = try XCTUnwrap(menu(CGPoint(x: 110, y: 110))?.items.first)
-        XCTAssertEqual(item.title, "Delete")
+        let items = try XCTUnwrap(menu(CGPoint(x: 110, y: 110))?.items), item = items[0]
+        XCTAssertEqual(items.prefix(3).map(\.title), ["Delete", "Add to Every Page", ""])
         XCTAssertEqual(viewer.tool, .select)
         XCTAssertTrue(viewer.canvas.selected === box)
         XCTAssertTrue(viewer.canvas.responds(to: delete))
+        act(undo) { NSApplication.shared.sendAction(items[1].action!, to: items[1].target, from: items[1]) }
+        XCTAssertEqual(viewer.doc.pages[1].annotations.map(\.type), ["Square"])
+        XCTAssertEqual(viewer.message, "Added to 1 more page")
         act(undo) { NSApplication.shared.sendAction(item.action!, to: item.target, from: item) }
         XCTAssertTrue(page.annotations.isEmpty)
         XCTAssertEqual(undo.undoActionName, "Delete")

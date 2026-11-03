@@ -368,7 +368,7 @@ final class Canvas: PDFView {
     }
 
     /// A right click on a mark selects it, with the Select tool whatever the tool was, and puts Delete first in the page
-    /// view's menu.
+    /// view's menu, then Add to Every Page when there are other pages.
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = super.menu(for: event) ?? NSMenu(), point = convert(event.locationInWindow, from: nil)
         guard viewer.doc.canEdit, let page = page(for: point, nearest: false), let mark = page.annotation(at: convert(point, to: page)),
@@ -377,12 +377,16 @@ final class Canvas: PDFView {
         viewer.tool = .select
         selected = mark
         // Its own target: sent down the responder chain, Delete would go to a text field that has the keys.
-        let delete = NSMenuItem(title: "Delete", action: #selector(deleteMark), keyEquivalent: "")
-        delete.target = self
-        menu.insertItem(delete, at: 0)
-        menu.insertItem(.separator(), at: 1)
+        let items = [NSMenuItem(title: "Delete", action: #selector(deleteMark), keyEquivalent: "")]
+            + (viewer.doc.pdf.pageCount > 1 ? [NSMenuItem(title: "Add to Every Page", action: #selector(addToEveryPage), keyEquivalent: "")] : [])
+        for (index, item) in (items + [.separator()]).enumerated() {
+            item.target = self
+            menu.insertItem(item, at: index)
+        }
         return menu
     }
+
+    @objc private func addToEveryPage(_ sender: Any?) { viewer.addToEveryPage() }
 
     /// Edit › Delete is on only while a mark is selected.
     override func responds(to selector: Selector!) -> Bool {

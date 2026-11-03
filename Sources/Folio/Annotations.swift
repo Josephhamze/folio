@@ -439,6 +439,26 @@ extension FolioDocument {
         change("Change Font", do: { box.font = font; box.bounds = bounds }, undo: { box.font = old.font; box.bounds = old.bounds })
     }
 
+    /// Copies of the mark on every other page, at the same place on each, as one change: initials on each page of a
+    /// contract, or a stamp. On a page of another size the copy keeps its size, and its middle sits as far across and up
+    /// the page as the mark's does on its own. It returns how many pages got one.
+    /// shortcut: a page turned another way than the mark's gets its copy unturned. Turn the copies with their pages if
+    /// files that mix upright and turned pages ever need it.
+    @discardableResult
+    func addToEveryPage(_ mark: PDFAnnotation) -> Int {
+        guard let home = mark.page, pdf.pageCount > 1 else { return 0 }
+        let from = home.bounds(for: .cropBox), size = mark.bounds.size
+        let copies = pages.filter { $0 != home }.map { page in
+            let to = page.bounds(for: .cropBox), copy = mark.copy() as! PDFAnnotation
+            let middle = CGPoint(x: to.minX + (mark.bounds.midX - from.minX) / from.width * to.width,
+                                 y: to.minY + (mark.bounds.midY - from.minY) / from.height * to.height)
+            copy.bounds = CGRect(origin: CGPoint(x: middle.x - size.width / 2, y: middle.y - size.height / 2), size: size)
+            return (page: page, mark: copy)
+        }
+        change("Add to Every Page", do: { copies.forEach { $0.page.addAnnotation($0.mark) } }, undo: { copies.forEach { $0.page.drop($0.mark) } })
+        return copies.count
+    }
+
     /// Every comment, page by page.
     var comments: [(page: PDFPage, annotation: PDFAnnotation)] {
         pages.flatMap { page in page.annotations.filter(\.isComment).map { (page, $0) } }

@@ -179,6 +179,27 @@ final class ScreenshotTests: XCTestCase {
         shot("undone by key")
     }
 
+    /// The date tool's date, put on every page from the tool bar, and the Tools menu's stamp pad, which takes a picture of the
+    /// company's stamp.
+    func testDateOnEveryPageAndTheStampPad() {
+        openSample()
+        let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
+        choose("calendar")
+        point(line.maxX - 80, line.minY - 30).tap()
+        let every = app.buttons["Add to Every Page"].firstMatch
+        XCTAssertTrue(every.isEnabled)
+        every.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Added to'")).firstMatch.waitForExistence(timeout: 3))
+        shot("date on every page")
+        barButton("Tools")
+        let stamp = app.buttons["Edit Stamp…"]
+        XCTAssertTrue(stamp.waitForExistence(timeout: 5))
+        stamp.tap()
+        XCTAssertTrue(app.buttons["Photos…"].waitForExistence(timeout: 5))
+        shot("stamp pad")
+        app.buttons["Cancel"].tap()
+    }
+
     /// Undo while typing takes back the typing, not the change before it.
     func testUndoWhileTyping() {
         openSample()
@@ -269,20 +290,25 @@ final class ScreenshotTests: XCTestCase {
     }
 
     /// Launches Folio and opens a sample from its folder in the document browser.
+    /// Opens a sample from Folio's folder. Browse opens where it was left: at its locations, in On My iPhone or iPad, or in
+    /// Folio's folder. A slow Mac, such as GitHub's, can take a while to show a folder, and let a tap go while the folder
+    /// slides in, so it takes whichever step shows until the document opens.
     private func openSample(_ name: String = "Quarterly Brief") {
         app.launch()
-        app.buttons["Browse"].firstMatch.tap()   // the tab, or the back button to it
-        // Browse opens where it was left: at its locations, in On My iPhone or iPad, or in Folio's folder.
-        for place in [app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'On My i'")).firstMatch, app.cells["Folio, Container"]]
-        where place.waitForExistence(timeout: 2) {
+        let browse = app.buttons["Browse"].firstMatch   // the tab, or the back button to it
+        if browse.waitForExistence(timeout: 30) { browse.tap() }
+        let sample = app.cells["\(name), pdf"], opened = app.buttons["highlighter"]
+        let steps = [sample, app.cells["Folio, Container"], app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'On My i'")).firstMatch]
+        let deadline = Date.now + 120
+        while !opened.waitForExistence(timeout: 1), Date.now < deadline {
+            guard let step = steps.first(where: \.exists) else { continue }
             // On a fresh iPad the locations are a sidebar over the folder, put away by a tap beside it.
-            if !place.isHittable { point(app.frame.maxX - 40, app.frame.midY).tap() }
-            place.tap()
+            if !step.isHittable { point(app.frame.maxX - 40, app.frame.midY).tap() }
+            step.tap()
+            // A document takes a while to open, and a second tap on the way could open it twice.
+            if step === sample { _ = opened.waitForExistence(timeout: 20) }
         }
-        let sample = app.cells["\(name), pdf"]
-        XCTAssert(sample.waitForExistence(timeout: 10))
-        sample.tap()
-        XCTAssert(app.buttons["highlighter"].waitForExistence(timeout: 10))
+        XCTAssert(opened.exists)
     }
 
     private func point(_ x: CGFloat, _ y: CGFloat) -> XCUICoordinate {

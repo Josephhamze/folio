@@ -185,6 +185,34 @@ final class TouchTests: XCTestCase {
         XCTAssertNil(viewer.mark)
     }
 
+    /// A tap places the stamp at its usual size, selected, so the tool bar's Add to Every Page puts it on the other pages;
+    /// the date tool's tap places today's date, and its drag scrolls.
+    func testTapsPlaceAStampOnEveryPageAndTheDate() throws {
+        let saved = Signature[.stamp]
+        defer { Signature[.stamp] = saved }
+        Signature[.stamp] = .typed("ACME SARL")
+        let (viewer, undo) = host(makePDF([["Date:"], ["Page two"]]))
+        let canvas = viewer.canvas, page = viewer.doc.pages[0], at = { (point: CGPoint) in canvas.convert(point, from: page) }
+        viewer.tool = .stamp
+        act(undo) { canvas.tapped(at: at(CGPoint(x: 300, y: 300))) }
+        let stamp = try XCTUnwrap(page.annotations.first)
+        XCTAssertEqual(stamp.bounds.midX, 300, accuracy: 0.5)
+        XCTAssertEqual(max(stamp.bounds.width, stamp.bounds.height), 120, accuracy: 0.5)
+        XCTAssertTrue(canvas.selected === stamp)
+        XCTAssertTrue(viewer.canAddToEveryPage)
+        act(undo) { viewer.addToEveryPage() }
+        XCTAssertEqual(viewer.doc.pages[1].annotations.map(\.type), ["Stamp"])
+        XCTAssertEqual(undo.undoActionName, "Add to Every Page")
+        viewer.tool = .date
+        XCTAssertFalse(canvas.pans(at: at(CGPoint(x: 300, y: 500))))
+        act(undo) { canvas.tapped(at: at(CGPoint(x: 300, y: 500))) }
+        let date = try XCTUnwrap(page.annotations.last)
+        XCTAssertEqual(date.type, "FreeText")
+        XCTAssertEqual(date.contents, Date.now.formatted(date: .numeric, time: .omitted))
+        XCTAssertTrue(canvas.selected === date)
+        XCTAssertEqual(undo.undoActionName, "Add Date")
+    }
+
     /// A tap that slips a little, as a finger's does, places the usual signature, not one the size of the slip.
     func testSlippedTapPlacesTheUsualSignature() {
         let saved = Signature[.sign]

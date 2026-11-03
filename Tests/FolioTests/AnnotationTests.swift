@@ -206,6 +206,53 @@ final class AnnotationTests: XCTestCase {
         XCTAssertEqual(darkPixels(doc.extract([page]).page(at: 0)!, in: stamp.bounds), shown)
     }
 
+    func testAddToEveryPagePutsACopyAtTheSamePlace() {
+        let doc = FolioDocument(pdf: makePDF([["1"], ["2"]])), undo = manualUndo(doc)
+        // On a page half the size, the copy keeps its size, and sits as far across and up.
+        doc.pdf.insert(makePDF([["3"]], size: CGSize(width: 306, height: 396)).page(at: 0)!.copy() as! PDFPage, at: 2)
+        let mark = Signature.typed("JH").annotation(in: CGRect(x: 500, y: 40, width: 80, height: 30))
+        doc.pages[0].addAnnotation(mark)
+        act(undo) { XCTAssertEqual(doc.addToEveryPage(mark), 2) }
+        XCTAssertEqual(undo.undoActionName, "Add to Every Page")
+        let marks = doc.pages.map(\.annotations)
+        XCTAssertEqual(marks.map(\.count), [1, 1, 1])
+        let same = marks[1][0].bounds, half = marks[2][0].bounds
+        XCTAssertTrue(marks[1][0] is SignatureAnnotation && marks[1][0] !== mark)
+        XCTAssertEqual(hypot(same.minX - mark.bounds.minX, same.minY - mark.bounds.minY), 0, accuracy: 0.01)
+        XCTAssertEqual(half.size, mark.bounds.size)
+        XCTAssertEqual(half.midX, mark.bounds.midX / 2, accuracy: 0.01)
+        XCTAssertEqual(half.midY, mark.bounds.midY / 2, accuracy: 0.01)
+        // The copies are drawn as the mark is.
+        XCTAssertEqual(darkPixels(doc.pages[1], in: same), darkPixels(doc.pages[0], in: mark.bounds))
+        undo.undo()
+        XCTAssertEqual(doc.pages.map(\.annotations.count), [1, 0, 0])
+        // A document of one page has no others.
+        let single = FolioDocument(pdf: makePDF([["1"]])), alone = shape(.rect, from: .zero, to: CGPoint(x: 9, y: 9), color: .red)
+        single.pages[0].addAnnotation(alone)
+        XCTAssertEqual(single.addToEveryPage(alone), 0)
+        XCTAssertEqual(single.revision, 0)
+    }
+
+    /// A file opened again has PDFKit's own stamp, with the picture in the file, and a text box: those copy too.
+    func testAddToEveryPageCopiesMarksReadFromAFile() throws {
+        let first = FolioDocument(pdf: makePDF([["1"], ["2"]]))
+        let stamp = Signature.image(try XCTUnwrap(Signature.lifted(from: stampPhoto()))).annotation(in: CGRect(x: 400, y: 50, width: 120, height: 120))
+        let date = textBox(at: CGPoint(x: 100, y: 100), on: first.pages[0])
+        date.contents = "03/11/2026"
+        first.pages[0].addAnnotation(stamp)
+        first.pages[0].addAnnotation(date)
+        let doc = FolioDocument(pdf: PDFDocument(data: try first.snapshot(contentType: .pdf))!)
+        let marks = doc.pages[0].annotations
+        XCTAssertEqual(marks.map(\.type), ["Stamp", "FreeText"])
+        marks.forEach { doc.addToEveryPage($0) }
+        let copies = doc.pages[1].annotations
+        XCTAssertEqual(copies.map(\.type), ["Stamp", "FreeText"])
+        XCTAssertEqual(copies.last?.contents, "03/11/2026")
+        let ink = Double(darkPixels(doc.pages[0], in: marks[0].bounds))
+        XCTAssertGreaterThan(ink, 5000)
+        XCTAssertEqual(Double(darkPixels(doc.pages[1], in: marks[0].bounds)), ink, accuracy: ink / 20)
+    }
+
     /// The pixels of `rect` on the page, at four a point, that are darker than mid grey.
     private func darkPixels(_ page: PDFPage, in rect: CGRect) -> Int {
         gray(page, in: rect, scale: 4).joined().filter { $0 < 128 }.count

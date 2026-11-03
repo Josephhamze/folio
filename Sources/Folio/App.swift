@@ -114,14 +114,23 @@ struct FolioCommands: Commands {
             #endif
             Divider()
         }
-        CommandMenu("Tools") {
-            Button("Edit Signature…") { viewer?.sheet = .signature(.sign) }.disabled(viewer == nil)
-            Button("Edit Initials…") { viewer?.sheet = .signature(.initial) }.disabled(viewer == nil)
-            Button("Edit Stamp…") { viewer?.sheet = .signature(.stamp) }.disabled(viewer == nil)
-            #if os(macOS)
-            Divider()
-            Button("Show Fonts") { NSFontManager.shared.orderFrontFontPanel(nil) }.keyboardShortcut("t").disabled(viewer == nil)
-            #endif
-        }
+        CommandMenu("Tools") { ToolsMenu(viewer: viewer) }
+    }
+}
+
+/// The Tools menu: the menu bar's, and on iOS the navigation bar's too, as iPhone has no menu bar.
+struct ToolsMenu: View {
+    let viewer: Viewer?
+
+    var body: some View {
+        Button("Add to Every Page") { viewer?.addToEveryPage() }.disabled(viewer?.canAddToEveryPage != true)
+        Divider()
+        Button("Edit Signature…") { viewer?.sheet = .signature(.sign) }.disabled(viewer == nil)
+        Button("Edit Initials…") { viewer?.sheet = .signature(.initial) }.disabled(viewer == nil)
+        Button("Edit Stamp…") { viewer?.sheet = .signature(.stamp) }.disabled(viewer == nil)
+        #if os(macOS)
+        Divider()
+        Button("Show Fonts") { NSFontManager.shared.orderFrontFontPanel(nil) }.keyboardShortcut("t").disabled(viewer == nil)
+        #endif
     }
 }

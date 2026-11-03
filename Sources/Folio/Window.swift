@@ -178,6 +178,23 @@ final class Viewer {
         doc.delete(targetPages)
         selection = []
     }
+
+    /// Whether the document takes changes now: it can be edited, and nothing is working on it.
+    var isIdle: Bool { doc.canEdit && busy == nil }
+
+    /// Whether Add to Every Page has a mark to copy, and pages to copy it to.
+    var canAddToEveryPage: Bool {
+        _ = doc.revision   // pages come and go without telling
+        return isIdle && mark != nil && doc.pdf.pageCount > 1
+    }
+
+    /// Copies the selected mark onto every other page, once the words being typed are in, and says onto how many.
+    func addToEveryPage() {
+        settle()
+        guard let mark = canvas.selected else { return }
+        let count = doc.addToEveryPage(mark)
+        message = count == 1 ? "Added to 1 more page" : "Added to \(count) more pages"
+    }
 }
 
 struct DocumentView: View {
@@ -289,6 +306,8 @@ struct DocumentView: View {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     pageBox
                     Button("Panes", systemImage: "sidebar.right") { viewer.showsPanes.toggle() }
+                    // iPhone has no menu bar for the Tools menu.
+                    Menu("Tools", systemImage: "ellipsis.circle") { ToolsMenu(viewer: viewer) }
                     ShareButton(viewer: viewer, name: name)
                 }
             }
@@ -348,8 +367,8 @@ struct SharedPDF: Transferable {
 }
 #endif
 
-/// The tools, the colour and Delete for the selected mark, in a bar across the top of the pages. On iOS it's at the bottom,
-/// the tools scroll where they don't fit, and it has Undo and Redo.
+/// The tools, the colour, and Add to Every Page and Delete for the selected mark, in a bar across the top of the pages. On
+/// iOS it's at the bottom, the tools scroll where they don't fit, and it has Undo and Redo.
 struct ToolBar: View {
     @Bindable var viewer: Viewer
     #if os(iOS)
@@ -386,12 +405,15 @@ struct ToolBar: View {
             }
             .disabled(undoManager?.canRedo != true)
             #endif
+            Button("Add to Every Page", systemImage: "rectangle.portrait.on.rectangle.portrait") { viewer.addToEveryPage() }
+                .help("Add to Every Page")
+                .disabled(!viewer.canAddToEveryPage)
             Button("Delete", systemImage: "trash", role: .destructive) { viewer.canvas.deleteMark() }
                 .help("Delete")
                 .disabled(viewer.mark == nil)
         }
         .labelStyle(.iconOnly)
-        .disabled(!viewer.doc.canEdit)
+        .disabled(!viewer.isIdle)
         .padding(6)
         .frame(maxWidth: .infinity)
         .background(.bar)
