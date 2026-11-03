@@ -19,14 +19,14 @@ func render(_ page: PDFPage, dpi: CGFloat) -> CGImage? {
     return context.makeImage()
 }
 
-/// Draws the page's own content, not its annotations, in the page's space.
+/// Draws the page's own content, not its annotations, unturned, in the page's space.
 private func drawContent(of page: PDFPage, in context: CGContext) {
     if let ref = page.pageRef { return context.drawPDFPage(ref) }
-    // A page made in memory, such as one from a picture, has no page of a file to draw.
-    let shown = page.displaysAnnotations
-    page.displaysAnnotations = false
+    // A page made in memory, such as one from a picture, has no page of a file to draw, and PDFKit draws it turned.
+    let (shown, turn) = (page.displaysAnnotations, page.rotation)
+    (page.displaysAnnotations, page.rotation) = (false, 0)
     page.draw(with: .mediaBox, to: context)
-    page.displaysAnnotations = shown
+    (page.displaysAnnotations, page.rotation) = (shown, turn)
 }
 
 /// The lines of text Vision reads in the picture, each with its box as a share of the picture, from the bottom left. It
@@ -84,8 +84,7 @@ func picture(of page: PDFPage, dpi: CGFloat = 144) -> Data? {
     context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
     context.fill(CGRect(x: 0, y: 0, width: width, height: height))
     context.scaleBy(x: scale, y: scale)
-    page.transform(context, for: .cropBox)
-    page.draw(with: .cropBox, to: context)
+    page.draw(with: .cropBox, to: context)   // turned and cropped as it shows
     let data = NSMutableData()
     guard let image = context.makeImage(), let file = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return nil }
     CGImageDestinationAddImage(file, image, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)

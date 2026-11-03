@@ -71,6 +71,9 @@ final class ToolsTests: XCTestCase {
         }
         let again = try XCTUnwrap(rebuilt(photo, text: [])), shown = Double(ink(try XCTUnwrap(render(photo, dpi: 72))))
         XCTAssertEqual(Double(ink(try XCTUnwrap(render(again, dpi: 72)))), shown, accuracy: shown / 100)
+        // Turned, it's still read upright, all of it.
+        photo.rotation = 90
+        XCTAssertEqual(Double(ink(try XCTUnwrap(render(photo, dpi: 72)))), shown, accuracy: shown / 100)
     }
 
     func testRecognizeTextPutsTheWordsUnderTheScan() async throws {
