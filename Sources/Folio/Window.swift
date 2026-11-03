@@ -316,6 +316,7 @@ struct DocumentView: View {
             }
             .sheet(item: $viewer.sheet) { sheet in
                 if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
+                if sheet == .protect { PasswordSheet(viewer: viewer) }
             }
             .fileImporter(isPresented: $viewer.choosingPages, allowedContentTypes: [.pdf, .image], allowsMultipleSelection: true) { result in
                 guard let urls = try? result.get().sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }),

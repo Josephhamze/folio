@@ -33,7 +33,7 @@
 - **Redact.** Box what must go with the Redact tool (X), then choose Tools › Apply Redactions. Each marked page becomes a picture of itself with the boxes blacked out, so the words under them are gone from the file, not just covered. Folio reads the rest of the page back, so it can still be found, and drops any mark over a box.
 - **Smaller files.** On the Mac, Tools › Reduce File Size saves the pictures as JPEG at 144 dpi, so a scanned contract is light enough to send over mobile data. Folio shows the size before and after, and keeps a file's password.
 - **Fill in forms.** You can also fix a line of text by typing over it. The original text stays underneath in the file, and Folio tells you so.
-- **Protected files.** Folio asks for a file's password in the window. It respects an author's editing restrictions until you enter the permissions password, and saving keeps the file encrypted.
+- **Protected files.** Folio asks for a file's password in the window. It respects an author's editing restrictions until you enter the permissions password, and saving keeps the file encrypted. Tools › Password… sets the password that opens a file, changes it, or takes it off, once the file is saved.
 - **Save.** Your changes stay out of the file until you save them with ⌘S. Closing or quitting with unsaved changes asks whether to save them. File › Save As… (⌥⇧⌘S) saves the document under a new name, and you keep working in the new file.
 - **Undo.** Every change can be undone and redone.
 - **Print**, and open PDFs from Finder. Folio asks once to be your default PDF app, and Home offers it while it isn't.
@@ -68,7 +68,7 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 ## Roadmap
 
 - **Combine and split files:** combine PDFs and pictures into a new document, and split one into files of a few pages each. The document side of this is built and tested. The screens aren't built yet.
-- **Passwords:** add or remove a file's password, plus a document properties sheet.
+- **Restrictions and properties:** restrict printing, copying and changes with a permissions password, and a sheet for the title, author and keywords.
 
 ## License
 

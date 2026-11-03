@@ -124,3 +124,38 @@ struct SignatureSheet: View {
         noInk = picture == nil
     }
 }
+
+/// Sets the password the file opens with once it's saved, or takes its password off.
+struct PasswordSheet: View {
+    let viewer: Viewer
+    @Environment(\.dismiss) private var dismiss
+    @State private var password = ""
+    @State private var again = ""
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Password").font(.headline)
+            Text("Once saved, the file asks for this password to open it.").foregroundStyle(.secondary)
+            SecureField("Password", text: $password)
+            SecureField("Again", text: $again)
+            HStack {
+                if viewer.doc.newPassword != nil || viewer.doc.pdf.isEncrypted { Button("Remove Password") { set(nil) } }
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }
+                Button("Set Password") { set(password) }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(password.isEmpty || password != again)
+            }
+        }
+        .frame(width: 340)
+        .padding(20)
+    }
+
+    private func set(_ new: String?) {
+        // A protected file's pages move to a new document, which would show its first page.
+        if viewer.doc.pdf.isEncrypted { viewer.resume = viewer.pageIndex }
+        viewer.doc.setPassword(new)
+        viewer.message = new == nil ? "The password comes off once the file is saved" : "The password goes on once the file is saved"
+        dismiss()
+    }
+}

@@ -12,6 +12,8 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     var revision = 0
     /// The password that unlocked the file.
     var password: String?
+    /// The password the file opens with once it's saved, when one was set here. Without one, it's saved as `pdf` is.
+    var newPassword: String?
     @ObservationIgnored weak var undo: UndoManager?
 
     init() {
@@ -46,7 +48,8 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     }
 
     func snapshot(contentType: UTType) throws -> Data {
-        guard !pdf.isLocked, let data = pdf.dataRepresentation() else { throw CocoaError(.fileWriteUnknown) }
+        let options = newPassword.map { [PDFDocumentWriteOption.userPasswordOption: $0, .ownerPasswordOption: $0] } ?? [:]
+        guard !pdf.isLocked, let data = pdf.dataRepresentation(options: options) else { throw CocoaError(.fileWriteUnknown) }
         return data
     }
 
@@ -74,6 +77,29 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         revision += 1
         undo?.registerUndo(withTarget: self) { $0.change(name, do: revert, undo: redo) }
         undo?.setActionName(name)
+    }
+
+    /// Sets the password that opens the file once it's saved, or with nil takes the file's password off. PDFKit saves a
+    /// protected file with its own protection, whatever it's asked, so the pages of one move into a document without any.
+    func setPassword(_ new: String?) {
+        let (old, plain) = ((pdf: pdf, password: newPassword), pdf.isEncrypted ? PDFDocument() : pdf)
+        change(new == nil ? "Remove Password" : "Set Password", do: {
+            if plain !== old.pdf { Self.move(from: old.pdf, to: plain) }
+            (self.pdf, self.newPassword) = (plain, new)
+        }, undo: {
+            if plain !== old.pdf { Self.move(from: plain, to: old.pdf) }
+            (self.pdf, self.newPassword) = old
+        })
+    }
+
+    /// Moves every page, the bookmarks and the title and other attributes from one document to another.
+    private static func move(from: PDFDocument, to: PDFDocument) {
+        while from.pageCount > 0, let page = from.page(at: 0) {
+            from.removePage(at: 0)
+            to.insert(page, at: to.pageCount)
+        }
+        to.outlineRoot = from.outlineRoot
+        to.documentAttributes = from.documentAttributes
     }
 
     // MARK: Pages

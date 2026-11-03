@@ -86,6 +86,57 @@ final class DocumentTests: XCTestCase {
         XCTAssertTrue(PDFDocument(data: try! doc.snapshot(contentType: .pdf))!.isEncrypted)
     }
 
+    func testPasswordToOpenGoesOnWhenSavedAndUndoes() throws {
+        let doc = FolioDocument(pdf: makePDF([["A"]])), undo = manualUndo(doc)
+        act(undo) { doc.setPassword("pw") }
+        let file = try reopened(doc)
+        XCTAssertTrue(file.isLocked)
+        XCTAssertFalse(file.unlock(withPassword: "nope"))
+        XCTAssertTrue(file.unlock(withPassword: "pw"))
+        XCTAssertEqual(texts(file), ["A"])
+        undo.undo()
+        XCTAssertFalse(try reopened(doc).isEncrypted)
+    }
+
+    func testNewPasswordReplacesTheFilesOwn() throws {
+        let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "a", .ownerPasswordOption: "a"])!
+        let doc = FolioDocument(pdf: PDFDocument(data: data)!)
+        XCTAssertTrue(doc.unlock("a"))
+        doc.setPassword("b")
+        let file = try reopened(doc)
+        XCTAssertFalse(file.unlock(withPassword: "a"))
+        XCTAssertTrue(file.unlock(withPassword: "b"))
+        XCTAssertEqual(texts(file), ["A"])
+    }
+
+    func testRemovePasswordKeepsWhatsInTheFileAndUndoes() throws {
+        let pdf = makePDF([["A"], ["B"]]), outline = PDFOutline(), item = PDFOutline()
+        pdf.documentAttributes = [PDFDocumentAttribute.titleAttribute: "Q3"]
+        pdf.page(at: 1)!.addAnnotation(shape(.rect, from: .zero, to: CGPoint(x: 20, y: 20), color: .red))
+        item.label = "Second"
+        item.destination = PDFDestination(page: pdf.page(at: 1)!, at: .zero)
+        outline.insertChild(item, at: 0)
+        pdf.outlineRoot = outline
+        let data = pdf.dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "a", .ownerPasswordOption: "a"])!
+        let doc = FolioDocument(pdf: PDFDocument(data: data)!), undo = manualUndo(doc)
+        XCTAssertTrue(doc.unlock("a"))
+        act(undo) { doc.setPassword(nil) }
+        let file = try reopened(doc)
+        XCTAssertFalse(file.isEncrypted)
+        XCTAssertEqual(texts(file), ["A", "B"])
+        XCTAssertEqual(file.page(at: 1)?.annotations.count, 1)
+        XCTAssertEqual(file.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String, "Q3")
+        XCTAssertEqual(file.outlineRoot?.child(at: 0)?.label, "Second")
+        undo.undo()
+        XCTAssertTrue(try reopened(doc).isEncrypted)
+        XCTAssertEqual(doc.pdf.pageCount, 2)
+    }
+
+    /// The document as its file would be read back.
+    private func reopened(_ doc: FolioDocument) throws -> PDFDocument {
+        try XCTUnwrap(PDFDocument(data: try doc.snapshot(contentType: .pdf)))
+    }
+
     func testUnlockRedrawsWhatReadCanEdit() {
         let data = makePDF([["Secret"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "pw"])!
         let doc = FolioDocument(pdf: PDFDocument(data: data)!)

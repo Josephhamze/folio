@@ -155,6 +155,7 @@ struct ToolsMenu: View {
         #if os(macOS)
         Button("Reduce File Size") { viewer?.reduceFileSize() }.disabled(!idle)
         #endif
+        Button("Password…") { viewer?.sheet = .protect }.disabled(!idle)
         Button("Add to Every Page") { viewer?.addToEveryPage() }.disabled(viewer?.canAddToEveryPage != true)
         if let viewer, !viewer.doc.pdf.isLocked {
             ShareLink("Send Page as Picture", item: PagePicture(viewer: viewer), preview: SharePreview("Page \(viewer.pageIndex + 1)"))

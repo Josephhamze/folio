@@ -39,6 +39,9 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - The Redact tool marked areas, but nothing applied them, so the words stayed in the file under a red box. Tools › Apply Redactions now burns them in: each page with marks becomes a picture of itself with the marked areas black, and gets back the words read from the picture, so the rest can still be found. Marks that overlap a redaction go, since they could tell what it hid. It's one undo step, and all or nothing: a page that can't be redacted leaves every page as it was.
 - Placing a redaction mark says that Apply Redactions takes out what's under the marks.
 
+**Password…** (added once the rest was built)
+- Tools › Password… sets the password that opens the file once it's saved, changes a file's own, or takes it off: a contract sent by email or WhatsApp can then be opened only by whoever is told the password. It's one undo step, and says it applies once the file is saved.
+
 **Tools on iPhone**
 - The navigation bar gets a Tools menu with what the menu bar's Tools menu has. Without it, a signature saved on an iPhone could never be changed: the pad opened only when none was saved, and only iPad has a menu bar.
 
@@ -47,7 +50,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 
 ## Non-goals
 
-- Scanning with the camera; combining and splitting files; passwords and properties; French and Chinese for Folio's own words. They are next.
+- Scanning with the camera; combining and splitting files; restrictions on printing, copying and changes, and the properties sheet; French and Chinese for Folio's own words. They are next.
 - Choosing the date's format, or a stamp's colour. The date follows the region; the stamp keeps its ink.
 - Resizing a placed stamp: as with signatures, it's placed again at another size.
 - Recognizing text on pages that have some, or on parts of pages.
@@ -72,6 +75,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - **The Tools menu** is one view, `ToolsMenu`, in the menu bar's Tools menu and in the iOS navigation bar.
 - **Send Page as Picture** is a `ShareLink` in the Tools menu, whose item makes the JPEG only when it's shared: the page drawn by PDFKit's `draw(with: .cropBox, to:)`, which turns and crops it itself, on white, at 144 dpi, quality 0.85. It's named "Page n".
 - **Apply Redactions** renders each marked page as `render` does for Recognize Text, in colour at 300 dpi without its annotations, with the marks' boxes filled black in page space, so a turned page or one whose media box doesn't start at 0,0 is blacked exactly where marked. The picture is kept as a JPEG at quality 0.85 (a page-sized picture kept as drawn would weigh tens of megabytes), drawn over the page's media box by `rebuilt`, with the recognized words under it. Recognition that fails, as on GitHub's Macs, still redacts, leaving the page without text.
+- **The password** is the document's `newPassword`, written as both the user and owner password by `snapshot`, so whoever opens the file can do anything with it. PDFKit saves a file opened encrypted with its own protection whatever it's asked, so setting or removing a password on one first moves its pages, bookmarks and attributes into a new, unprotected document, and undo moves them back. Only a document Folio may edit can have its password changed: a restricted file needs its permissions password first.
 - **The organizer** is a SwiftUI grid laid over the page view, which stays alive under it, so the page view keeps its place and a page can be shown as the grid goes. Each page is drawn once per change, as it shows, 320 pixels on its longest side. A drag carries the document's address and the page's number as text, so text dragged in from elsewhere, or a page from another window, is refused. The page actions are one view, `PageActions`, in the Pages menu and in the bar while organizing.
 - **Insert from File…** and **Extract Pages…** use SwiftUI's file importer and exporter on both platforms. Files are read whole while they may be read. Extracted pages are saved as a new file named after the document, rather than opened in a new window, since iPhone shows one document at a time.
 - **Tool keys:** C for Stamp (cachet, chop), D for Date.
@@ -86,4 +90,5 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - Reduce File Size shrinks a photo PDF, stays small once saved, and leaves a text PDF alone.
 - On iOS: a tap places a stamp and a date; Add to Every Page from the tool bar; the Tools menu opens the pads.
 - Apply Redactions: the words under a mark are gone from the window and the saved file, the box is black, other pages keep their text, a mark overlapping a redaction goes and one clear of it stays, the page keeps its turn, and undo brings it all back. A redacted photo page stays a JPEG.
+- Password: a password set goes on when saved and undoes; a new one replaces a file's own; removing one keeps the pages, marks, bookmarks and title, and undoes.
 - Organizing: drops take only pages dragged in the same window; inserted pages are selected; leaving shows the first selected page. On iOS, a tap selects a page in the grid, the bar deletes it, and Undo puts it back.
