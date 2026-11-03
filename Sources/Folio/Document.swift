@@ -49,7 +49,9 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
 
     func snapshot(contentType: UTType) throws -> Data {
         let options = newPassword.map { [PDFDocumentWriteOption.userPasswordOption: $0, .ownerPasswordOption: $0] } ?? [:]
-        guard !pdf.isLocked, let data = pdf.dataRepresentation(options: options) else { throw CocoaError(.fileWriteUnknown) }
+        // PDFKit writes a file it can't protect, as with a password not in ASCII, unprotected, and says nothing.
+        guard !pdf.isLocked, let data = pdf.dataRepresentation(options: options),
+              newPassword == nil || PDFDocument(data: data)?.isEncrypted == true else { throw CocoaError(.fileWriteUnknown) }
         return data
     }
 
@@ -80,9 +82,15 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     }
 
     /// Sets the password that opens the file once it's saved, or with nil takes the file's password off. PDFKit saves a
-    /// protected file with its own protection, whatever it's asked, so the pages of one move into a document without any.
+    /// protected file with its own protection, whatever it's asked, so the pages of one move into a document without any,
+    /// with its bookmarks, title and other attributes.
     func setPassword(_ new: String?) {
         let (old, plain) = ((pdf: pdf, password: newPassword), pdf.isEncrypted ? PDFDocument() : pdf)
+        if plain !== old.pdf {
+            // The bookmarks are copied before the pages move, while they still find them.
+            plain.outlineRoot = pdf.outlineRoot.map(Self.copied)
+            plain.documentAttributes = pdf.documentAttributes
+        }
         change(new == nil ? "Remove Password" : "Set Password", do: {
             if plain !== old.pdf { Self.move(from: old.pdf, to: plain) }
             (self.pdf, self.newPassword) = (plain, new)
@@ -92,22 +100,24 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         })
     }
 
-    /// Moves every page, the bookmarks and the title and other attributes from one document to another.
+    /// Moves every page from one document to the other.
     private static func move(from: PDFDocument, to: PDFDocument) {
         while from.pageCount > 0, let page = from.page(at: 0) {
             from.removePage(at: 0)
             to.insert(page, at: to.pageCount)
         }
-        // A document saves only bookmarks made for it.
-        to.outlineRoot = from.outlineRoot.map(copied)
-        to.documentAttributes = from.documentAttributes
     }
 
-    /// A copy of the bookmarks, to the same pages.
+    /// A copy of the bookmarks, each to the same page. A file's own bookmark finds its page through the file, so loses it
+    /// once the page leaves; the copy holds the page.
     private static func copied(_ outline: PDFOutline) -> PDFOutline {
         let copy = PDFOutline()
         (copy.label, copy.isOpen) = (outline.label, outline.isOpen)
-        if let action = outline.action { copy.action = action } else { copy.destination = outline.destination }
+        if let to = outline.destination, let page = to.page {
+            copy.destination = PDFDestination(page: page, at: to.point)
+        } else {
+            copy.action = outline.action
+        }
         for i in 0..<outline.numberOfChildren { outline.child(at: i).map { copy.insertChild(copied($0), at: copy.numberOfChildren) } }
         return copy
     }

@@ -44,8 +44,9 @@ func recognize(_ image: CGImage) async throws -> [(text: String, box: CGRect)] {
 /// The page drawn again, or `picture` in its place, filling its media box, with these lines of text under it, invisible,
 /// each fitted to its box, so the words can be found, selected and copied where they show. The new page keeps the page's
 /// turn, crop box and annotations, but popups.
-/// shortcut: a bookmark to the page still points at the old one, so loses its page. Point bookmarks at the new page if
-/// scans with bookmarks turn up.
+/// shortcut: a bookmark to the page still points at the old one, so once saved it opens the first page. PDFKit saves the
+/// bookmarks of a file it read as the file had them, so pointing them at the new page takes writing them anew, as a new
+/// document; do that if scanned or redacted files with bookmarks turn up.
 func rebuilt(_ page: PDFPage, text: [(text: String, box: CGRect)], over picture: CGImage? = nil) -> PDFPage? {
     var media = page.bounds(for: .mediaBox)
     let data = NSMutableData()

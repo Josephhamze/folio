@@ -138,13 +138,16 @@ struct PasswordSheet: View {
             Text("Once saved, the file asks for this password to open it.").foregroundStyle(.secondary)
             SecureField("Password", text: $password)
             SecureField("Again", text: $again)
+            // PDFKit can't protect a file with any other character, and saves it unprotected.
+            let ascii = password.allSatisfy(\.isASCII)
+            if !ascii { Text("Use only English letters, digits and symbols.").foregroundStyle(.red) }
             HStack {
                 if viewer.doc.newPassword != nil || viewer.doc.pdf.isEncrypted { Button("Remove Password") { set(nil) } }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                 Button("Set Password") { set(password) }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(password.isEmpty || password != again)
+                    .disabled(password.isEmpty || password != again || !ascii)
             }
         }
         .frame(width: 340)

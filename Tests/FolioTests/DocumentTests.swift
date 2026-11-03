@@ -24,6 +24,28 @@ func makePDF(styled pages: [[NSAttributedString]], size: CGSize = CGSize(width: 
     return PDFDocument(data: data as Data)!
 }
 
+/// Two blank pages and a bookmark, "Second", to the second, written out by hand: PDFKit saves the bookmarks of a file it
+/// read as the file had them, not ones added to it.
+func outlinedPDF() -> Data {
+    let objects = [
+        "<< /Type /Catalog /Pages 2 0 R /Outlines 5 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>",
+        "<< /Type /Outlines /First 6 0 R /Last 6 0 R /Count 1 >>",
+        "<< /Title (Second) /Parent 5 0 R /Dest [4 0 R /XYZ 0 792 0] >>",
+    ]
+    var pdf = "%PDF-1.4\n", offsets: [Int] = []
+    for (i, object) in objects.enumerated() {
+        offsets.append(pdf.utf8.count)
+        pdf += "\(i + 1) 0 obj\n\(object)\nendobj\n"
+    }
+    let xref = pdf.utf8.count
+    pdf += "xref\n0 \(objects.count + 1)\n0000000000 65535 f \n" + offsets.map { String(format: "%010d 00000 n \n", $0) }.joined()
+    pdf += "trailer\n<< /Size \(objects.count + 1) /Root 1 0 R >>\nstartxref\n\(xref)\n%%EOF\n"
+    return Data(pdf.utf8)
+}
+
 /// A photo of a company's stamp: a blue ring 200 pixels across, its line 12 thick, on grey paper in poor light, as a JPEG.
 func stampPhoto(ring: Bool = true) -> Data {
     let context = CGContext(data: nil, width: 400, height: 300, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -125,31 +147,37 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual(texts(file), ["A"])
     }
 
-    /// Taking off a file's protection keeps its pages, marks, title and bookmarks. The file here is protected by a permissions
-    /// password alone: PDFKit doesn't show the bookmarks of a file that needs a password to open, even once it's open.
+    /// Taking off a file's password keeps its pages, marks, title and bookmarks, each to its page, and undoes.
     func testRemovePasswordKeepsWhatsInTheFileAndUndoes() throws {
-        let pdf = makePDF([["A"], ["B"]]), outline = PDFOutline(), item = PDFOutline()
+        let pdf = try XCTUnwrap(PDFDocument(data: outlinedPDF()))
         pdf.documentAttributes = [PDFDocumentAttribute.titleAttribute: "Q3"]
         pdf.page(at: 1)!.addAnnotation(shape(.rect, from: .zero, to: CGPoint(x: 20, y: 20), color: .red))
-        item.label = "Second"
-        item.destination = PDFDestination(page: pdf.page(at: 1)!, at: .zero)
-        outline.insertChild(item, at: 0)
-        pdf.outlineRoot = outline
-        let data = pdf.dataRepresentation(options: [PDFDocumentWriteOption.ownerPasswordOption: "a"])!
-        let doc = FolioDocument(pdf: PDFDocument(data: data)!), undo = manualUndo(doc)
-        XCTAssertTrue(doc.pdf.isEncrypted)
+        let data = try XCTUnwrap(pdf.dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "a", .ownerPasswordOption: "a"]))
+        let doc = FolioDocument(pdf: try XCTUnwrap(PDFDocument(data: data))), undo = manualUndo(doc)
         XCTAssertTrue(doc.unlock("a"))
-        XCTAssertEqual(doc.pdf.outlineRoot?.child(at: 0)?.label, "Second")
         act(undo) { doc.setPassword(nil) }
         let file = try reopened(doc)
         XCTAssertFalse(file.isEncrypted)
-        XCTAssertEqual(texts(file), ["A", "B"])
+        XCTAssertEqual(file.pageCount, 2)
         XCTAssertEqual(file.page(at: 1)?.annotations.count, 1)
         XCTAssertEqual(file.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String, "Q3")
         XCTAssertEqual(file.outlineRoot?.child(at: 0)?.label, "Second")
+        XCTAssertEqual(file.outlineRoot?.child(at: 0)?.destination?.page.map(file.index(for:)), 1)
         undo.undo()
-        XCTAssertTrue(try reopened(doc).isEncrypted)
+        let back = try reopened(doc)
+        XCTAssertTrue(back.isLocked)
+        XCTAssertTrue(back.unlock(withPassword: "a"))
+        XCTAssertEqual(back.outlineRoot?.child(at: 0)?.destination?.page.map(back.index(for:)), 1)
         XCTAssertEqual(doc.pdf.pageCount, 2)
+    }
+
+    /// PDFKit saves a file whose password isn't all ASCII unprotected, without a word, so then the save fails instead.
+    func testPasswordPDFKitCantUseFailsTheSave() throws {
+        let doc = FolioDocument(pdf: makePDF([["A"]]))
+        doc.setPassword("密码")
+        XCTAssertThrowsError(try doc.snapshot(contentType: .pdf))
+        doc.setPassword("mima")
+        XCTAssertTrue(try reopened(doc).isEncrypted)
     }
 
     /// The document as its file would be read back.
