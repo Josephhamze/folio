@@ -111,8 +111,9 @@ final class DocumentTests: XCTestCase {
     /// A file its author kept from being copied or printed, open without the permissions password, takes marks but gives no
     /// pages to another file, which would go without what the author forbids. The permissions password lifts that.
     func testRestrictedFileGivesNoPages() throws {
-        let editable: PDFAccessPermissions = [.allowsDocumentChanges, .allowsDocumentAssembly, .allowsCommenting, .allowsFormFieldEntry]
-        let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.ownerPasswordOption: "pw", .accessPermissionsOption: editable.rawValue])!
+        // The Mac's PDFKit has these as a plain enum, not a set.
+        let editable = [PDFAccessPermissions.allowsDocumentChanges, .allowsDocumentAssembly, .allowsCommenting, .allowsFormFieldEntry].reduce(UInt(0)) { $0 | $1.rawValue }
+        let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.ownerPasswordOption: "pw", .accessPermissionsOption: editable])!
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).pdf")
         try data.write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
