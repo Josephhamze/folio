@@ -292,22 +292,26 @@ final class ScreenshotTests: XCTestCase {
     /// Launches Folio and opens a sample from its folder in the document browser.
     /// Opens a sample from Folio's folder. Browse opens where it was left: at its locations, in On My iPhone or iPad, or in
     /// Folio's folder. A slow Mac, such as GitHub's, can take a while to show a folder, and let a tap go while the folder
-    /// slides in, so it takes whichever step shows until the document opens.
+    /// slides in, so it takes whichever step shows until the document opens. A simulator just started there also leaves a
+    /// tapped document unopened for the first ten minutes or so, so Folio launches again each minute until it opens.
     private func openSample(_ name: String = "Quarterly Brief") {
-        app.launch()
-        let browse = app.buttons["Browse"].firstMatch   // the tab, or the back button to it
-        if browse.waitForExistence(timeout: 30) { browse.tap() }
         let sample = app.cells["\(name), pdf"], opened = app.buttons["highlighter"]
         let steps = [sample, app.cells["Folio, Container"], app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'On My i'")).firstMatch]
-        let deadline = Date.now + 120
-        while !opened.waitForExistence(timeout: 1), Date.now < deadline {
-            guard let step = steps.first(where: \.exists) else { continue }
-            // On a fresh iPad the locations are a sidebar over the folder, put away by a tap beside it.
-            if !step.isHittable { point(app.frame.maxX - 40, app.frame.midY).tap() }
-            step.tap()
-            // A document takes a while to open, and a second tap on the way could open it twice.
-            if step === sample { _ = opened.waitForExistence(timeout: 20) }
-        }
+        let deadline = Date.now + 900
+        repeat {
+            app.launch()
+            let browse = app.buttons["Browse"].firstMatch   // the tab, or the back button to it
+            if browse.waitForExistence(timeout: 30) { browse.tap() }
+            let launch = Date.now + 60
+            while !opened.waitForExistence(timeout: 1), Date.now < launch {
+                guard let step = steps.first(where: \.exists) else { continue }
+                // On a fresh iPad the locations are a sidebar over the folder, put away by a tap beside it.
+                if !step.isHittable { point(app.frame.maxX - 40, app.frame.midY).tap() }
+                step.tap()
+                // A document takes a while to open, and a second tap on the way could open it twice.
+                if step === sample { _ = opened.waitForExistence(timeout: 20) }
+            }
+        } while !opened.exists && Date.now < deadline
         XCTAssert(opened.exists)
     }
 
