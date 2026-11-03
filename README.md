@@ -22,9 +22,13 @@
 
 - **Home.** Folio opens on your recent files, shown as thumbnails. Click one to open it, or drop a PDF on the window. Each file reopens at the page you left it on.
 - **Read.** The sidebar shows thumbnails, bookmarks and every comment. View one page, a continuous scroll or two pages side by side, zoom with a pinch or ⌘ and the scroll wheel, and switch to a full-screen Read Mode. Type a page number in the toolbar to go to it. Find counts the matches and steps through them.
-- **Mark up.** Highlight, underline, strike through, add notes and text boxes, and draw rectangles, ovals, lines, arrows and freehand ink, in any colour. Select a mark to drag it, nudge it with the arrow keys, recolour it, or delete it with the Delete key or the trash in the tool bar. Right-click any mark to delete it, whatever the tool. A signature, note or text box you place stays selected, ready to drag into place. Single keys pick the tools: V Select, H Highlight, T Text Box, S Sign. Each tool's tooltip shows its key.
+- **Mark up.** Highlight, underline, strike through, add notes and text boxes, and draw rectangles, ovals, lines, arrows and freehand ink, in any colour. Select a mark to drag it, nudge it with the arrow keys, recolour it, or delete it with the Delete key or the trash in the tool bar. Right-click any mark to delete it, whatever the tool. A signature, note or text box you place stays selected, ready to drag into place. Single keys pick the tools: V Select, H Highlight, T Text Box, S Sign, C Stamp, D Date. Each tool's tooltip shows its key.
 - **Text that matches.** Click with the Text Box tool and type. The text takes the font, size and colour of the nearest text on the page. Beside a line, it sits on that line, so it looks typed into the document. Show Fonts (⌘T) changes a box's font and size.
-- **Sign.** Draw or type your signature and initials once. Then place them with a click, or drag a box to size them. They're saved as vector outlines, so they stay sharp at any zoom and in other PDF apps.
+- **Sign.** Draw or type your signature and initials once, or take them from a photo or scan. Then place them with a click, or drag a box to size them. Drawn and typed ones are saved as vector outlines, so they stay sharp at any zoom and in other PDF apps.
+- **Stamp and date.** Photograph your company's stamp printed on white paper, and the Stamp tool places it like a rubber stamp: Folio lifts the ink off the paper and keeps its colour. The Date tool types today's date beside the line you click, in that line's font.
+- **Every page at once.** Select a mark and choose Add to Every Page, in the tool bar or the mark's menu, to put a copy at the same place on every page: your initials on each page of a contract, or the stamp on each page of an invoice.
+- **Scans you can search.** Tools › Recognize Text reads the words on scanned pages, in English, French, Chinese and many other languages, on your device. Find then finds them, and you can select and copy them. The pages look as they did.
+- **Smaller files.** Tools › Reduce File Size saves the pictures as JPEG at screen resolution, so a scanned contract is light enough to send over mobile data. Folio shows the size before and after, and keeps a file's password.
 - **Fill in forms.** You can also fix a line of text by typing over it. The original text stays underneath in the file, and Folio tells you so.
 - **Protected files.** Folio asks for a file's password in the window. It respects an author's editing restrictions until you enter the permissions password, and saving keeps the file encrypted.
 - **Save.** Your changes stay out of the file until you save them with ⌘S. Closing or quitting with unsaved changes asks whether to save them. File › Save As… (⌥⇧⌘S) saves the document under a new name, and you keep working in the new file.
@@ -51,7 +55,8 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 - `./build.sh` builds the app without opening it. It signs the app with your Apple Development certificate if you have one, and ad hoc if you don't.
 - `./build.sh dmg` makes `build/Folio.dmg` for a release, signed with your Developer ID and notarised. It needs a notarytool keychain profile named `notary`. Finder lays out the dmg's window, so macOS asks once to let your terminal control Finder.
 - `./build.sh ios` builds the iPhone and iPad app and runs it in the simulator, on an iPhone 17 Pro. It needs XcodeGen: `brew install xcodegen`.
-- `./build.sh ios-test` runs the iOS tests, on an iPhone 17 Pro and an iPad Pro 13-inch simulator.
+- `./build.sh ios-test` runs the iOS tests, on an iPhone 17 Pro and an iPad Pro 13-inch simulator. Give it a test's name to run only that one, such as `./build.sh ios-test FolioTouchTests`.
+- GitHub runs the Mac and iOS tests on every push, and keeps the iOS tests' screenshots with each run.
 - `./build.sh screenshots` takes the App Store's screenshots, into `build/app-store`.
 - `./build.sh ios-release` uploads a build to App Store Connect. [`docs/app-store.md`](docs/app-store.md) has the one-time setup and the listing.
 - `swift icon/icon.swift` draws the icon and the dmg window's background from code, into `icon/Folio.icns`, `icon/logo.png` and `icon/dmg.png`.
@@ -62,7 +67,7 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 - **Organise pages:** reorder, rotate, delete, insert and extract pages, and combine or split files. The document side of this is built and tested. The screens aren't built yet.
 - **Passwords:** add or remove a file's password, plus a document properties sheet.
 - **Redaction:** apply redactions. For now the Redact tool only marks areas.
-- **Other tools:** text recognition, reducing file size and exporting pages as images.
+- **Other tools:** exporting pages as images.
 
 ## License
 
