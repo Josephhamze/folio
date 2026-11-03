@@ -56,9 +56,13 @@ func rebuilt(_ page: PDFPage, text: [(text: String, box: CGRect)]) -> PDFPage? {
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: words, attributes: [.font: CTFontCreateWithName("Helvetica" as CFString, box.height * 0.8, nil)]))
         let width = CTLineGetTypographicBounds(line, nil, nil, nil)
         guard width > 0 else { continue }
-        context.textMatrix = CGAffineTransform(scaleX: box.width / width, y: 1)
-        context.textPosition = CGPoint(x: box.minX, y: box.minY + box.height * 0.2)
+        // Stretched by the context, not the text matrix, which Core Text sets for itself as it draws.
+        context.saveGState()
+        context.translateBy(x: box.minX, y: box.minY + box.height * 0.2)
+        context.scaleBy(x: box.width / width, y: 1)
+        context.textPosition = .zero
         CTLineDraw(line, context)
+        context.restoreGState()
     }
     context.endPDFPage()
     context.closePDF()
