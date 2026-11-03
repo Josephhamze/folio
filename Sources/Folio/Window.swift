@@ -1,5 +1,6 @@
 import PDFKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// A window's state: its document, its page view and what the window shows.
 @Observable
@@ -28,6 +29,9 @@ final class Viewer {
     var selection: Set<PDFPage> = []
     /// Whether Insert from File… is choosing its files.
     var choosingPages = false
+    #if os(iOS)
+    var scanning = false
+    #endif
     /// The pages Extract Pages… copied out, while the window saves them.
     var extracted: FolioDocument?
     var readMode = false
@@ -198,6 +202,34 @@ final class Viewer {
         if organizing { selection = Set(pages) }
     }
 
+    /// Puts the scanned pages, each a picture on a page of the system's paper size, after the target pages, and says how to
+    /// make them searchable.
+    func insertScanned(_ images: [NSImage]) {
+        let pages = images.compactMap(FolioDocument.page(from:))
+        guard !pages.isEmpty else { return }
+        insert(pages)
+        message = pages.count == 1 ? "Scanned 1 page. Tools › Recognize Text makes it searchable"
+            : "Scanned \(pages.count) pages. Tools › Recognize Text makes them searchable"
+    }
+
+    /// Puts the pages of PDFs and pictures another device hands over, such as a scan from an iPhone by Continuity Camera,
+    /// after the target pages, in their order. False when the document takes no changes now.
+    func importItems(_ providers: [NSItemProvider]) -> Bool {
+        guard isIdle else { return false }
+        Task { @MainActor in
+            var pages: [PDFPage] = []
+            for provider in providers {
+                guard let type = provider.registeredContentTypes.first(where: { $0.conforms(to: .pdf) || $0.conforms(to: .image) }) else { continue }
+                let data = await withCheckedContinuation { (done: CheckedContinuation<Data?, Never>) in
+                    _ = provider.loadDataRepresentation(forTypeIdentifier: type.identifier) { data, _ in done.resume(returning: data) }
+                }
+                pages += data.map { FolioDocument.pages(from: $0, isPDF: type.conforms(to: .pdf)) } ?? []
+            }
+            if pages.isEmpty { message = "Found no pages to insert" } else { insert(pages) }
+        }
+        return true
+    }
+
     /// Copies the target pages into a document of their own, for the window to save. Pages of a protected file stay
     /// protected: by its new password, or the one that opened it.
     func extract() {
@@ -344,6 +376,16 @@ struct DocumentView: View {
             #if os(macOS)
             .focusedSceneValue(\.viewer, viewer)
             .focusedSceneValue(\.searchFocus, $searching)
+            // File › Import from iPhone or iPad.
+            .importsItemProviders([.pdf, .image]) { viewer.importItems($0) }
+            #else
+            .fullScreenCover(isPresented: $viewer.scanning) {
+                PageScanner { images in
+                    viewer.scanning = false
+                    viewer.insertScanned(images)
+                }
+                .ignoresSafeArea()
+            }
             #endif
             .onAppear { viewer.doc.undo = undoManager }
             .onChange(of: undoManager) { viewer.doc.undo = undoManager }

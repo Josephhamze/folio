@@ -179,19 +179,26 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         return urls
     }
 
-    /// Pages from files: copies of a PDF's pages, or an image fitted to a page of the system's paper size, turned
-    /// landscape for a wide image. Each file is read whole at once, while a file chosen in a panel may still be read.
+    /// Pages from files. Each file is read whole at once, while a file chosen in a panel may still be read.
     static func pages(from urls: [URL]) -> [PDFPage] {
-        urls.flatMap { url -> [PDFPage] in
-            guard let data = try? Data(contentsOf: url) else { return [] }
-            if UTType(filenameExtension: url.pathExtension)?.conforms(to: .pdf) == true {
-                guard let pdf = PDFDocument(data: data), pdf.hasFullRights else { return [] }
-                return (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.copy() as? PDFPage }
-            }
-            guard let image = NSImage(data: data) else { return [] }
-            let size = image.size.width > image.size.height ? CGSize(width: paper.height, height: paper.width) : paper
-            return PDFPage(image: image, options: [.mediaBox: CGRect(origin: .zero, size: size)]).map { [$0] } ?? []
+        urls.flatMap { url in
+            (try? Data(contentsOf: url)).map { pages(from: $0, isPDF: UTType(filenameExtension: url.pathExtension)?.conforms(to: .pdf) == true) } ?? []
         }
+    }
+
+    /// Copies of a PDF's pages, or a picture on a page of its own.
+    static func pages(from data: Data, isPDF: Bool) -> [PDFPage] {
+        if isPDF {
+            guard let pdf = PDFDocument(data: data), pdf.hasFullRights else { return [] }
+            return (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.copy() as? PDFPage }
+        }
+        return NSImage(data: data).flatMap(page(from:)).map { [$0] } ?? []
+    }
+
+    /// A picture fitted to a page of the system's paper size, turned landscape for a wide picture.
+    static func page(from image: NSImage) -> PDFPage? {
+        let size = image.size.width > image.size.height ? CGSize(width: paper.height, height: paper.width) : paper
+        return PDFPage(image: image, options: [.mediaBox: CGRect(origin: .zero, size: size)])
     }
 }
 

@@ -29,6 +29,7 @@
 - **Every page at once.** Select a mark and choose Add to Every Page, in the tool bar or the mark's menu, to put a copy at the same place on every page: your initials on each page of a contract, or the stamp on each page of an invoice.
 - **Scans you can search.** Tools › Recognize Text reads the words on scanned pages, in English, French, Chinese and many other languages, on your device. Find then finds them, and you can select and copy them. The pages look as they did.
 - **Organize pages.** Organize Pages (⌥⌘O), in the window's bar or the Pages menu, shows the pages as a grid. Select them with a click, ⌘ or ⇧ click for more (a tap on iPhone and iPad), and drag them into a new order. Rotate them (⌘L, ⌘R), insert a blank page or pages from PDFs and pictures, extract them into a file of their own, or delete them. Out of the grid, the Pages menu does the same to the page in view.
+- **Scan paper.** On iPhone and iPad, Scan Pages…, in Organize Pages, scans paper with the camera into the document. On the Mac, File › Import from iPhone or iPad › Scan Documents does the same with your iPhone. Tools › Recognize Text then makes the pages searchable.
 - **Send a page as a picture.** Tools › Send Page as Picture shares the page you're on, with its marks, as a picture, for a chat app where a picture shows at once and a PDF is a file to download.
 - **Redact.** Box what must go with the Redact tool (X), then choose Tools › Apply Redactions. Each marked page becomes a picture of itself with the boxes blacked out, so the words under them are gone from the file, not just covered. Folio reads the rest of the page back, so it can still be found, and drops any mark over a box.
 - **Smaller files.** On the Mac, Tools › Reduce File Size saves the pictures as JPEG at 144 dpi, so a scanned contract is light enough to send over mobile data. Folio shows the size before and after, and keeps a file's password.
@@ -68,7 +69,6 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 ## Roadmap
 
 - **Split files:** split a document into files of a few pages each. The document side of this is built and tested. The screen isn't built yet. (Organize Pages already combines PDFs and pictures, with Insert from File…, and takes pages out, with Extract Pages….)
-- **Scan with the camera:** scan paper into a document on iPhone and iPad, then Recognize Text makes it searchable.
 - **French and Chinese:** Folio's menus, buttons and messages in French and Chinese.
 - **Restrictions and properties:** restrict printing, copying and changes with a permissions password, and a sheet for the title, author and keywords.
 

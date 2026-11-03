@@ -123,6 +123,9 @@ struct FolioCommands: Commands {
             PageActions(viewer: viewer)
         }
         CommandMenu("Tools") { ToolsMenu(viewer: viewer) }
+        #if os(macOS)
+        ImportFromDevicesCommands()
+        #endif
     }
 }
 

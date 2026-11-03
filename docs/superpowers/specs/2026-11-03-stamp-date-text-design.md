@@ -42,6 +42,10 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 **Password…** (added once the rest was built)
 - Tools › Password… sets the password that opens the file once it's saved, changes a file's own, or takes it off: a contract sent by email or WhatsApp can then be opened only by whoever is told the password. It's one undo step, and says it applies once the file is saved.
 
+**Scan Pages** (added once the rest was built)
+- Receipts, delivery notes and signed paper are scanned on a phone. On iPhone and iPad, Scan Pages… in the Pages menu and the organizer's bar opens the system's document scanner, which finds the page's edges and straightens it; the pages it scans go in after the target pages, as Insert from File puts in pictures, as one undo step. It says that Tools › Recognize Text makes them searchable. Where there's no camera, as in the simulator, the button isn't there.
+- On the Mac, File › Import from iPhone or iPad (Take Photo, Scan Documents, Add Sketch) takes the same from a nearby iPhone or iPad, by Continuity Camera, and puts it in the same way.
+
 **Tools on iPhone**
 - The navigation bar gets a Tools menu with what the menu bar's Tools menu has. Without it, a signature saved on an iPhone could never be changed: the pad opened only when none was saved, and only iPad has a menu bar.
 
@@ -50,7 +54,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 
 ## Non-goals
 
-- Scanning with the camera; combining and splitting files; restrictions on printing, copying and changes, and the properties sheet; French and Chinese for Folio's own words. They are next.
+- Splitting files; restrictions on printing, copying and changes, and the properties sheet; French and Chinese for Folio's own words. They are next.
 - Choosing the date's format, or a stamp's colour. The date follows the region; the stamp keeps its ink.
 - Resizing a placed stamp: as with signatures, it's placed again at another size.
 - Recognizing text on pages that have some, or on parts of pages.
@@ -78,6 +82,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - **The password** is the document's `newPassword`, written as both the user and owner password by `snapshot`, so whoever opens the file can do anything with it. PDFKit saves a file opened encrypted with its own protection whatever it's asked, so setting or removing a password on one first moves its pages, bookmarks and attributes into a new, unprotected document, and undo moves them back. The bookmarks are copied, each to its page, before the pages move: a file's own bookmark finds its page through the file, and once saved one that lost it opens the first page. PDFKit protects a file only with a password in ASCII: with any other character it saves the file unprotected and says nothing, so the sheet takes only English letters, digits and symbols, and a save that would come out unprotected fails instead. Only a file with every right can have its password changed: a new password on one its author restricted, opened without its permissions password, would lift what it forbids. Where the author restricted editing too, the window asks for the permissions password; a file restricted only from copying or printing stays as it is. For the same reason Extract Pages… needs every right, Insert from File… skips a restricted file, and Send Page as Picture needs the right to copy.
 - **The organizer** is a SwiftUI grid laid over the page view, which stays alive under it, so the page view keeps its place and a page can be shown as the grid goes. Each page is drawn once per change, as it shows, 320 pixels on its longest side. A drag carries the document's address and the page's number as text, so text dragged in from elsewhere, or a page from another window, is refused. The page actions are one view, `PageActions`, in the Pages menu and in the bar while organizing.
 - **Insert from File…** and **Extract Pages…** use SwiftUI's file importer and exporter on both platforms. Files are read whole while they may be read. Extracted pages are saved as a new file named after the document, rather than opened in a new window, since iPhone shows one document at a time.
+- **Scan Pages** wraps VisionKit's `VNDocumentCameraViewController`, shown full screen, and fits each scanned picture to a page of the system's paper size, as an inserted picture is. The Mac's import is SwiftUI's `ImportFromDevicesCommands` and `importsItemProviders`; each item is read as the first PDF or picture type it has, and a restricted PDF is skipped, as Insert from File… does.
 - **Tool keys:** C for Stamp (cachet, chop), D for Date.
 
 ## Testing
@@ -92,4 +97,5 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - Apply Redactions: the words under a mark are gone from the window and the saved file, the box is black on a page whose box starts away from 0,0 and is cropped, other pages keep their text, a mark overlapping a redaction goes and one clear of it stays, the page keeps its turn, and undo brings it all back. A redacted photo page stays a JPEG. The window stays on its page.
 - Password: a password set goes on when saved and undoes; a new one replaces a file's own; removing one keeps the pages, marks, bookmarks, each to its page, and title, and undoes; a password PDFKit can't protect with fails the save rather than saving the file unprotected.
 - A restricted file opened without its permissions password takes marks but gives no pages to another file; its permissions password lifts that.
+- Scanning: what another device hands over, a PDF's pages and a picture, goes in after the page in view in its order, and scanned pages go in with word of Recognize Text. The camera itself can't be tested in the simulator.
 - Organizing: drops take only pages dragged in the same window; inserted pages are selected; leaving shows the first selected page; extracted pages keep their marks and the file's password. On iOS, a tap selects a page in the grid, the bar deletes it, and Undo puts it back.

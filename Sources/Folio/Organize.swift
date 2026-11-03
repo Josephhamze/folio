@@ -1,5 +1,8 @@
 import PDFKit
 import SwiftUI
+#if os(iOS)
+import VisionKit
+#endif
 
 /// The pages as a grid, over the page view while organizing. A click selects a page, and ⌘ and ⇧ clicks select more; on
 /// iOS a tap selects or deselects one. Dragged pages move in front of the page they're dropped on, or to the end.
@@ -88,6 +91,13 @@ struct PageActions: View {
         Button("Insert from File…", systemImage: "folder.badge.plus") { viewer?.choosingPages = true }
             .help("Insert from File…")
             .disabled(!idle)
+        #if os(iOS)
+        if VNDocumentCameraViewController.isSupported {
+            Button("Scan Pages…", systemImage: "doc.viewfinder") { viewer?.scanning = true }
+                .help("Scan Pages…")
+                .disabled(!idle)
+        }
+        #endif
         Button("Extract Pages…", systemImage: "square.and.arrow.up") { viewer?.extract() }
             .help("Extract Pages…")
             .disabled(!chosen || viewer?.doc.pdf.hasFullRights != true)
@@ -96,3 +106,34 @@ struct PageActions: View {
             .disabled(!idle || viewer?.canDelete != true)
     }
 }
+
+#if os(iOS)
+/// The system's document scanner, which hands back the pages it scanned, or none when cancelled.
+struct PageScanner: UIViewControllerRepresentable {
+    let done: ([UIImage]) -> Void
+
+    func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
+        let scanner = VNDocumentCameraViewController()
+        scanner.delegate = context.coordinator
+        return scanner
+    }
+
+    func updateUIViewController(_ scanner: VNDocumentCameraViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(done: done) }
+
+    final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+        let done: ([UIImage]) -> Void
+
+        init(done: @escaping ([UIImage]) -> Void) { self.done = done }
+
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
+            done((0..<scan.pageCount).map(scan.imageOfPage(at:)))
+        }
+
+        func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) { done([]) }
+
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) { done([]) }
+    }
+}
+#endif
