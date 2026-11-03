@@ -151,6 +151,7 @@ struct ToolsMenu: View {
     var body: some View {
         let idle = viewer?.isIdle ?? false
         Button("Recognize Text") { viewer?.recognizeText() }.disabled(!idle)
+        Button("Apply Redactions") { viewer?.applyRedactions() }.disabled(!idle || viewer?.doc.hasRedactions != true)
         #if os(macOS)
         Button("Reduce File Size") { viewer?.reduceFileSize() }.disabled(!idle)
         #endif

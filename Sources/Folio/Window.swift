@@ -241,6 +241,17 @@ final class Viewer {
         }
     }
 
+    /// Burns in the redaction marks, showing it's at work, then says how it went.
+    func applyRedactions() {
+        settle()
+        busy = "Applying redactions…"
+        Task { @MainActor in
+            let count = await doc.applyRedactions()
+            busy = nil
+            message = count.map { $0 == 1 ? "Redacted 1 page" : "Redacted \($0) pages" } ?? "Couldn't apply the redactions"
+        }
+    }
+
     #if os(macOS)
     /// Rewrites the document smaller, staying on its page, and says by how much, or that it can't be.
     func reduceFileSize() {

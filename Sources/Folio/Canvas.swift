@@ -261,6 +261,8 @@ final class Canvas: PDFView {
             guard let draft else { return }
             page.removeAnnotation(draft)
             viewer.doc.add(draft, to: page, name: viewer.tool == .pen ? "Draw" : viewer.tool == .redact ? "Mark for Redaction" : "Add Shape")
+            // A mark alone hides nothing in the file.
+            if viewer.tool == .redact { viewer.message = "Tools › Apply Redactions takes out what's under the marks" }
         case .sign, .initial, .stamp:
             guard let signature = Signature[viewer.tool] else { return }
             draft.map(page.removeAnnotation)

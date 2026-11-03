@@ -35,6 +35,10 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - The first design planned it; its document side was built and tested, but not its screens. Organize Pages, in the window's bar and the new Pages menu (⌥⌘O), lays the pages out as a grid over the page view. A click selects a page, ⌘ and ⇧ clicks select more, and on iPhone and iPad a tap selects or deselects one. Pages dragged in the grid move in front of the page they're dropped on, or to the end.
 - The bar then rotates the selected pages (⌘L, ⌘R), inserts a blank page or pages from PDFs and pictures after them, extracts them into a file of their own, and deletes them. The Pages menu does the same to the page in view when not organizing. Leaving the grid shows the first selected page.
 
+**Apply Redactions** (added once the rest was built)
+- The Redact tool marked areas, but nothing applied them, so the words stayed in the file under a red box. Tools › Apply Redactions now burns them in: each page with marks becomes a picture of itself with the marked areas black, and gets back the words read from the picture, so the rest can still be found. Marks that overlap a redaction go, since they could tell what it hid. It's one undo step, and all or nothing: a page that can't be redacted leaves every page as it was.
+- Placing a redaction mark says that Apply Redactions takes out what's under the marks.
+
 **Tools on iPhone**
 - The navigation bar gets a Tools menu with what the menu bar's Tools menu has. Without it, a signature saved on an iPhone could never be changed: the pad opened only when none was saved, and only iPad has a menu bar.
 
@@ -43,7 +47,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 
 ## Non-goals
 
-- Scanning with the camera; combining and splitting files; passwords and properties; applying redactions; French and Chinese for Folio's own words. They are next.
+- Scanning with the camera; combining and splitting files; passwords and properties; French and Chinese for Folio's own words. They are next.
 - Choosing the date's format, or a stamp's colour. The date follows the region; the stamp keeps its ink.
 - Resizing a placed stamp: as with signatures, it's placed again at another size.
 - Recognizing text on pages that have some, or on parts of pages.
@@ -67,6 +71,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - **Reduce File Size** writes a copy, away from the main thread, with the `QuartzFilter` write option and `/System/Library/Filters/Reduce File Size.qfilter`. It reads the result back and unlocks it with the document's password when it is encrypted. A result that would lose the file's encryption is thrown away, and so is one finished after the document changed. Otherwise it is swapped in with one `change`, and the window stays on its page. PDFKit's own write options, `saveImagesAsJPEGOption` and `optimizeImagesForScreenOption`, were tried for iOS. They shrink only the pictures PDFKit made from photos, not those of a file it read (3.4 MB stayed 3.4 MB, where the filter made 407 KB), so iOS has no Reduce File Size.
 - **The Tools menu** is one view, `ToolsMenu`, in the menu bar's Tools menu and in the iOS navigation bar.
 - **Send Page as Picture** is a `ShareLink` in the Tools menu, whose item makes the JPEG only when it's shared: the page drawn by PDFKit's `draw(with: .cropBox, to:)`, which turns and crops it itself, on white, at 144 dpi, quality 0.85. It's named "Page n".
+- **Apply Redactions** renders each marked page as `render` does for Recognize Text, in colour at 300 dpi without its annotations, with the marks' boxes filled black in page space, so a turned page or one whose media box doesn't start at 0,0 is blacked exactly where marked. The picture is kept as a JPEG at quality 0.85 (a page-sized picture kept as drawn would weigh tens of megabytes), drawn over the page's media box by `rebuilt`, with the recognized words under it. Recognition that fails, as on GitHub's Macs, still redacts, leaving the page without text.
 - **The organizer** is a SwiftUI grid laid over the page view, which stays alive under it, so the page view keeps its place and a page can be shown as the grid goes. Each page is drawn once per change, as it shows, 320 pixels on its longest side. A drag carries the document's address and the page's number as text, so text dragged in from elsewhere, or a page from another window, is refused. The page actions are one view, `PageActions`, in the Pages menu and in the bar while organizing.
 - **Insert from File…** and **Extract Pages…** use SwiftUI's file importer and exporter on both platforms. Files are read whole while they may be read. Extracted pages are saved as a new file named after the document, rather than opened in a new window, since iPhone shows one document at a time.
 - **Tool keys:** C for Stamp (cachet, chop), D for Date.
@@ -80,4 +85,5 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - Recognize Text makes a scan searchable, in English, French and Chinese, keeps marks, turn and crop, and undoes; pages with text are left alone.
 - Reduce File Size shrinks a photo PDF, stays small once saved, and leaves a text PDF alone.
 - On iOS: a tap places a stamp and a date; Add to Every Page from the tool bar; the Tools menu opens the pads.
+- Apply Redactions: the words under a mark are gone from the window and the saved file, the box is black, other pages keep their text, a mark overlapping a redaction goes and one clear of it stays, the page keeps its turn, and undo brings it all back. A redacted photo page stays a JPEG.
 - Organizing: drops take only pages dragged in the same window; inserted pages are selected; leaving shows the first selected page. On iOS, a tap selects a page in the grid, the bar deletes it, and Undo puts it back.

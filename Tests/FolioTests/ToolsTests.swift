@@ -159,6 +159,47 @@ final class ToolsTests: XCTestCase {
     }
 
     /// A page sent as a picture is as it shows: cropped, turned and marked, at two pixels a point.
+    /// Applying redactions leaves no trace of the words under the marks, in the window or the saved file, and blacks them
+    /// out. It keeps the rest, drops marks that overlap a redaction, keeps the page's turn, and undoes.
+    func testApplyRedactionsTakesOutWhatsUnderTheMarks() async throws {
+        let doc = FolioDocument(pdf: makePDF([["Delivery note 2026-41", "Bank account 99-1234"], ["Page two"]])), undo = manualUndo(doc)
+        let page = doc.pages[0], secret = try XCTUnwrap(doc.pdf.findString("Bank account 99-1234", withOptions: []).first).bounds(for: page)
+        let mark = secret.insetBy(dx: -2, dy: -2)
+        page.addAnnotation(shape(.redact, from: mark.origin, to: CGPoint(x: mark.maxX, y: mark.maxY), color: .red))
+        page.addAnnotation(shape(.rect, from: secret.origin, to: CGPoint(x: secret.minX + 20, y: secret.minY + 5), color: .blue))   // overlaps: goes
+        page.addAnnotation(shape(.rect, from: CGPoint(x: 10, y: 10), to: CGPoint(x: 30, y: 30), color: .blue))   // clear: stays
+        page.rotation = 90
+        undo.beginUndoGrouping()
+        let redacted = await doc.applyRedactions()
+        undo.endUndoGrouping()
+        XCTAssertEqual(redacted, 1)
+        let saved = try XCTUnwrap(PDFDocument(data: try XCTUnwrap(doc.pdf.dataRepresentation())))
+        for pdf in [doc.pdf, saved] {
+            XCTAssertTrue(pdf.findString("99-1234", withOptions: []).isEmpty)
+            XCTAssertTrue(pdf.findString("Bank", withOptions: []).isEmpty)
+            XCTAssertEqual(pdf.findString("Page two", withOptions: []).count, 1)
+        }
+        XCTAssertFalse(doc.hasRedactions)
+        XCTAssertEqual(doc.pages[0].annotations.count, 1)
+        XCTAssertEqual(doc.pages[0].rotation, 90)
+        // The words' box is black: the picture's rows run down from the top.
+        let image = try XCTUnwrap(render(doc.pages[0], dpi: 72))
+        let x = Int(secret.minX) + 2..<Int(secret.maxX) - 2, y = 792 - Int(secret.maxY) + 2..<792 - Int(secret.minY) - 2
+        XCTAssertGreaterThan(Double(count(image, x: x, y: y) { $0 < 64 && $1 < 64 && $2 < 64 }), 0.98 * Double(x.count * y.count))
+        undo.undo()
+        XCTAssertEqual(doc.pdf.findString("99-1234", withOptions: []).count, 1)
+        XCTAssertTrue(doc.hasRedactions)
+    }
+
+    /// A redacted page is kept as a JPEG: drawn as it is, a page-sized photo would weigh over 20 MB.
+    func testRedactedPhotoStaysAJPEG() async throws {
+        let doc = FolioDocument(pdf: photoPDF())
+        doc.pages[0].addAnnotation(shape(.redact, from: CGPoint(x: 100, y: 100), to: CGPoint(x: 200, y: 150), color: .red))
+        let redacted = await doc.applyRedactions()
+        XCTAssertEqual(redacted, 1)
+        XCTAssertLessThan(try XCTUnwrap(doc.pdf.dataRepresentation()).count, 10_000_000)
+    }
+
     func testPictureOfAPageIsAsItShows() throws {
         let page = try XCTUnwrap(makePDF([["Top line"]]).page(at: 0))
         page.setBounds(CGRect(x: 0, y: 392, width: 612, height: 400), for: .cropBox)
@@ -191,10 +232,8 @@ final class ToolsTests: XCTestCase {
     }
 
     /// How many of the grey picture's pixels are darker than mid grey.
+    /// How many of the picture's pixels are dark.
     private func ink(_ picture: CGImage) -> Int {
-        let bytes = picture.dataProvider!.data! as Data
-        return (0..<picture.height).reduce(0) { sum, row in
-            sum + bytes[row * picture.bytesPerRow..<row * picture.bytesPerRow + picture.width].filter { $0 < 128 }.count
-        }
+        count(picture, x: 0..<picture.width, y: 0..<picture.height) { Int($0) + Int($1) + Int($2) < 3 * 128 }
     }
 }

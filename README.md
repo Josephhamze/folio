@@ -30,6 +30,7 @@
 - **Scans you can search.** Tools › Recognize Text reads the words on scanned pages, in English, French, Chinese and many other languages, on your device. Find then finds them, and you can select and copy them. The pages look as they did.
 - **Organize pages.** Organize Pages (⌥⌘O), in the window's bar or the Pages menu, shows the pages as a grid. Select them with a click, ⌘ or ⇧ click for more (a tap on iPhone and iPad), and drag them into a new order. Rotate them (⌘L, ⌘R), insert a blank page or pages from PDFs and pictures, extract them into a file of their own, or delete them. Out of the grid, the Pages menu does the same to the page in view.
 - **Send a page as a picture.** Tools › Send Page as Picture shares the page you're on, with its marks, as a picture, for a chat app where a picture shows at once and a PDF is a file to download.
+- **Redact.** Box what must go with the Redact tool (X), then choose Tools › Apply Redactions. Each marked page becomes a picture of itself with the boxes blacked out, so the words under them are gone from the file, not just covered. Folio reads the rest of the page back, so it can still be found, and drops any mark over a box.
 - **Smaller files.** On the Mac, Tools › Reduce File Size saves the pictures as JPEG at 144 dpi, so a scanned contract is light enough to send over mobile data. Folio shows the size before and after, and keeps a file's password.
 - **Fill in forms.** You can also fix a line of text by typing over it. The original text stays underneath in the file, and Folio tells you so.
 - **Protected files.** Folio asks for a file's password in the window. It respects an author's editing restrictions until you enter the permissions password, and saving keeps the file encrypted.
@@ -68,7 +69,6 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 
 - **Combine and split files:** combine PDFs and pictures into a new document, and split one into files of a few pages each. The document side of this is built and tested. The screens aren't built yet.
 - **Passwords:** add or remove a file's password, plus a document properties sheet.
-- **Redaction:** apply redactions. For now the Redact tool only marks areas.
 
 ## License
 

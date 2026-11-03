@@ -5,17 +5,20 @@ import Vision
 import Quartz
 #endif
 
-/// The page's own drawing, without its annotations, in grey on white at `dpi`, as the file has it: the whole media box,
-/// unturned. A page so big it would pass 4,000 pixels a side gets fewer dots, to fit a phone's memory.
-func render(_ page: PDFPage, dpi: CGFloat) -> CGImage? {
+/// The page's own drawing, without its annotations, on white at `dpi`, as the file has it: the whole media box, unturned,
+/// with the areas `blacked`, in page space, filled black. A page so big it would pass 4,000 pixels a side gets fewer dots,
+/// to fit a phone's memory.
+func render(_ page: PDFPage, dpi: CGFloat, blacking blacked: [CGRect] = []) -> CGImage? {
     let box = page.bounds(for: .mediaBox), scale = min(dpi / 72, 4000 / max(box.width, box.height, 1))
     guard let context = CGContext(data: nil, width: Int(box.width * scale), height: Int(box.height * scale), bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return nil }
-    context.setFillColor(gray: 1, alpha: 1)
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+    context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
     context.fill(CGRect(x: 0, y: 0, width: context.width, height: context.height))
     context.scaleBy(x: scale, y: scale)
     context.translateBy(x: -box.minX, y: -box.minY)
     drawContent(of: page, in: context)
+    context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+    context.fill(blacked)
     return context.makeImage()
 }
 
@@ -38,16 +41,17 @@ func recognize(_ image: CGImage) async throws -> [(text: String, box: CGRect)] {
     return try await request.perform(on: image).compactMap { line in line.topCandidates(1).first.map { (text: $0.string, box: line.boundingBox.cgRect) } }
 }
 
-/// The page drawn again with these lines of text under its drawing, invisible, each fitted to its box, so the words can be
-/// found, selected and copied where they show. The new page keeps the page's turn, crop box and annotations, but popups.
+/// The page drawn again, or `picture` in its place, filling its media box, with these lines of text under it, invisible,
+/// each fitted to its box, so the words can be found, selected and copied where they show. The new page keeps the page's
+/// turn, crop box and annotations, but popups.
 /// shortcut: a bookmark to the page still points at the old one, so loses its page. Point bookmarks at the new page if
 /// scans with bookmarks turn up.
-func rebuilt(_ page: PDFPage, text: [(text: String, box: CGRect)]) -> PDFPage? {
+func rebuilt(_ page: PDFPage, text: [(text: String, box: CGRect)], over picture: CGImage? = nil) -> PDFPage? {
     var media = page.bounds(for: .mediaBox)
     let data = NSMutableData()
     guard let consumer = CGDataConsumer(data: data as CFMutableData), let context = CGContext(consumer: consumer, mediaBox: &media, nil) else { return nil }
     context.beginPDFPage(nil)
-    drawContent(of: page, in: context)
+    if let picture { context.draw(picture, in: media) } else { drawContent(of: page, in: context) }
     context.setTextDrawingMode(.invisible)
     for (words, share) in text {
         let box = CGRect(x: media.minX + share.minX * media.width, y: media.minY + share.minY * media.height,
@@ -89,9 +93,12 @@ func shown(_ page: PDFPage, dpi: CGFloat) -> CGImage? {
 
 /// The page as it shows, as a JPEG at `dpi`: to send in a chat app, where a picture shows at once and a PDF is a file to
 /// download.
-func picture(of page: PDFPage, dpi: CGFloat = 144) -> Data? {
+func picture(of page: PDFPage, dpi: CGFloat = 144) -> Data? { shown(page, dpi: dpi).flatMap(jpeg) }
+
+/// The picture as a JPEG, at a quality that keeps text sharp.
+func jpeg(_ image: CGImage) -> Data? {
     let data = NSMutableData()
-    guard let image = shown(page, dpi: dpi), let file = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return nil }
+    guard let file = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return nil }
     CGImageDestinationAddImage(file, image, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
     return CGImageDestinationFinalize(file) ? data as Data : nil
 }
@@ -112,6 +119,26 @@ extension FolioDocument {
         let new = Dictionary(uniqueKeysWithValues: found.compactMap { page, text in rebuilt(page, text: text).map { (page, $0) } })
         if !new.isEmpty { setPages(pages.map { new[$0] ?? $0 }, name: "Recognize Text") }
         return (new.count, scans.count)
+    }
+
+    /// Burns in the redaction marks, as one change. Each page with marks becomes a picture of itself at 300 dpi with the
+    /// marked areas black, so what was under them is gone from the file. It gets back the words read from the picture, so
+    /// the rest can still be found, and its marks but those that overlap a redaction, which could tell what it hid. It
+    /// returns how many pages it redacted, or nil, having changed nothing, when a page couldn't be.
+    @MainActor func applyRedactions() async -> Int? {
+        var new: [PDFPage: PDFPage] = [:]
+        for page in pages {
+            let marks = page.annotations.filter(\.isRedaction).map(\.bounds)
+            guard !marks.isEmpty else { continue }
+            // Kept as a JPEG, which the file holds as it is: a page-sized picture kept as drawn would weigh megabytes.
+            guard let image = render(page, dpi: 300, blacking: marks), let data = jpeg(image), let provider = CGDataProvider(data: data as CFData),
+                  let picture = CGImage(jpegDataProviderSource: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent),
+                  let redacted = rebuilt(page, text: (try? await recognize(image)) ?? [], over: picture) else { return nil }
+            for a in redacted.annotations where a.isRedaction || marks.contains(where: a.bounds.intersects) { redacted.removeAnnotation(a) }
+            new[page] = redacted
+        }
+        if !new.isEmpty { setPages(pages.map { new[$0] ?? $0 }, name: "Apply Redactions") }
+        return new.count
     }
 
     #if os(macOS)
