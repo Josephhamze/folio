@@ -1,5 +1,8 @@
 import PDFKit
 import Vision
+#if os(macOS)
+import Quartz
+#endif
 
 /// The page's own drawing, without its annotations, in grey on white at `dpi`, as the file has it: the whole media box,
 /// unturned. A page so big it would pass 4,000 pixels a side gets fewer dots, to fit a phone's memory.
@@ -84,16 +87,22 @@ extension FolioDocument {
         return (new.count, scans.count)
     }
 
-    /// Writes the document again with its pictures as JPEG at the screen's resolution, and keeps the result as one change
-    /// when it's smaller: a file of text and lines can grow. It works on a copy, away from the window, and returns the sizes
-    /// before and after, or nil when it changed nothing. A change made meanwhile, such as an undo, would be lost to the copy,
-    /// so then it changes nothing either.
+    #if os(macOS)
+    /// Rewrites the document through macOS's Reduce File Size filter, which keeps pictures as JPEG at 144 dpi, and keeps
+    /// the result as one change when it's smaller: a file of text and lines can grow. It works on a copy, away from the
+    /// window, and returns the sizes before and after, or nil when it changed nothing. A change made meanwhile, such as an
+    /// undo, would be lost to the copy, so then it changes nothing either. (PDFKit's own write options for pictures shrink
+    /// only those it made from photos, not those of a file it read, so iOS has no way to do this.)
     @MainActor func reduceFileSize() async -> (before: Int, after: Int)? {
         guard let before = pdf.dataRepresentation() else { return nil }
         let password = password, encrypted = pdf.isEncrypted, start = revision
         let after = await Task.detached { () -> Data? in
-            guard let copy = PDFDocument(data: before), !copy.isLocked || password.map({ copy.unlock(withPassword: $0) }) == true else { return nil }
-            return copy.dataRepresentation(options: [PDFDocumentWriteOption.saveImagesAsJPEGOption: true, .optimizeImagesForScreenOption: true])
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).pdf")
+            defer { try? FileManager.default.removeItem(at: file) }
+            let filter: QuartzFilter? = QuartzFilter(url: URL(fileURLWithPath: "/System/Library/Filters/Reduce File Size.qfilter"))
+            guard let filter, let copy = PDFDocument(data: before), !copy.isLocked || password.map({ copy.unlock(withPassword: $0) }) == true,
+                  copy.write(to: file, withOptions: [PDFDocumentWriteOption(rawValue: "QuartzFilter"): filter]) else { return nil }
+            return try? Data(contentsOf: file)
         }.value
         // Never at the cost of the file's password.
         guard revision == start, let after, after.count < before.count, let smaller = PDFDocument(data: after), smaller.isEncrypted == encrypted,
@@ -102,4 +111,5 @@ extension FolioDocument {
         change("Reduce File Size", do: { self.pdf = smaller }, undo: { self.pdf = old })
         return (before.count, after.count)
     }
+    #endif
 }

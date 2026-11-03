@@ -208,6 +208,7 @@ final class Viewer {
         }
     }
 
+    #if os(macOS)
     /// Rewrites the document smaller, staying on its page, and says by how much, or that it can't be.
     func reduceFileSize() {
         settle()
@@ -225,6 +226,7 @@ final class Viewer {
             message = "\(size(sizes.before)) → \(size(sizes.after))"
         }
     }
+    #endif
 }
 
 struct DocumentView: View {

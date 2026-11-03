@@ -125,7 +125,9 @@ struct ToolsMenu: View {
     var body: some View {
         let idle = viewer?.isIdle ?? false
         Button("Recognize Text") { viewer?.recognizeText() }.disabled(!idle)
+        #if os(macOS)
         Button("Reduce File Size") { viewer?.reduceFileSize() }.disabled(!idle)
+        #endif
         Button("Add to Every Page") { viewer?.addToEveryPage() }.disabled(viewer?.canAddToEveryPage != true)
         Divider()
         Button("Edit Signature…") { viewer?.sheet = .signature(.sign) }.disabled(viewer == nil)

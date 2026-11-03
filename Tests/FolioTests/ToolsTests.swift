@@ -30,13 +30,52 @@ func scannedPDF(_ pages: [[String]]) -> PDFDocument {
 
 @MainActor
 final class ToolsTests: XCTestCase {
-    func testRecognizeTextPutsTheWordsUnderTheScan() async throws {
-        let doc = FolioDocument(pdf: scannedPDF([["Invoice 2026-117", "Cement 50 bags"], ["Delivered to Lubumbashi"]])), undo = manualUndo(doc)
-        // The page keeps its marks, turn and crop.
-        let page = doc.pages[0], look = ink(try XCTUnwrap(render(page, dpi: 72)))
+    /// A page drawn again with lines of text, at their boxes as Vision gives them, holds those words where they show, and
+    /// looks as it did, with its marks, turn and crop.
+    func testRebuiltPageHasTheWordsWhereTheyShow() throws {
+        let page = try XCTUnwrap(scannedPDF([["Invoice 2026-117", "Cement 50 bags"]]).page(at: 0)), look = ink(try XCTUnwrap(render(page, dpi: 72)))
         page.addAnnotation(shape(.rect, from: CGPoint(x: 400, y: 100), to: CGPoint(x: 450, y: 150), color: .red))
         page.rotation = 90
         page.setBounds(CGRect(x: 0, y: 50, width: 612, height: 742), for: .cropBox)
+        // The second line's box, as a share of the page from the bottom left: its baseline is 642 points up, and Helvetica
+        // 24 reaches 5 below it and 19 above.
+        let font = NSFont(name: "Helvetica", size: 24)!, width = { (words: String) in NSAttributedString(string: words, attributes: [.font: font]).size().width }
+        let line = CGRect(x: 72 / 612, y: 637 / 792, width: width("Cement 50 bags") / 612, height: 24 / 792)
+        let new = try XCTUnwrap(rebuilt(page, text: [(text: "Cement 50 bags", box: line), (text: "水泥五十袋", box: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.03))]))
+        let doc = PDFDocument()
+        doc.insert(new, at: 0)
+        let words = new.string ?? ""
+        XCTAssertTrue(words.contains("Cement 50 bags"), words)
+        XCTAssertTrue(words.contains("水泥五十袋"), words)
+        let cement = try XCTUnwrap(doc.findString("Cement", withOptions: []).first).bounds(for: new)
+        XCTAssertEqual(cement.minX, 72, accuracy: 3)
+        XCTAssertEqual(cement.maxX, 72 + width("Cement"), accuracy: 3)
+        XCTAssertEqual(cement.midY, 650, accuracy: 8)
+        XCTAssertEqual(Double(ink(try XCTUnwrap(render(new, dpi: 72)))), Double(look), accuracy: Double(look) / 100)
+        XCTAssertEqual(new.rotation, 90)
+        XCTAssertEqual(new.bounds(for: .cropBox), CGRect(x: 0, y: 50, width: 612, height: 742))
+        XCTAssertEqual(new.annotations.map(\.type), ["Square"])
+    }
+
+    /// Only the page's own drawing is read, not its marks, whether the page is a file's or one made from a photo; and a
+    /// photo's page drawn again keeps its picture.
+    func testRenderLeavesOutTheMarks() throws {
+        let scan = try XCTUnwrap(scannedPDF([["Received with thanks"]]).page(at: 0))
+        let photo = try XCTUnwrap(PDFPage(image: scan.thumbnail(of: CGSize(width: 612, height: 792), for: .mediaBox)))
+        for page in [scan, photo] {
+            let before = ink(try XCTUnwrap(render(page, dpi: 72)))
+            XCTAssertGreaterThan(before, 100)
+            page.addAnnotation(shape(.rect, from: CGPoint(x: 100, y: 100), to: CGPoint(x: 500, y: 300), color: .black))
+            XCTAssertEqual(ink(try XCTUnwrap(render(page, dpi: 72))), before)
+        }
+        let again = try XCTUnwrap(rebuilt(photo, text: [])), shown = Double(ink(try XCTUnwrap(render(photo, dpi: 72))))
+        XCTAssertEqual(Double(ink(try XCTUnwrap(render(again, dpi: 72)))), shown, accuracy: shown / 100)
+    }
+
+    func testRecognizeTextPutsTheWordsUnderTheScan() async throws {
+        try await requireTextRecognition()
+        let doc = FolioDocument(pdf: scannedPDF([["Invoice 2026-117", "Cement 50 bags"], ["Delivered to Lubumbashi"]])), undo = manualUndo(doc)
+        let page = doc.pages[0]
         XCTAssertEqual(texts(doc.pdf), ["", ""])
         var heard: [Int] = []
         undo.beginUndoGrouping()
@@ -48,15 +87,6 @@ final class ToolsTests: XCTestCase {
         let words = texts(doc.pdf)
         for word in ["Invoice", "2026-117", "Cement", "bags"] { XCTAssertTrue(words[0].contains(word), words[0]) }
         XCTAssertTrue(words[1].contains("Lubumbashi"), words[1])
-        let new = doc.pages[0]
-        XCTAssertEqual(new.rotation, 90)
-        XCTAssertEqual(new.bounds(for: .cropBox), CGRect(x: 0, y: 50, width: 612, height: 742))
-        XCTAssertEqual(new.annotations.map(\.type), ["Square"])
-        // It looks as it did, and its words are where they show, so a selection lands on them.
-        XCTAssertEqual(Double(ink(try XCTUnwrap(render(new, dpi: 72)))), Double(look), accuracy: Double(look) / 100)
-        let cement = try XCTUnwrap(doc.pdf.findString("Cement", withOptions: []).first).bounds(for: new)
-        XCTAssertEqual(cement.minX, 72, accuracy: 6)
-        XCTAssertEqual(cement.midY, 650, accuracy: 8)
         // One step, which puts the old pages back.
         XCTAssertEqual(undo.undoActionName, "Recognize Text")
         undo.undo()
@@ -64,7 +94,8 @@ final class ToolsTests: XCTestCase {
         XCTAssertEqual(texts(doc.pdf), ["", ""])
     }
 
-    func testRecognizeTextReadsFrenchAndChinese() async {
+    func testRecognizeTextReadsFrenchAndChinese() async throws {
+        try await requireTextRecognition()
         let doc = FolioDocument(pdf: scannedPDF([["Facture réglée à Kinshasa"], ["水泥五十袋已交付"]]))
         let result = await doc.recognizeText { _, _ in }
         XCTAssertEqual(result.read, 2)
@@ -82,24 +113,16 @@ final class ToolsTests: XCTestCase {
         XCTAssertEqual(doc.revision, 0)
     }
 
-    /// A page made from a photo has no page of a file to draw: it's read too, but not the marks on it.
-    func testRecognizeTextReadsAPhotoPageButNotItsMarks() async throws {
-        let scan = try XCTUnwrap(scannedPDF([["Received with thanks"]]).page(at: 0)).thumbnail(of: CGSize(width: 1224, height: 1584), for: .mediaBox)
-        let page = try XCTUnwrap(PDFPage(image: scan)), note = textBox(at: CGPoint(x: 100, y: 300), on: page)
-        note.contents = "Paid in full"
-        page.addAnnotation(note)
-        let doc = FolioDocument(pdf: PDFDocument())
-        doc.pdf.insert(page, at: 0)
-        let result = await doc.recognizeText { _, _ in }
-        XCTAssertEqual(result.read, 1)
-        let words = texts(doc.pdf)[0]
-        XCTAssertTrue(words.contains("Received"), words)
-        XCTAssertFalse(words.contains("Paid"), words)
-        XCTAssertEqual(doc.pages[0].annotations.map(\.contents), ["Paid in full"])
+    /// Skips where Vision's accurate model doesn't run, as on GitHub's virtual Macs.
+    private func requireTextRecognition() async throws {
+        let blank = try XCTUnwrap(render(FolioDocument.blankPage(), dpi: 72))
+        let runs = (try? await recognize(blank)) != nil
+        try XCTSkipUnless(runs, "Text recognition's model doesn't run on this Mac, as on GitHub's virtual ones")
     }
 
+    /// A file of photos, as read from a file, shrinks.
     func testReduceFileSizeShrinksPhotosAndKeepsTheMarks() async throws {
-        let doc = FolioDocument(pdf: photoPDF()), undo = manualUndo(doc), original = doc.pdf
+        let doc = FolioDocument(pdf: PDFDocument(data: photoPDF().dataRepresentation()!)!), undo = manualUndo(doc), original = doc.pdf
         doc.pages[0].addAnnotation(shape(.rect, from: CGPoint(x: 100, y: 100), to: CGPoint(x: 200, y: 200), color: .red))
         undo.beginUndoGrouping()
         let reduced = await doc.reduceFileSize()
