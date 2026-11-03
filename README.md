@@ -28,6 +28,7 @@
 - **Stamp and date.** Photograph your company's stamp printed on white paper, and the Stamp tool places it like a rubber stamp: Folio lifts the ink off the paper and keeps its colour. The Date tool types today's date beside the line you click, in that line's font.
 - **Every page at once.** Select a mark and choose Add to Every Page, in the tool bar or the mark's menu, to put a copy at the same place on every page: your initials on each page of a contract, or the stamp on each page of an invoice.
 - **Scans you can search.** Tools › Recognize Text reads the words on scanned pages, in English, French, Chinese and many other languages, on your device. Find then finds them, and you can select and copy them. The pages look as they did.
+- **Send a page as a picture.** Tools › Send Page as Picture shares the page you're on, with its marks, as a picture, for a chat app where a picture shows at once and a PDF is a file to download.
 - **Smaller files.** On the Mac, Tools › Reduce File Size saves the pictures as JPEG at 144 dpi, so a scanned contract is light enough to send over mobile data. Folio shows the size before and after, and keeps a file's password.
 - **Fill in forms.** You can also fix a line of text by typing over it. The original text stays underneath in the file, and Folio tells you so.
 - **Protected files.** Folio asks for a file's password in the window. It respects an author's editing restrictions until you enter the permissions password, and saving keeps the file encrypted.
@@ -67,7 +68,6 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 - **Organise pages:** reorder, rotate, delete, insert and extract pages, and combine or split files. The document side of this is built and tested. The screens aren't built yet.
 - **Passwords:** add or remove a file's password, plus a document properties sheet.
 - **Redaction:** apply redactions. For now the Redact tool only marks areas.
-- **Other tools:** exporting pages as images.
 
 ## License
 

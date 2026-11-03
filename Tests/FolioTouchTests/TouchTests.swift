@@ -1,3 +1,4 @@
+import ImageIO
 import PDFKit
 import UIKit
 import XCTest
@@ -211,6 +212,13 @@ final class TouchTests: XCTestCase {
         XCTAssertEqual(date.contents, Date.now.formatted(date: .numeric, time: .omitted))
         XCTAssertTrue(canvas.selected === date)
         XCTAssertEqual(undo.undoActionName, "Add Date")
+    }
+
+    /// A page sent as a picture is the page at two pixels a point.
+    func testPageSentAsAPicture() throws {
+        let page = try XCTUnwrap(makePDF([["Hi"]]).page(at: 0))
+        let image = try XCTUnwrap(picture(of: page).flatMap { CGImageSourceCreateWithData($0 as CFData, nil) }.flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
+        XCTAssertEqual([image.width, image.height], [1224, 1584])
     }
 
     /// A tap that slips a little, as a finger's does, places the usual signature, not one the size of the slip.

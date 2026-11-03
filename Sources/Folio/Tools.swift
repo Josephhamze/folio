@@ -1,3 +1,4 @@
+import ImageIO
 import PDFKit
 import Vision
 #if os(macOS)
@@ -71,6 +72,24 @@ func rebuilt(_ page: PDFPage, text: [(text: String, box: CGRect)]) -> PDFPage? {
     new.setBounds(page.bounds(for: .cropBox), for: .cropBox)
     for a in page.annotations where a.type != "Popup" { new.addAnnotation(a.copy() as! PDFAnnotation) }
     return new
+}
+
+/// The page as it shows, its crop, turn and marks included, as a JPEG on white at `dpi`: to send in a chat app, where a
+/// picture shows at once and a PDF is a file to download.
+func picture(of page: PDFPage, dpi: CGFloat = 144) -> Data? {
+    let box = page.bounds(for: .cropBox), scale = dpi / 72, turned = page.rotation % 180 != 0
+    let width = Int((turned ? box.height : box.width) * scale), height = Int((turned ? box.width : box.height) * scale)
+    guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+    context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    context.scaleBy(x: scale, y: scale)
+    page.transform(context, for: .cropBox)
+    page.draw(with: .cropBox, to: context)
+    let data = NSMutableData()
+    guard let image = context.makeImage(), let file = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return nil }
+    CGImageDestinationAddImage(file, image, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
+    return CGImageDestinationFinalize(file) ? data as Data : nil
 }
 
 extension FolioDocument {

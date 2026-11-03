@@ -1,3 +1,4 @@
+import ImageIO
 import PDFKit
 import XCTest
 @testable import Folio
@@ -152,6 +153,31 @@ final class ToolsTests: XCTestCase {
         let sizes = await doc.reduceFileSize()
         print("Reduce File Size, encrypted: \(sizes.map { "\($0.before) → \($0.after)" } ?? "left as it was")")
         XCTAssertTrue(PDFDocument(data: try doc.snapshot(contentType: .pdf))!.isEncrypted)
+    }
+
+    /// A page sent as a picture is as it shows: cropped, turned and marked, at two pixels a point.
+    func testPictureOfAPageIsAsItShows() throws {
+        let page = try XCTUnwrap(makePDF([["Top line"]]).page(at: 0))
+        page.setBounds(CGRect(x: 0, y: 392, width: 612, height: 400), for: .cropBox)
+        page.rotation = 90
+        page.addAnnotation(shape(.rect, from: CGPoint(x: 400, y: 500), to: CGPoint(x: 500, y: 600), color: .red))
+        let image = try XCTUnwrap(picture(of: page).flatMap { CGImageSourceCreateWithData($0 as CFData, nil) }.flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
+        // Turned a quarter clockwise, the crop's 612 by 400 points show 400 wide and 612 tall.
+        XCTAssertEqual([image.width, image.height], [800, 1224])
+        // So the line at the crop's top left runs down its top right, the box is a little left of the middle, 400 points
+        // down, and the crop's bottom left is blank paper.
+        XCTAssertGreaterThan(count(image, x: 630..<700, y: 130..<300) { r, g, b in r < 100 && g < 100 && b < 100 }, 50)
+        XCTAssertGreaterThan(count(image, x: 200..<430, y: 790..<1010) { r, g, b in r > 150 && g < 100 && b < 100 }, 100)
+        XCTAssertEqual(count(image, x: 0..<200, y: 0..<700) { r, g, _ in r < 200 || g < 200 }, 0)
+    }
+
+    /// How many of the picture's pixels, in these columns and rows from the top left, are of this kind.
+    private func count(_ image: CGImage, x: Range<Int>, y: Range<Int>, where kind: (UInt8, UInt8, UInt8) -> Bool) -> Int {
+        let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let bytes = context.data!.assumingMemoryBound(to: UInt8.self)
+        return y.flatMap { row in x.map { col in bytes + (row * image.width + col) * 4 } }.filter { kind($0[0], $0[1], $0[2]) }.count
     }
 
     /// A page holding a 3840 by 2160 photo.

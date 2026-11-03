@@ -1,3 +1,4 @@
+import PDFKit
 import SwiftUI
 
 @main
@@ -118,6 +119,24 @@ struct FolioCommands: Commands {
     }
 }
 
+/// The page in view, the words being typed included, as a picture named after its number, for the share sheet.
+struct PagePicture: Transferable {
+    let viewer: Viewer
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(exportedContentType: .jpeg) { shared in
+            try await MainActor.run {
+                shared.viewer.settle()
+                guard let page = shared.viewer.doc.pdf.page(at: shared.viewer.pageIndex), let data = picture(of: page) else {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+                return data
+            }
+        }
+        .suggestedFileName { "Page \($0.viewer.pageIndex + 1)" }
+    }
+}
+
 /// The Tools menu: the menu bar's, and on iOS the navigation bar's too, as iPhone has no menu bar.
 struct ToolsMenu: View {
     let viewer: Viewer?
@@ -129,6 +148,11 @@ struct ToolsMenu: View {
         Button("Reduce File Size") { viewer?.reduceFileSize() }.disabled(!idle)
         #endif
         Button("Add to Every Page") { viewer?.addToEveryPage() }.disabled(viewer?.canAddToEveryPage != true)
+        if let viewer, !viewer.doc.pdf.isLocked {
+            ShareLink("Send Page as Picture", item: PagePicture(viewer: viewer), preview: SharePreview("Page \(viewer.pageIndex + 1)"))
+        } else {
+            Button("Send Page as Picture") {}.disabled(true)
+        }
         Divider()
         Button("Edit Signature…") { viewer?.sheet = .signature(.sign) }.disabled(viewer == nil)
         Button("Edit Initials…") { viewer?.sheet = .signature(.initial) }.disabled(viewer == nil)
