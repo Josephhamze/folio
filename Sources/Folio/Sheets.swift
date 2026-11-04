@@ -138,8 +138,9 @@ struct PasswordSheet: View {
 
     init(viewer: Viewer) {
         self.viewer = viewer
-        // As the file would be saved: a protected file keeps the password it opened with, unless it's changed here.
-        let kept = viewer.doc.keptPassword ?? "", restrictions = viewer.doc.newRestrictions
+        // As a file made from it would be saved: a protected file keeps its own password and restrictions, unless they're
+        // changed here.
+        let kept = viewer.doc.keptPassword ?? "", restrictions = viewer.doc.keptRestrictions
         (_password, _again) = (State(initialValue: kept), State(initialValue: kept))
         _restricts = State(initialValue: restrictions != nil)
         _restrictions = State(initialValue: restrictions ?? FolioDocument.Restrictions(password: ""))

@@ -258,9 +258,13 @@ final class DocumentTests: XCTestCase {
         let opened = FolioDocument(pdf: file)
         XCTAssertFalse(opened.canEdit)
         XCTAssertFalse(opened.unlock("nope"))
+        XCTAssertNil(opened.keptRestrictions)
         XCTAssertTrue(opened.unlock("perm"))
         XCTAssertTrue(opened.canEdit)
         XCTAssertTrue(opened.pdf.hasFullRights)
+        // Opened again, it keeps its own restrictions in what's made from it, and asks for no password it didn't.
+        XCTAssertEqual(opened.keptRestrictions, .init(password: "perm", printing: true))
+        XCTAssertNil(opened.keptPassword)
         undo.undo()
         XCTAssertFalse(try reopened(doc).isEncrypted)
 
@@ -271,6 +275,11 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual([both.allowsPrinting, both.allowsCopying, both.allowsDocumentChanges], [false, true, false])
         XCTAssertTrue(both.unlock(withPassword: "perm"))
         XCTAssertEqual(both.permissionsStatus, .owner)
+        let again = FolioDocument(pdf: try reopened(doc))
+        XCTAssertTrue(again.unlock("open"))
+        XCTAssertTrue(again.unlock("perm"))
+        XCTAssertEqual(again.keptPassword, "open")
+        XCTAssertEqual(again.keptRestrictions, .init(password: "perm", copying: true))
 
         for restrictions in [FolioDocument.Restrictions(password: "open"), .init(password: "权限")] {
             act(undo) { doc.setPassword("open", restrictions: restrictions) }

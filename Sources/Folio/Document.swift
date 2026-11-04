@@ -12,6 +12,11 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     var revision = 0
     /// The password that unlocked the file.
     var password: String?
+    /// The password the file opened with, when it asked for one.
+    var opensWith: String?
+    /// What the file allowed without its permissions password as it was opened, when it was restricted, and that password
+    /// once it's typed.
+    var ownRestrictions: Restrictions?
     /// The password the file opens with once it's saved, when one was set here. Without one, it's saved as `pdf` is.
     var newPassword: String?
     /// What the file allows without its permissions password once it's saved, when that was set here.
@@ -25,6 +30,7 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
 
     init(pdf: PDFDocument) {
         self.pdf = pdf
+        noteRestrictions()
     }
 
     init(configuration: ReadConfiguration) throws {
@@ -32,6 +38,15 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
             throw CocoaError(.fileReadCorruptFile)
         }
         self.pdf = pdf
+        noteRestrictions()
+    }
+
+    /// Notes what a restricted file allows, which PDFKit tells only until the permissions password is typed.
+    private func noteRestrictions() {
+        guard pdf.isEncrypted, !pdf.isLocked, pdf.permissionsStatus == .user else { return }
+        let changes = pdf.allowsDocumentChanges && pdf.allowsDocumentAssembly && pdf.allowsCommenting && pdf.allowsFormFieldEntry
+        guard !(pdf.allowsPrinting && pdf.allowsCopying && changes) else { return }
+        ownRestrictions = Restrictions(password: "", printing: pdf.allowsPrinting, copying: pdf.allowsCopying, changes: changes)
     }
 
     /// The system's paper size. iOS has none: Letter where the region measures in US units, A4 elsewhere.
@@ -86,6 +101,8 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         let opening = pdf.isLocked
         guard pdf.unlock(withPassword: password), opening || pdf.permissionsStatus == .owner else { return false }
         self.password = password
+        if opening { opensWith = password }
+        if pdf.permissionsStatus == .owner { ownRestrictions?.password = password } else { noteRestrictions() }
         revision += 1
         return true
     }
@@ -269,10 +286,15 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     }
 
     /// The password a file made from this one's pages opens with: the one set here, or the one this one opened with.
-    var keptPassword: String? { newPassword ?? (pdf.isEncrypted ? password : nil) }
+    var keptPassword: String? { newPassword ?? (pdf.isEncrypted ? opensWith : nil) }
+    /// The restrictions a file made from this one's pages keeps: those set here, or this one's own, once their password's
+    /// typed. Until it is, nothing can be made from a restricted file.
+    var keptRestrictions: Restrictions? {
+        newRestrictions ?? (pdf.isEncrypted ? ownRestrictions.flatMap { $0.password.isEmpty ? nil : $0 } : nil)
+    }
 
     /// Writes the pages into files of `count` pages each, in `folder`: "<name> 1.pdf", "<name> 2.pdf" and so on, each with
-    /// the kept password and the restrictions set here. It writes over no file: when one of the names is taken, it throws
+    /// the kept password and restrictions. It writes over no file: when one of the names is taken, it throws
     /// before writing any. When a file can't be written, it takes back those it wrote, so trying again finds the names free.
     /// The pages are copied here, into documents of their own, and the files written away from the window.
     @MainActor func split(every count: Int, into folder: URL, name: String) async throws -> [URL] {
@@ -283,7 +305,7 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         }
         let pieces = starts.map { start in
             let piece = FolioDocument(pdf: extract(Array(all[start..<min(start + count, all.count)])))
-            (piece.newPassword, piece.newRestrictions) = (keptPassword, newRestrictions)
+            (piece.newPassword, piece.newRestrictions) = (keptPassword, keptRestrictions)
             return piece
         }
         return try await Task.detached {

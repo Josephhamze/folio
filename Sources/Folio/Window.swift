@@ -233,11 +233,11 @@ final class Viewer {
     }
 
     /// Copies the target pages into a document of their own, for the window to save. Pages of a protected file stay
-    /// protected: by its new password and restrictions, or the password that opened it.
+    /// protected: by its new password and restrictions, or its own.
     func extract() {
         settle()
         let pages = FolioDocument(pdf: doc.extract(targetPages))
-        (pages.newPassword, pages.newRestrictions) = (doc.keptPassword, doc.newRestrictions)
+        (pages.newPassword, pages.newRestrictions) = (doc.keptPassword, doc.keptRestrictions)
         extracted = pages
     }
 
