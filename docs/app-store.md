@@ -5,7 +5,7 @@ What goes into App Store Connect for Folio on iPhone and iPad.
 ## Before the first upload
 
 1. **Sign Xcode in.** In Xcode › Settings › Accounts, add the Apple Account of team PP6TZWTTLG. `./build.sh ios-release` then makes the Apple Distribution certificate and the App Store profile by itself.
-2. **Make the app record.** In App Store Connect › Apps › New App, pick iOS, the name below, English (U.S.), the bundle ID `com.josephhamze.folio` and the SKU `folio`. If the bundle ID isn't offered, register it under Certificates, Identifiers & Profiles › Identifiers first.
+2. **Make the app record.** In App Store Connect › Apps › New App, pick iOS, the name below, English (U.S.), the bundle ID `com.alphapms.folio` and the SKU `folio`. If the bundle ID isn't offered, register it under Certificates, Identifiers & Profiles › Identifiers first.
 3. **Upload.** `./build.sh ios-release` archives the app and uploads it. Each build's number is the commit count, so it always goes up.
 4. **Screenshots.** `./build.sh screenshots` takes them, into `build/app-store`: three for the 6.9-inch iPhone (1320 × 2868) and three for the 13-inch iPad (2064 × 2752). App Store Connect scales them down for the smaller sizes.
 
@@ -19,7 +19,7 @@ It signs and uploads with these repository secrets:
 | --- | --- |
 | `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY` | An App Store Connect API key with Admin access, from Users and Access › Integrations; `ASC_KEY` is the `.p8` file's text. |
 | `DIST_P12`, `DIST_P12_PASSWORD` | An Apple Distribution certificate with its private key, as a `.p12` in base64, and the `.p12`'s password. |
-| `APP_STORE_PROFILE` | The App Store provisioning profile "Folio App Store", for `com.josephhamze.folio` and that certificate, in base64. |
+| `APP_STORE_PROFILE` | The App Store provisioning profile "Folio App Store", for `com.alphapms.folio` and that certificate, in base64. |
 
 The key made the certificate and the profile through the App Store Connect API. They expire on 4 November 2027, and the workflow then fails at signing: make a new private key and certificate signing request with `openssl`, a certificate from them (`POST /v1/certificates`, type `DISTRIBUTION`), and a profile for it (`POST /v1/profiles`, type `IOS_APP_STORE`, named "Folio App Store"), then replace the three signing secrets.
 

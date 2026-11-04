@@ -22,9 +22,9 @@ ios_test() {
 	[ -n "$DEVICE" ] || { echo "No $1 simulator: add one in Xcode › Window › Devices and Simulators"; exit 1; }
 	xcrun simctl bootstatus "$DEVICE" -b >/dev/null
 	xcrun simctl status_bar "$DEVICE" override --time 9:41 --batteryState charged --batteryLevel 100
-	xcrun simctl uninstall "$DEVICE" com.josephhamze.folio
+	xcrun simctl uninstall "$DEVICE" com.alphapms.folio
 	xcrun simctl install "$DEVICE" .build/ios/Build/Products/Debug-iphonesimulator/Folio.app
-	DOCS=$(xcrun simctl get_app_container "$DEVICE" com.josephhamze.folio data)/Documents
+	DOCS=$(xcrun simctl get_app_container "$DEVICE" com.alphapms.folio data)/Documents
 	mkdir -p "$DOCS" && cp Tests/FolioUITests/*.pdf "$DOCS"
 	rm -rf ".build/ios/$1.xcresult"
 	xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination "id=$DEVICE" -derivedDataPath .build/ios \
@@ -80,7 +80,7 @@ if [ "$1" = ios-release ]; then
 			CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution" PROVISIONING_PROFILE_SPECIFIER="Folio App Store"
 		cp ExportOptions.plist build/ExportOptions.plist
 		plutil -replace signingStyle -string manual build/ExportOptions.plist
-		plutil -insert provisioningProfiles -json '{"com.josephhamze.folio": "Folio App Store"}' build/ExportOptions.plist
+		plutil -insert provisioningProfiles -json '{"com.alphapms.folio": "Folio App Store"}' build/ExportOptions.plist
 		xcodebuild -quiet -exportArchive -archivePath build/Folio.xcarchive -exportOptionsPlist build/ExportOptions.plist \
 			-exportPath build/ios -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$ASC_KEY_ID" \
 			-authenticationKeyIssuerID "$ASC_ISSUER_ID"
@@ -97,7 +97,7 @@ if [ "$1" = ios ]; then
 	xcrun simctl bootstatus "$DEVICE" -b >/dev/null
 	open -a DeviceHub 2>/dev/null || open -a Simulator
 	xcrun simctl install "$DEVICE" .build/ios/Build/Products/Debug-iphonesimulator/Folio.app
-	xcrun simctl launch "$DEVICE" com.josephhamze.folio
+	xcrun simctl launch "$DEVICE" com.alphapms.folio
 	exit
 fi
 
