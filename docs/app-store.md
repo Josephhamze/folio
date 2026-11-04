@@ -21,7 +21,7 @@ It signs and uploads with these repository secrets:
 | `DIST_P12`, `DIST_P12_PASSWORD` | An Apple Distribution certificate with its private key, as a `.p12` in base64, and the `.p12`'s password. |
 | `APP_STORE_PROFILE` | The App Store provisioning profile "Folio App Store", for `com.josephhamze.folio` and that certificate, in base64. |
 
-The key made the certificate and the profile through the App Store Connect API. They expire after a year, and the workflow then fails at signing: make a new private key and certificate signing request with `openssl`, a certificate from them (`POST /v1/certificates`, type `DISTRIBUTION`), and a profile for it (`POST /v1/profiles`, type `IOS_APP_STORE`, named "Folio App Store"), then replace the three signing secrets.
+The key made the certificate and the profile through the App Store Connect API. They expire on 4 November 2027, and the workflow then fails at signing: make a new private key and certificate signing request with `openssl`, a certificate from them (`POST /v1/certificates`, type `DISTRIBUTION`), and a profile for it (`POST /v1/profiles`, type `IOS_APP_STORE`, named "Folio App Store"), then replace the three signing secrets.
 
 ## The listing
 
