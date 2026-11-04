@@ -159,9 +159,12 @@ extension FolioDocument {
                   copy.write(to: file, withOptions: [PDFDocumentWriteOption(rawValue: "QuartzFilter"): filter]) else { return nil }
             return try? Data(contentsOf: file)
         }.value
-        // Never at the cost of the file's password.
-        guard revision == start, let after, after.count < before.count, let smaller = PDFDocument(data: after), smaller.isEncrypted == encrypted,
-              !smaller.isLocked || password.map({ smaller.unlock(withPassword: $0) }) == true else { return nil }
+        // Never at the cost of the file's password, marks or bookmarks: each page's marks, and the bookmarks, are counted as
+        // PDFKit reads them back, from the file as it was and as it is now.
+        let opened = { (data: Data) in PDFDocument(data: data).flatMap { !$0.isLocked || password.map($0.unlock(withPassword:)) == true ? $0 : nil } }
+        let held = { (pdf: PDFDocument) in (0..<pdf.pageCount).map { pdf.page(at: $0)?.annotations.count ?? 0 } + [pdf.outlineRoot?.numberOfChildren ?? -1] }
+        guard revision == start, let after, after.count < before.count, let smaller = opened(after), smaller.isEncrypted == encrypted,
+              let original = opened(before), held(smaller) == held(original) else { return nil }
         let old = pdf
         change("Reduce File Size", do: { self.pdf = smaller }, undo: { self.pdf = old })
         return (before.count, after.count)
