@@ -24,7 +24,7 @@ What goes into App Store Connect for Folio on iPhone and iPad.
 - **Privacy policy URL:** https://github.com/Josephhamze/folio/blob/main/PRIVACY.md
 - **Copyright:** 2026 Joseph Hamze
 - **What's New** (1.0): First release on iPhone and iPad.
-- **What's New** (the next release): A Stamp tool for your company's stamp, a Date tool, signatures from a photo, and Add to Every Page. Organize, scan and split pages. Recognize Text, Apply Redactions, passwords and restrictions, and Properties. Send a page as a picture. And Folio now speaks French and Simplified Chinese.
+- **What's New** (the next release): A Stamp tool for your company's stamp, a Date tool, signatures from a photo, and Add to Every Page. Organize, scan and split pages. Recognize Text, Apply Redactions, passwords and restrictions, and Properties. Send a page as a picture, and add your own bookmarks. And Folio now speaks French and Simplified Chinese.
 
 ### Description
 
@@ -62,7 +62,7 @@ FILL IN FORMS
 • Type into a PDF's form fields.
 
 READ
-• Thumbnails, bookmarks and every comment, in a column beside the page on iPad.
+• Thumbnails, bookmarks and every comment, in a column beside the page on iPad. Add, rename and delete bookmarks.
 • Find counts the matches and steps through them.
 • Each file reopens at the page you left it on.
 • Folio asks for a protected file's password, and respects its author's editing restrictions.

@@ -4,6 +4,7 @@
 "%lld of %lld" = "%lld sur %lld";
 "A photo or scan of it on white paper" = "Une photo ou un scan sur papier blanc";
 "Actual Size" = "Taille réelle";
+"Add Bookmark" = "Ajouter un signet";
 "Add Date" = "Ajouter la date";
 "Add Note" = "Ajouter une note";
 "Add Shape" = "Ajouter une forme";
@@ -36,6 +37,7 @@
 "Couldn't save the files in %@." = "Impossible d’enregistrer les fichiers dans %@.";
 "Date" = "Date";
 "Delete" = "Supprimer";
+"Delete Bookmark" = "Supprimer le signet";
 "Delete Pages" = "Supprimer les pages";
 "Draw" = "Dessiner";
 "Edit Comment" = "Modifier le commentaire";
@@ -72,6 +74,7 @@
 "Mark for Redaction" = "Marquer pour caviardage";
 "Move" = "Déplacer";
 "Move Pages" = "Déplacer les pages";
+"Name" = "Nom";
 "Next" = "Suivant";
 "No Bookmarks" = "Aucun signet";
 "No Comments" = "Aucun commentaire";
@@ -115,6 +118,9 @@
 "Reduce File Size" = "Réduire la taille du fichier";
 "Reducing file size…" = "Réduction de la taille du fichier…";
 "Remove Password" = "Supprimer le mot de passe";
+"Rename" = "Renommer";
+"Rename Bookmark" = "Renommer le signet";
+"Rename…" = "Renommer…";
 "Restrict printing, copying and changes" = "Restreindre l’impression, la copie et les modifications";
 "Rotate" = "Faire pivoter";
 "Rotate Left" = "Faire pivoter à gauche";

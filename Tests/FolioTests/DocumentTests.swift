@@ -201,10 +201,41 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual(linked(back, from: 0), 1)
     }
 
+    /// Bookmarks added to pages are saved in the file by their pages, among a file's own too; renamed and deleted ones as
+    /// well; and each change undoes.
+    func testBookmarksAreAddedRenamedAndDeleted() throws {
+        let doc = FolioDocument(pdf: makePDF([["1"], ["2"], ["3"]])), undo = manualUndo(doc)
+        act(undo) { doc.addBookmark(to: doc.pages[2], label: "Page 3") }
+        act(undo) { doc.addBookmark(to: doc.pages[0], label: "Page 1") }
+        var file = try reopened(doc)
+        XCTAssertEqual(labels(file), ["Page 1", "Page 3"])
+        XCTAssertEqual(bookmarked(file), [0, 2])
+        let (first, last) = (try XCTUnwrap(doc.pdf.outlineRoot?.child(at: 0)), try XCTUnwrap(doc.pdf.outlineRoot?.child(at: 1)))
+        act(undo) { doc.renameBookmark(last, to: "Summary") }
+        act(undo) { doc.deleteBookmark(first) }
+        file = try reopened(doc)
+        XCTAssertEqual(labels(file), ["Summary"])
+        XCTAssertEqual(bookmarked(file), [2])
+        undo.undo()
+        undo.undo()
+        XCTAssertEqual(labels(try reopened(doc)), ["Page 1", "Page 3"])
+        undo.undo()
+        undo.undo()
+        XCTAssertNil(try reopened(doc).outlineRoot)
+
+        let outlined = FolioDocument(pdf: try XCTUnwrap(PDFDocument(data: outlinedPDF())))
+        outlined.addBookmark(to: outlined.pages[0], label: "New")
+        file = try reopened(outlined)
+        XCTAssertEqual(labels(file), ["New", "Second", "First"])
+        XCTAssertEqual(bookmarked(file), [0, 1, 0])
+    }
+
+    private func labels(_ file: PDFDocument) -> [String] { file.outlineRoot?.kids?.map { $0.label ?? "" } ?? [] }
+
     /// The pages the bookmarks go to, by the bookmark or by its go-to action.
     private func bookmarked(_ file: PDFDocument) -> [Int?] {
         (0..<(file.outlineRoot?.numberOfChildren ?? 0)).map { i in
-            file.outlineRoot?.child(at: i).flatMap { $0.destination ?? ($0.action as? PDFActionGoTo)?.destination }?.page.map(file.index(for:))
+            file.outlineRoot?.child(at: i)?.target?.page.map(file.index(for:))
         }
     }
 

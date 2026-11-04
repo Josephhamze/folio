@@ -136,6 +136,13 @@ final class Viewer {
         showsPanes = true
     }
 
+    /// Bookmarks the page in view, named after its number, and shows the bookmarks.
+    func addBookmark() {
+        guard let page = doc.pdf.page(at: pageIndex) else { return }
+        doc.addBookmark(to: page, label: String(localized: "Page \(pageIndex + 1)"))
+        show(.bookmarks)
+    }
+
     /// Ends the typing, commits the comment being typed and records the form fills, for when the document closes or the app
     /// leaves the screen.
     func settle() {
@@ -679,21 +686,46 @@ struct Thumbnails: UIViewRepresentable {
 extension PDFOutline: @retroactive Identifiable {
     /// The children, or nil for a leaf, as `List` wants them.
     var kids: [PDFOutline]? { numberOfChildren == 0 ? nil : (0..<numberOfChildren).compactMap { child(at: $0) } }
+    /// Where it goes: its destination, or its go-to action's, which a file can give it instead.
+    var target: PDFDestination? { destination ?? (action as? PDFActionGoTo)?.destination }
 }
 
+/// The bookmarks: a tap goes to one's page; a right-click or a long press renames or deletes it. Add Bookmark bookmarks the
+/// page in view.
 struct Bookmarks: View {
     let viewer: Viewer
+    @State private var renaming: PDFOutline?
+    @State private var name = ""
 
     var body: some View {
         let _ = viewer.doc.revision
+        VStack(spacing: 0) {
+            bookmarks
+            Button("Add Bookmark", systemImage: "plus") { viewer.addBookmark() }
+                .disabled(!viewer.isIdle)
+                .padding(8)
+        }
+        .alert("Rename Bookmark", isPresented: Binding { renaming != nil } set: { if !$0 { renaming = nil } }) {
+            TextField("Name", text: $name)
+            Button("Rename") { if let renaming { viewer.doc.renameBookmark(renaming, to: name) } }
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    @ViewBuilder private var bookmarks: some View {
         if let items = viewer.doc.pdf.outlineRoot?.kids {
             List(items, children: \.kids) { item in
                 Text(item.label ?? "")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
-                    // A bookmark goes to its page by a destination or by a go-to action, which has none.
-                    .onTapGesture {
-                        if let destination = item.destination ?? (item.action as? PDFActionGoTo)?.destination { viewer.canvas.go(to: destination) }
+                    .onTapGesture { if let target = item.target { viewer.canvas.go(to: target) } }
+                    .contextMenu {
+                        Group {
+                            Button("Rename…") { (renaming, name) = (item, item.label ?? "") }
+                            Button("Delete", role: .destructive) { viewer.doc.deleteBookmark(item) }
+                        }
+                        .disabled(!viewer.isIdle)
                     }
             }
         } else {

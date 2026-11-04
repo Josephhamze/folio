@@ -4,6 +4,7 @@
 "%lld of %lld" = "第 %lld 个，共 %lld 个";
 "A photo or scan of it on white paper" = "白纸上的照片或扫描件";
 "Actual Size" = "实际大小";
+"Add Bookmark" = "添加书签";
 "Add Date" = "添加日期";
 "Add Note" = "添加附注";
 "Add Shape" = "添加形状";
@@ -36,6 +37,7 @@
 "Couldn't save the files in %@." = "无法将文件存储到“%@”。";
 "Date" = "日期";
 "Delete" = "删除";
+"Delete Bookmark" = "删除书签";
 "Delete Pages" = "删除页面";
 "Draw" = "绘制";
 "Edit Comment" = "编辑批注";
@@ -72,6 +74,7 @@
 "Mark for Redaction" = "标记涂黑";
 "Move" = "移动";
 "Move Pages" = "移动页面";
+"Name" = "名称";
 "Next" = "下一个";
 "No Bookmarks" = "没有书签";
 "No Comments" = "没有批注";
@@ -115,6 +118,9 @@
 "Reduce File Size" = "减小文件大小";
 "Reducing file size…" = "正在减小文件大小…";
 "Remove Password" = "移除密码";
+"Rename" = "重新命名";
+"Rename Bookmark" = "重新命名书签";
+"Rename…" = "重新命名…";
 "Restrict printing, copying and changes" = "限制打印、拷贝和更改";
 "Rotate" = "旋转";
 "Rotate Left" = "向左旋转";

@@ -144,6 +144,34 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         })
     }
 
+    /// Adds a bookmark to the top of `page`, among the others by their pages, as one change.
+    func addBookmark(to page: PDFPage, label: String) {
+        let root = pdf.outlineRoot ?? PDFOutline(), had = pdf.outlineRoot != nil, item = PDFOutline(), index = pdf.index(for: page)
+        item.label = label
+        item.destination = PDFDestination(page: page, at: CGPoint(x: 0, y: page.bounds(for: .cropBox).maxY))
+        let at = root.kids?.firstIndex { ($0.target?.page).map(pdf.index(for:)) ?? -1 > index } ?? root.numberOfChildren
+        change("Add Bookmark", do: {
+            if !had { self.pdf.outlineRoot = root }
+            root.insertChild(item, at: at)
+        }, undo: {
+            item.removeFromParent()
+            if !had { self.pdf.outlineRoot = nil }
+        })
+    }
+
+    func renameBookmark(_ item: PDFOutline, to label: String) {
+        let old = item.label
+        guard label != old else { return }
+        change("Rename Bookmark", do: { item.label = label }, undo: { item.label = old })
+    }
+
+    /// Deletes the bookmark, and those under it.
+    func deleteBookmark(_ item: PDFOutline) {
+        guard let parent = item.parent else { return }
+        let at = item.index
+        change("Delete Bookmark", do: { item.removeFromParent() }, undo: { parent.insertChild(item, at: at) })
+    }
+
     /// What the file says about itself, which other apps and searches show, in Properties…' order.
     static let propertyKeys: [PDFDocumentAttribute] = [.titleAttribute, .authorAttribute, .subjectAttribute, .keywordsAttribute]
 
@@ -186,7 +214,7 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     private static func copied(_ outline: PDFOutline) -> PDFOutline {
         let copy = PDFOutline()
         (copy.label, copy.isOpen) = (outline.label, outline.isOpen)
-        if let to = outline.destination ?? (outline.action as? PDFActionGoTo)?.destination, let page = to.page {
+        if let to = outline.target, let page = to.page {
             copy.destination = PDFDestination(page: page, at: to.point)
         } else {
             copy.action = outline.action

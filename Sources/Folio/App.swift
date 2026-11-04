@@ -119,6 +119,7 @@ struct FolioCommands: Commands {
             Button(viewer?.organizing == true ? "Stop Organizing" : "Organize Pages") { viewer?.organize() }
                 .keyboardShortcut("o", modifiers: [.command, .option])
                 .disabled(viewer?.doc.pdf.isLocked ?? true)
+            Button("Add Bookmark") { viewer?.addBookmark() }.keyboardShortcut("d").disabled(viewer?.isIdle != true)
             Divider()
             PageActions(viewer: viewer)
         }

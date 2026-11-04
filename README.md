@@ -21,7 +21,7 @@
 ## Features
 
 - **Home.** Folio opens on your recent files, shown as thumbnails. Click one to open it, or drop a PDF on the window. Each file reopens at the page you left it on.
-- **Read.** The sidebar shows thumbnails, bookmarks and every comment. View one page, a continuous scroll or two pages side by side, zoom with a pinch or ⌘ and the scroll wheel, and switch to a full-screen Read Mode. Type a page number in the toolbar to go to it. Find counts the matches and steps through them.
+- **Read.** The sidebar shows thumbnails, bookmarks and every comment. View one page, a continuous scroll or two pages side by side, zoom with a pinch or ⌘ and the scroll wheel, and switch to a full-screen Read Mode. Type a page number in the toolbar to go to it. Pages › Add Bookmark (⌘D), or the button under the bookmarks, bookmarks the page in view; right-click a bookmark, or press it on iPhone and iPad, to rename or delete it. Find counts the matches and steps through them.
 - **Mark up.** Highlight, underline, strike through, add notes and text boxes, and draw rectangles, ovals, lines, arrows and freehand ink, in any colour. Select a mark to drag it, nudge it with the arrow keys, recolour it, or delete it with the Delete key or the trash in the tool bar. Right-click any mark to delete it, whatever the tool. A signature, note or text box you place stays selected, ready to drag into place. Single keys pick the tools: V Select, H Highlight, T Text Box, S Sign, C Stamp, D Date. Each tool's tooltip shows its key.
 - **Text that matches.** Click with the Text Box tool and type. The text takes the font, size and colour of the nearest text on the page. Beside a line, it sits on that line, so it looks typed into the document. Show Fonts (⌘T) changes a box's font and size.
 - **Sign.** Draw or type your signature and initials once, or take them from a photo or scan. Then place them with a click, or drag a box to size them. Drawn and typed ones are saved as vector outlines, so they stay sharp at any zoom and in other PDF apps.
@@ -68,10 +68,6 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 - `swift icon/icon.swift` draws the icon and the dmg window's background from code, into `icon/Folio.icns`, `icon/logo.png` and `icon/dmg.png`.
 - The design and the build plan are in [`docs/superpowers`](docs/superpowers).
 - [`Localization`](Localization) has Folio's French and Chinese, each line a translation of Folio's English. Words added to Folio need a line in both, and `swift test` checks that the two tables match each other, the code and the numbers and names each line takes.
-
-## Roadmap
-
-- **Bookmarks:** add, rename and delete bookmarks.
 
 ## License
 
