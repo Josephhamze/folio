@@ -71,7 +71,7 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 
 ## Roadmap
 
-- **Bookmarks:** add, rename and delete bookmarks.
+- **Bookmarks:** add, rename and delete bookmarks. PDFKit saves the bookmarks of a file it read as the file had them, whatever is changed, so Folio needs to write them into the file itself.
 
 ## License
 
