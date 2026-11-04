@@ -96,7 +96,10 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
             plain.documentAttributes = pdf.documentAttributes
         }
         change(new == nil ? "Remove Password" : "Set Password", do: {
-            if plain !== old.pdf { Self.move(from: old.pdf, to: plain) }
+            if plain !== old.pdf {
+                self.pin()
+                Self.move(from: old.pdf, to: plain)
+            }
             (self.pdf, self.newPassword) = (plain, new)
         }, undo: {
             if plain !== old.pdf { Self.move(from: plain, to: old.pdf) }
@@ -138,20 +141,35 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     }
 
     private func fill(_ list: [PDFPage], replacing: [PDFPage: PDFPage]) {
-        pdf.outlineRoot.map { Self.repoint($0, replacing) }
+        pin(replacing)
         while pdf.pageCount > 0 { pdf.removePage(at: pdf.pageCount - 1) }
         for page in list { pdf.insert(page, at: pdf.pageCount) }
     }
 
-    /// Points each bookmark at its page itself, or at the page that replaces it, as the pages are about to leave: a file's
-    /// own bookmark finds its page through the file, so would lose it, and open the first page once saved.
-    private static func repoint(_ outline: PDFOutline, _ replacing: [PDFPage: PDFPage]) {
-        if let to = outline.destination, let page = to.page {
-            outline.destination = PDFDestination(page: replacing[page] ?? page, at: to.point)
-        } else if let to = (outline.action as? PDFActionGoTo)?.destination, let page = to.page {
-            outline.action = PDFActionGoTo(destination: PDFDestination(page: replacing[page] ?? page, at: to.point))
+    /// Points each bookmark, and each link to a page, at the page itself, or at the page that replaces it, as the pages are
+    /// about to leave: one the file came with finds its page through the file, so would lose it, and open the first page
+    /// once saved.
+    private func pin(_ replacing: [PDFPage: PDFPage] = [:]) {
+        func pinned(_ to: PDFDestination?) -> PDFDestination? {
+            guard let to, let page = to.page else { return nil }
+            return PDFDestination(page: replacing[page] ?? page, at: to.point)
         }
-        for i in 0..<outline.numberOfChildren { outline.child(at: i).map { repoint($0, replacing) } }
+        func walk(_ item: PDFOutline) {
+            if let to = pinned(item.destination) {
+                item.destination = to
+            } else if let to = pinned((item.action as? PDFActionGoTo)?.destination) {
+                item.action = PDFActionGoTo(destination: to)
+            }
+            for i in 0..<item.numberOfChildren { item.child(at: i).map(walk) }
+        }
+        pdf.outlineRoot.map(walk)
+        for link in (pages + replacing.values).flatMap(\.annotations) where link.type == "Link" {
+            if let to = pinned(link.destination) {
+                link.destination = to
+            } else if let to = pinned((link.action as? PDFActionGoTo)?.destination) {
+                link.action = PDFActionGoTo(destination: to)
+            }
+        }
     }
 
     func rotate(_ chosen: [PDFPage], by degrees: Int) {
