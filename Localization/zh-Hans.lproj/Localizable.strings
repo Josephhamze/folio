@@ -16,10 +16,12 @@
 "Apply Redactions" = "应用涂黑";
 "Applying redactions…" = "正在应用涂黑…";
 "Arrow" = "箭头";
+"Author" = "作者";
 "Bookmarks" = "书签";
 "Cancel" = "取消";
 "Change Colour" = "更改颜色";
 "Change Font" = "更改字体";
+"Change Properties" = "更改属性";
 "Choose Folder…" = "选择文件夹…";
 "Clear" = "清除";
 "Colour" = "颜色";
@@ -56,6 +58,7 @@
 "Insert Blank Page" = "插入空白页";
 "Insert from File…" = "从文件插入…";
 "Insert Pages" = "插入页面";
+"Keywords" = "关键词";
 "Leave Read Mode" = "退出阅读模式";
 "Line" = "直线";
 "Make Default" = "设为默认";
@@ -91,6 +94,8 @@
 "Photos…" = "照片…";
 "Previous" = "上一个";
 "Print…" = "打印…";
+"Properties" = "属性";
+"Properties…" = "属性…";
 "Read Mode" = "阅读模式";
 "Recent" = "最近使用";
 "Recognize Text" = "识别文本";
@@ -118,6 +123,7 @@
 "Scanned 1 page. Tools › Recognize Text makes it searchable" = "已扫描 1 页。使用“工具” › “识别文本”后即可搜索其中的文字";
 "Select" = "选择";
 "Send Page as Picture" = "以图片发送此页";
+"Separated by commas" = "用逗号分隔";
 "Set Password" = "设置密码";
 "Show" = "显示";
 "Show Fonts" = "显示字体";
@@ -130,6 +136,7 @@
 "Stamp" = "印章";
 "Stop Organizing" = "完成整理";
 "Strike Through" = "删除线";
+"Subject" = "主题";
 "Text Box" = "文本框";
 "The original text stays underneath in the file." = "原来的文本仍保留在文件中，位于下方。";
 "The password comes off once the file is saved" = "文件存储后将移除密码";
@@ -137,6 +144,7 @@
 "There's no ink in that picture. Try one of it on white paper." = "这张图片里没有墨迹。请试试白纸上的照片。";
 "This document is protected." = "此文稿受保护。";
 "Thumbnails" = "缩略图";
+"Title" = "标题";
 "Tool" = "工具";
 "Tools" = "工具";
 "Tools › Apply Redactions takes out what's under the marks" = "“工具” › “应用涂黑”会去除标记下的内容";

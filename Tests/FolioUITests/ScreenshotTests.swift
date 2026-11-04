@@ -179,8 +179,8 @@ final class ScreenshotTests: XCTestCase {
         shot("undone by key")
     }
 
-    /// The date tool's date, put on every page from the tool bar, and the Tools menu's stamp pad, which takes a picture of the
-    /// company's stamp.
+    /// The date tool's date, put on every page from the tool bar, the Tools menu's stamp pad, which takes a picture of the
+    /// company's stamp, and its Properties… sheet.
     func testDateOnEveryPageAndTheStampPad() {
         openSample()
         let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
@@ -197,6 +197,11 @@ final class ScreenshotTests: XCTestCase {
         stamp.tap()
         XCTAssertTrue(app.buttons["Photos…"].waitForExistence(timeout: 5))
         shot("stamp pad")
+        app.buttons["Cancel"].tap()
+        barButton("Tools")
+        app.buttons["Properties…"].tap()
+        XCTAssertTrue(app.textFields["Title"].waitForExistence(timeout: 5))
+        shot("properties")
         app.buttons["Cancel"].tap()
     }
 

@@ -107,6 +107,35 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         })
     }
 
+    /// What the file says about itself, which other apps and searches show, in Properties…' order.
+    static let propertyKeys: [PDFDocumentAttribute] = [.titleAttribute, .authorAttribute, .subjectAttribute, .keywordsAttribute]
+
+    /// Each of the file's properties as typed: its keywords, which PDFKit keeps as a list, separated by commas.
+    var properties: [String] { Self.typed(pdf.documentAttributes ?? [:]) }
+
+    /// Sets the properties, in `propertyKeys`' order, taking off each one left empty.
+    func setProperties(_ values: [String]) {
+        let old = pdf.documentAttributes
+        var new = old ?? [:]
+        for (key, value) in zip(Self.propertyKeys, values) {
+            let value = value.trimmingCharacters(in: .whitespacesAndNewlines), words = Self.words(value)
+            new[key] = key == .keywordsAttribute ? (words.isEmpty ? nil : words) : (value.isEmpty ? nil : value)
+        }
+        guard Self.typed(new) != properties else { return }
+        change("Change Properties", do: { self.pdf.documentAttributes = new }, undo: { self.pdf.documentAttributes = old })
+    }
+
+    private static func typed(_ attributes: [AnyHashable: Any]) -> [String] {
+        propertyKeys.map { key in
+            let value = attributes[key] as? [String] ?? (attributes[key] as? String).map { [$0] } ?? []
+            return key == .keywordsAttribute ? words(value.joined(separator: ",")).joined(separator: ", ") : value.joined()
+        }
+    }
+
+    private static func words(_ keywords: String) -> [String] {
+        keywords.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+    }
+
     /// Moves every page from one document to the other.
     private static func move(from: PDFDocument, to: PDFDocument) {
         while from.pageCount > 0, let page = from.page(at: 0) {

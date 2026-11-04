@@ -164,6 +164,42 @@ struct PasswordSheet: View {
     }
 }
 
+/// The title, author, subject and keywords the file keeps about itself, which other apps and searches show.
+struct PropertiesSheet: View {
+    let viewer: Viewer
+    @Environment(\.dismiss) private var dismiss
+    @State private var values: [String]
+
+    init(viewer: Viewer) {
+        self.viewer = viewer
+        _values = State(initialValue: viewer.doc.properties)
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Properties").font(.headline)
+            Grid(alignment: .leading) {
+                GridRow { Text("Title").gridColumnAlignment(.trailing); TextField("Title", text: $values[0]) }
+                GridRow { Text("Author"); TextField("Author", text: $values[1]) }
+                GridRow { Text("Subject"); TextField("Subject", text: $values[2]) }
+                GridRow { Text("Keywords"); TextField("Keywords", text: $values[3], prompt: Text("Separated by commas")) }
+            }
+            .textFieldStyle(.roundedBorder)
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }
+                Button("Save") {
+                    viewer.doc.setProperties(values)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .frame(width: 340)
+        .padding(20)
+    }
+}
+
 /// Splits the document into files of a few pages each, in a folder chosen next, named after the document and numbered.
 struct SplitSheet: View {
     let viewer: Viewer

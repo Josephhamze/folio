@@ -361,6 +361,7 @@ struct DocumentView: View {
             .sheet(item: $viewer.sheet) { sheet in
                 if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
                 if sheet == .protect { PasswordSheet(viewer: viewer) }
+                if sheet == .properties { PropertiesSheet(viewer: viewer) }
                 if sheet == .split { SplitSheet(viewer: viewer, name: name) }
             }
             .fileImporter(isPresented: $viewer.choosingPages, allowedContentTypes: [.pdf, .image], allowsMultipleSelection: true) { result in

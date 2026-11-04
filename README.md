@@ -35,6 +35,7 @@
 - **Smaller files.** On the Mac, Tools › Reduce File Size saves the pictures as JPEG at 144 dpi, so a scanned contract is light enough to send over mobile data. Folio shows the size before and after, and keeps a file's password.
 - **Fill in forms.** You can also fix a line of text by typing over it. The original text stays underneath in the file, and Folio tells you so.
 - **Protected files.** Folio asks for a file's password in the window. It respects an author's restrictions until you enter the permissions password, and saving keeps the file encrypted. Tools › Password… sets the password that opens a file, changes it, or takes it off, once the file is saved.
+- **Properties.** Tools › Properties… sets the title, author, subject and keywords a file keeps about itself, which other apps and searches show.
 - **Save.** Your changes stay out of the file until you save them with ⌘S. Closing or quitting with unsaved changes asks whether to save them. File › Save As… (⌥⇧⌘S) saves the document under a new name, and you keep working in the new file.
 - **Undo.** Every change can be undone and redone.
 - **English, French and Chinese.** Folio's menus, buttons and messages follow your device's language: English, French or Simplified Chinese. On the Mac, System Settings › General › Language & Region › Applications sets Folio's language alone, and on iPhone and iPad, Settings › Apps › Folio › Language does.
@@ -70,7 +71,7 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 
 ## Roadmap
 
-- **Restrictions and properties:** restrict printing, copying and changes with a permissions password, and a sheet for the title, author and keywords.
+- **Restrictions:** restrict printing, copying and changes with a permissions password.
 
 ## License
 

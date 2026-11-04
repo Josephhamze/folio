@@ -152,6 +152,28 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual(texts(file), ["A"])
     }
 
+    /// The title, author, subject and keywords are saved in the file, a protected file's too, an emptied one taken off, and
+    /// undo puts them back. The same again is no change.
+    func testPropertiesAreSavedAndUndo() throws {
+        let doc = FolioDocument(pdf: makePDF([["A"]])), undo = manualUndo(doc)
+        doc.pdf.documentAttributes = [PDFDocumentAttribute.titleAttribute: "Draft", PDFDocumentAttribute.authorAttribute: "Someone"]
+        act(undo) { doc.setProperties(["Lease", " ", " Mining ", "lease, Kolwezi,, 2026 "]) }
+        XCTAssertEqual(FolioDocument(pdf: try reopened(doc)).properties, ["Lease", "", "Mining", "lease, Kolwezi, 2026"])
+        undo.undo()
+        XCTAssertEqual(doc.properties, ["Draft", "Someone", "", ""])
+        let revision = doc.revision
+        doc.setProperties(["Draft ", "Someone", "", ","])
+        XCTAssertEqual(doc.revision, revision)
+
+        let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "pw", .ownerPasswordOption: "pw"])!
+        let protected = FolioDocument(pdf: try XCTUnwrap(PDFDocument(data: data)))
+        XCTAssertTrue(protected.unlock("pw"))
+        protected.setProperties(["Lease", "", "", "mining"])
+        let file = try reopened(protected)
+        XCTAssertTrue(file.unlock(withPassword: "pw"))
+        XCTAssertEqual(FolioDocument(pdf: file).properties, ["Lease", "", "", "mining"])
+    }
+
     /// Inserting, moving and deleting pages keeps each of the file's bookmarks and links to its page once saved, and undoes.
     func testOrganizingKeepsEachBookmarkAndLinkToItsPage() throws {
         let doc = FolioDocument(pdf: try XCTUnwrap(PDFDocument(data: outlinedPDF()))), undo = manualUndo(doc)

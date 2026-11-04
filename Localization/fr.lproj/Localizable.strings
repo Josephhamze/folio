@@ -16,10 +16,12 @@
 "Apply Redactions" = "Appliquer les caviardages";
 "Applying redactions…" = "Application des caviardages…";
 "Arrow" = "Flèche";
+"Author" = "Auteur";
 "Bookmarks" = "Signets";
 "Cancel" = "Annuler";
 "Change Colour" = "Changer la couleur";
 "Change Font" = "Changer la police";
+"Change Properties" = "Modifier les propriétés";
 "Choose Folder…" = "Choisir le dossier…";
 "Clear" = "Effacer";
 "Colour" = "Couleur";
@@ -56,6 +58,7 @@
 "Insert Blank Page" = "Insérer une page vierge";
 "Insert from File…" = "Insérer depuis un fichier…";
 "Insert Pages" = "Insérer des pages";
+"Keywords" = "Mots-clés";
 "Leave Read Mode" = "Quitter le mode lecture";
 "Line" = "Ligne";
 "Make Default" = "Définir par défaut";
@@ -91,6 +94,8 @@
 "Photos…" = "Photos…";
 "Previous" = "Précédent";
 "Print…" = "Imprimer…";
+"Properties" = "Propriétés";
+"Properties…" = "Propriétés…";
 "Read Mode" = "Mode lecture";
 "Recent" = "Récents";
 "Recognize Text" = "Reconnaître le texte";
@@ -118,6 +123,7 @@
 "Scanned 1 page. Tools › Recognize Text makes it searchable" = "1 page numérisée. Outils › Reconnaître le texte permet d’y faire des recherches";
 "Select" = "Sélectionner";
 "Send Page as Picture" = "Envoyer la page en image";
+"Separated by commas" = "Séparés par des virgules";
 "Set Password" = "Définir le mot de passe";
 "Show" = "Afficher";
 "Show Fonts" = "Afficher les polices";
@@ -130,6 +136,7 @@
 "Stamp" = "Tampon";
 "Stop Organizing" = "Terminer l’organisation";
 "Strike Through" = "Barrer";
+"Subject" = "Sujet";
 "Text Box" = "Zone de texte";
 "The original text stays underneath in the file." = "Le texte d’origine reste dessous, dans le fichier.";
 "The password comes off once the file is saved" = "Le mot de passe sera retiré à l’enregistrement du fichier";
@@ -137,6 +144,7 @@
 "There's no ink in that picture. Try one of it on white paper." = "Cette image ne contient pas d’encre. Essayez-en une sur papier blanc.";
 "This document is protected." = "Ce document est protégé.";
 "Thumbnails" = "Vignettes";
+"Title" = "Titre";
 "Tool" = "Outil";
 "Tools" = "Outils";
 "Tools › Apply Redactions takes out what's under the marks" = "Outils › Appliquer les caviardages retire ce qui se trouve sous les marques";
