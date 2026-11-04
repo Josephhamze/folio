@@ -517,50 +517,47 @@ struct DocumentView: View {
             }
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    // The undo manager says nothing when it changes; each change bumps the revision.
-                    let _ = viewer.doc.revision
-                    // A tap here leaves the words being typed in their field, so they become a change of their own first.
-                    Button("Undo", systemImage: "arrow.uturn.backward") {
-                        viewer.settle()
-                        undoManager?.undo()
-                    }
-                    .disabled(!viewer.isIdle || undoManager?.canUndo != true)
-                    Button("Redo", systemImage: "arrow.uturn.forward") {
-                        viewer.settle()
-                        undoManager?.redo()
-                    }
-                    .disabled(!viewer.isIdle || undoManager?.canRedo != true)
-                }
-                .hidden(!editing)
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        if viewer.organizing {
-                            viewer.organize()
-                        } else {
+                    if editing {
+                        // The undo manager says nothing when it changes; each change bumps the revision.
+                        let _ = viewer.doc.revision
+                        // A tap here leaves the words being typed in their field, so they become a change of their own first.
+                        Button("Undo", systemImage: "arrow.uturn.backward") {
                             viewer.settle()
-                            viewer.tool = .select
-                            viewer.markingUp = false
+                            undoManager?.undo()
                         }
-                        // There's no Save: the first Done says so.
-                        if !toldSaving {
-                            toldSaving = true
-                            viewer.message = String(localized: "Folio saves your changes as you make them")
+                        .disabled(!viewer.isIdle || undoManager?.canUndo != true)
+                        Button("Redo", systemImage: "arrow.uturn.forward") {
+                            viewer.settle()
+                            undoManager?.redo()
+                        }
+                        .disabled(!viewer.isIdle || undoManager?.canRedo != true)
+                        Button("Done") {
+                            if viewer.organizing {
+                                viewer.organize()
+                            } else {
+                                viewer.settle()
+                                viewer.tool = .select
+                                viewer.markingUp = false
+                            }
+                            // There's no Save: the first Done says so.
+                            if !toldSaving {
+                                toldSaving = true
+                                viewer.message = String(localized: "Folio saves your changes as you make them")
+                            }
+                        }
+                        .fontWeight(.semibold)
+                    } else {
+                        ShareButton(viewer: viewer, name: name)
+                        // iPhone has no menu bar for the Tools menu.
+                        Menu("Tools", systemImage: "ellipsis.circle") {
+                            Button("Organize Pages") { viewer.organize() }.disabled(viewer.doc.pdf.isLocked)
+                            Divider()
+                            ToolsMenu(viewer: viewer)
+                            Divider()
+                            Button("Make Default PDF App") { guidingDefault = true }
                         }
                     }
                 }
-                .hidden(!editing)
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    ShareButton(viewer: viewer, name: name)
-                    // iPhone has no menu bar for the Tools menu.
-                    Menu("Tools", systemImage: "ellipsis.circle") {
-                        Button("Organize Pages") { viewer.organize() }.disabled(viewer.doc.pdf.isLocked)
-                        Divider()
-                        ToolsMenu(viewer: viewer)
-                        Divider()
-                        Button("Make Default PDF App") { guidingDefault = true }
-                    }
-                }
-                .hidden(editing)
             }
             // iOS has no switch an app can turn: Files sets the app a PDF opens in.
             .alert("Make Default PDF App", isPresented: $guidingDefault) {
