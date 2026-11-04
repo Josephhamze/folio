@@ -1,0 +1,30 @@
+# Takes the App Store's screenshots on GitHub's Macs and frames them for the listing, with `./build.sh screenshots`:
+# the 6.9-inch iPhone's and the 13-inch iPad's, each on a runner of its own, kept with the run as "app-store <device>".
+# Run it from the Actions tab, or with `gh workflow run screenshots.yml`.
+name: Screenshots
+permissions:
+  contents: read
+on:
+  workflow_dispatch:
+  push:
+    branches: [listing]   # TEMPORARY: the first screenshots, before merging
+jobs:
+  screenshots:
+    runs-on: macos-26
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ["iPhone 17 Pro Max", "iPad Pro 13-inch (M5)"]
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install xcodegen
+      - run: ./build.sh screenshots
+        env:
+          SIMULATOR: ${{ matrix.device }}
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: app-store ${{ matrix.device }}
+          path: build/app-store
+          if-no-files-found: ignore

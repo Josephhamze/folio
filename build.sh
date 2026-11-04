@@ -9,7 +9,7 @@
 # simulator on an iPhone 17 Pro. "./build.sh ios-test" runs its tests on an iPhone 17 Pro and an iPad Pro 13-inch, or
 # only the tests named after it, such as FolioTouchTests or FolioUITests/ScreenshotTests/testMarkUpByTouch, and
 # "./build.sh screenshots" takes the App Store's screenshots, on an iPhone 17 Pro Max and an iPad Pro 13-inch, into
-# build/app-store.
+# build/app-store, and frames them with a headline each for the listing, into build/app-store/listing.
 # "./build.sh ios-release" uploads a build to App Store Connect. Xcode signs it with the team's Apple Account, added in
 # Xcode › Settings › Accounts; on GitHub, the TestFlight workflow runs it with an App Store Connect API key instead.
 set -e
@@ -48,7 +48,9 @@ if [ "$1" = ios-test ] || [ "$1" = screenshots ]; then
 	fi
 	rm -rf build/app-store
 	mkdir -p build/app-store
-	for NAME in "iPhone 17 Pro Max" "iPad Pro 13-inch (M5)"; do
+	# GitHub's workflow names one simulator in $SIMULATOR, to take each on a runner of its own.
+	if [ -n "$SIMULATOR" ]; then set -- "$SIMULATOR"; else set -- "iPhone 17 Pro Max" "iPad Pro 13-inch (M5)"; fi
+	for NAME in "$@"; do
 		ios_test "$NAME" FolioUITests/ScreenshotTests/testScreenshots
 		OUT=$(mktemp -d)
 		xcrun xcresulttool export attachments --path ".build/ios/$NAME.xcresult" --output-path "$OUT"
@@ -57,7 +59,8 @@ if [ "$1" = ios-test ] || [ "$1" = screenshots ]; then
 			"$OUT/manifest.json" | while read -r FILE SHOT; do mv "$OUT/$FILE" "build/app-store/$NAME - $SHOT.png"; done
 		rm -rf "$OUT"
 	done
-	echo "Took the screenshots, into build/app-store"
+	swift icon/app-store.swift
+	echo "Took the screenshots, into build/app-store, and framed them for the listing, into build/app-store/listing"
 	exit
 fi
 

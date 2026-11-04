@@ -7,7 +7,7 @@ What goes into App Store Connect for Folio on iPhone and iPad.
 1. **Sign Xcode in.** In Xcode › Settings › Accounts, add the Apple Account of team PP6TZWTTLG. `./build.sh ios-release` then makes the Apple Distribution certificate and the App Store profile by itself.
 2. **Make the app record.** In App Store Connect › Apps › New App, pick iOS, the name below, English (U.S.), the bundle ID `com.alphapms.folio` and the SKU `folio`. If the bundle ID isn't offered, register it under Certificates, Identifiers & Profiles › Identifiers first.
 3. **Upload.** `./build.sh ios-release` archives the app and uploads it. Each build's number is the commit count, so it always goes up.
-4. **Screenshots.** `./build.sh screenshots` takes them, into `build/app-store`: three for the 6.9-inch iPhone (1320 × 2868) and three for the 13-inch iPad (2064 × 2752). App Store Connect scales them down for the smaller sizes.
+4. **Screenshots.** `./build.sh screenshots` takes them, into `build/app-store`: five for the 6.9-inch iPhone (1320 × 2868) and five for the 13-inch iPad (2064 × 2752). `icon/app-store.swift` then frames each under a headline on Folio's red, into `build/app-store/listing`, and those go on the listing. App Store Connect scales them down for the smaller sizes. The Screenshots workflow does it all on GitHub: run it from the Actions tab, or with `gh workflow run screenshots.yml`.
 
 ## TestFlight from GitHub
 

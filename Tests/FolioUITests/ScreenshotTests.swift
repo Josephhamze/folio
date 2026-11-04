@@ -33,6 +33,23 @@ final class ScreenshotTests: XCTestCase {
 
         showPanes()
         shot("3 Pages")
+
+        closePanes()
+        barButton("Tools")
+        app.buttons["Password…"].tap()
+        let restrict = app.switches["Restrict printing, copying and changes"]
+        XCTAssertTrue(restrict.waitForExistence(timeout: 5))
+        // A switch turns where its knob is, not where its words are.
+        restrict.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        shot("5 Protect")
+        app.buttons["Cancel"].tap()
+
+        // Last, since organizing leaves the page out of reach.
+        barButton("Organize Pages")
+        let second = app.buttons["Page 2"]
+        XCTAssertTrue(second.waitForExistence(timeout: 5))
+        second.tap()
+        shot("4 Organize")
     }
 
     /// Marks up the sample by touch, as a person would, with a screenshot after each step.
