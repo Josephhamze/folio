@@ -31,7 +31,8 @@ jobs:
         env:
           ONLY: ${{ inputs.only }}
           DEVICE: ${{ matrix.device }}
-      - name: Export the screenshots
+      # The log says which tests failed but not why; the summary does.
+      - name: Export the screenshots, and say why any test failed
         if: always()
         run: |
           for RESULT in .build/ios/*.xcresult; do
@@ -39,6 +40,8 @@ jobs:
             OUT="screenshots/$(basename "$RESULT" .xcresult)"
             mkdir -p "$OUT"
             xcrun xcresulttool export attachments --path "$RESULT" --output-path "$OUT" || true
+            xcrun xcresulttool get test-results summary --path "$RESULT" --compact > "$OUT/summary.json" || true
+            jq -r '.testFailures[]? | "\(.testName): \(.failureText)"' "$OUT/summary.json" || true
           done
       - uses: actions/upload-artifact@v5
         if: always()
