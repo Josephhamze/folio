@@ -131,7 +131,7 @@ final class DocumentTests: XCTestCase {
 
     func testPasswordToOpenGoesOnWhenSavedAndUndoes() throws {
         let doc = FolioDocument(pdf: makePDF([["A"]])), undo = manualUndo(doc)
-        act(undo) { doc.setPassword("pw") }
+        act(undo) { doc.setPassword("pw", restrictions: nil) }
         let file = try reopened(doc)
         XCTAssertTrue(file.isLocked)
         XCTAssertFalse(file.unlock(withPassword: "nope"))
@@ -145,7 +145,7 @@ final class DocumentTests: XCTestCase {
         let data = makePDF([["A"]]).dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "a", .ownerPasswordOption: "a"])!
         let doc = FolioDocument(pdf: PDFDocument(data: data)!)
         XCTAssertTrue(doc.unlock("a"))
-        doc.setPassword("b")
+        doc.setPassword("b", restrictions: nil)
         let file = try reopened(doc)
         XCTAssertFalse(file.unlock(withPassword: "a"))
         XCTAssertTrue(file.unlock(withPassword: "b"))
@@ -213,7 +213,7 @@ final class DocumentTests: XCTestCase {
         let data = try XCTUnwrap(pdf.dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "a", .ownerPasswordOption: "a"]))
         let doc = FolioDocument(pdf: try XCTUnwrap(PDFDocument(data: data))), undo = manualUndo(doc)
         XCTAssertTrue(doc.unlock("a"))
-        act(undo) { doc.setPassword(nil) }
+        act(undo) { doc.setPassword(nil, restrictions: nil) }
         let file = try reopened(doc)
         XCTAssertFalse(file.isEncrypted)
         XCTAssertEqual(file.pageCount, 2)
@@ -232,10 +232,42 @@ final class DocumentTests: XCTestCase {
     /// PDFKit saves a file whose password isn't all ASCII unprotected, without a word, so then the save fails instead.
     func testPasswordPDFKitCantUseFailsTheSave() throws {
         let doc = FolioDocument(pdf: makePDF([["A"]]))
-        doc.setPassword("密码")
+        doc.setPassword("密码", restrictions: nil)
         XCTAssertThrowsError(try doc.snapshot(contentType: .pdf))
-        doc.setPassword("mima")
+        doc.setPassword("mima", restrictions: nil)
         XCTAssertTrue(try reopened(doc).isEncrypted)
+    }
+
+    /// Restrictions go on once saved, with or without a password to open the file: without the permissions password the file
+    /// allows only what was allowed, Folio's own editing included, and with it, everything. Undo takes them off. A
+    /// permissions password that's the open one, or one PDFKit can't protect with, fails the save.
+    func testRestrictionsGoOnWhenSavedAndUndo() throws {
+        let doc = FolioDocument(pdf: makePDF([["A"]])), undo = manualUndo(doc)
+        act(undo) { doc.setPassword(nil, restrictions: .init(password: "perm", printing: true)) }
+        let file = try reopened(doc)
+        XCTAssertFalse(file.isLocked)
+        XCTAssertEqual([file.allowsPrinting, file.allowsCopying, file.allowsDocumentChanges, file.allowsCommenting], [true, false, false, false])
+        let opened = FolioDocument(pdf: file)
+        XCTAssertFalse(opened.canEdit)
+        XCTAssertFalse(opened.unlock("nope"))
+        XCTAssertTrue(opened.unlock("perm"))
+        XCTAssertTrue(opened.canEdit)
+        XCTAssertTrue(opened.pdf.hasFullRights)
+        undo.undo()
+        XCTAssertFalse(try reopened(doc).isEncrypted)
+
+        act(undo) { doc.setPassword("open", restrictions: .init(password: "perm", copying: true)) }
+        let both = try reopened(doc)
+        XCTAssertTrue(both.isLocked)
+        XCTAssertTrue(both.unlock(withPassword: "open"))
+        XCTAssertEqual([both.allowsPrinting, both.allowsCopying, both.allowsDocumentChanges], [false, true, false])
+        XCTAssertTrue(both.unlock(withPassword: "perm"))
+        XCTAssertEqual(both.permissionsStatus, .owner)
+
+        for restrictions in [FolioDocument.Restrictions(password: "open"), .init(password: "权限")] {
+            act(undo) { doc.setPassword("open", restrictions: restrictions) }
+            XCTAssertThrowsError(try doc.snapshot(contentType: .pdf), restrictions.password)
+        }
     }
 
     /// The document as its file would be read back.
@@ -330,6 +362,10 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual(pieces.map(\.isLocked), [true, true])
         XCTAssertEqual(pieces.map { $0.unlock(withPassword: "pw") }, [true, true])
         XCTAssertEqual(pieces.map(texts), [["1", "2"], ["3"]])
+        doc.newRestrictions = .init(password: "perm")
+        let restricted = try XCTUnwrap(PDFDocument(url: try XCTUnwrap(doc.split(every: 3, into: folder, name: "Restricted").first)))
+        XCTAssertTrue(restricted.unlock(withPassword: "pw"))
+        XCTAssertFalse(restricted.allowsCopying)
         doc.newPassword = "密码"
         XCTAssertThrowsError(try doc.split(every: 2, into: folder, name: "Other"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Other 1.pdf").path))

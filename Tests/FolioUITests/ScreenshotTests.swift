@@ -180,7 +180,7 @@ final class ScreenshotTests: XCTestCase {
     }
 
     /// The date tool's date, put on every page from the tool bar, the Tools menu's stamp pad, which takes a picture of the
-    /// company's stamp, and its Properties… sheet.
+    /// company's stamp, and its Properties… and Password… sheets, the latter restricting printing, copying and changes.
     func testDateOnEveryPageAndTheStampPad() {
         openSample()
         let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
@@ -202,6 +202,14 @@ final class ScreenshotTests: XCTestCase {
         app.buttons["Properties…"].tap()
         XCTAssertTrue(app.textFields["Title"].waitForExistence(timeout: 5))
         shot("properties")
+        app.buttons["Cancel"].tap()
+        barButton("Tools")
+        app.buttons["Password…"].tap()
+        let restrict = app.switches["Restrict printing, copying and changes"]
+        XCTAssertTrue(restrict.waitForExistence(timeout: 5))
+        // A switch turns where its knob is, not where its words are.
+        restrict.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        shot("password and restrictions")
         app.buttons["Cancel"].tap()
     }
 

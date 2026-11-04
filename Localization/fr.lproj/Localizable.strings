@@ -12,9 +12,13 @@
 "Added to %lld more pages" = "Ajouté à %lld autres pages";
 "Added to 1 more page" = "Ajouté à 1 autre page";
 "Again" = "Confirmation";
+"Allow changes" = "Autoriser les modifications";
+"Allow copying" = "Autoriser la copie";
+"Allow printing" = "Autoriser l’impression";
 "Already as small as it gets" = "Le fichier est déjà aussi petit que possible";
 "Apply Redactions" = "Appliquer les caviardages";
 "Applying redactions…" = "Application des caviardages…";
+"Apps that respect restrictions ask for this password first, but not every app does." = "Les apps qui respectent les restrictions demandent d’abord ce mot de passe, mais toutes ne le font pas.";
 "Arrow" = "Flèche";
 "Author" = "Auteur";
 "Bookmarks" = "Signets";
@@ -111,6 +115,7 @@
 "Reduce File Size" = "Réduire la taille du fichier";
 "Reducing file size…" = "Réduction de la taille du fichier…";
 "Remove Password" = "Supprimer le mot de passe";
+"Restrict printing, copying and changes" = "Restreindre l’impression, la copie et les modifications";
 "Rotate" = "Faire pivoter";
 "Rotate Left" = "Faire pivoter à gauche";
 "Rotate Right" = "Faire pivoter à droite";
@@ -143,6 +148,7 @@
 "The password goes on once the file is saved" = "Le mot de passe sera appliqué à l’enregistrement du fichier";
 "There's no ink in that picture. Try one of it on white paper." = "Cette image ne contient pas d’encre. Essayez-en une sur papier blanc.";
 "This document is protected." = "Ce document est protégé.";
+"This replaces the file's own password and restrictions." = "Ceci remplace le mot de passe et les restrictions propres au fichier.";
 "Thumbnails" = "Vignettes";
 "Title" = "Titre";
 "Tool" = "Outil";
@@ -154,6 +160,7 @@
 "Undo" = "Annuler";
 "Unlock" = "Déverrouiller";
 "Untitled" = "Sans titre";
+"Use a permissions password other than the one that opens the file." = "Utilisez un mot de passe des autorisations différent de celui qui ouvre le fichier.";
 "Use only English letters, digits and symbols." = "Utilisez seulement des lettres sans accents, des chiffres et des symboles.";
 "Wrong password" = "Mot de passe incorrect";
 "Your initials" = "Vos initiales";

@@ -125,40 +125,74 @@ struct SignatureSheet: View {
     }
 }
 
-/// Sets the password the file opens with once it's saved, or takes its password off.
+/// Sets the password the file opens with once it's saved, and what it allows without a second, permissions password, or
+/// takes them off.
 struct PasswordSheet: View {
     let viewer: Viewer
     @Environment(\.dismiss) private var dismiss
-    @State private var password = ""
-    @State private var again = ""
+    @State private var password: String
+    @State private var again: String
+    @State private var restricts: Bool
+    @State private var restrictions: FolioDocument.Restrictions
+    @State private var permissionsAgain: String
+
+    init(viewer: Viewer) {
+        self.viewer = viewer
+        // As the file would be saved: a protected file keeps the password it opened with, unless it's changed here.
+        let kept = viewer.doc.keptPassword ?? "", restrictions = viewer.doc.newRestrictions
+        (_password, _again) = (State(initialValue: kept), State(initialValue: kept))
+        _restricts = State(initialValue: restrictions != nil)
+        _restrictions = State(initialValue: restrictions ?? FolioDocument.Restrictions(password: ""))
+        _permissionsAgain = State(initialValue: restrictions?.password ?? "")
+    }
 
     var body: some View {
+        // PDFKit can't protect a file with any other character, and saves it unprotected.
+        let ascii = (password + (restricts ? restrictions.password : "")).allSatisfy(\.isASCII)
+        // The password that opens the file would lift its restrictions too.
+        let same = restricts && !password.isEmpty && restrictions.password == password
         VStack(spacing: 16) {
             Text("Password").font(.headline)
             Text("Once saved, the file asks for this password to open it.").foregroundStyle(.secondary)
             SecureField("Password", text: $password)
             SecureField("Again", text: $again)
-            // PDFKit can't protect a file with any other character, and saves it unprotected.
-            let ascii = password.allSatisfy(\.isASCII)
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("Restrict printing, copying and changes", isOn: $restricts)
+                if restricts {
+                    SecureField("Permissions password", text: $restrictions.password)
+                    SecureField("Again", text: $permissionsAgain)
+                    Toggle("Allow printing", isOn: $restrictions.printing)
+                    Toggle("Allow copying", isOn: $restrictions.copying)
+                    Toggle("Allow changes", isOn: $restrictions.changes)
+                    Text("Apps that respect restrictions ask for this password first, but not every app does.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if viewer.doc.pdf.isEncrypted { Text("This replaces the file's own password and restrictions.").foregroundStyle(.secondary) }
             if !ascii { Text("Use only English letters, digits and symbols.").foregroundStyle(.red) }
+            if same { Text("Use a permissions password other than the one that opens the file.").foregroundStyle(.red) }
             HStack {
-                if viewer.doc.newPassword != nil || viewer.doc.pdf.isEncrypted { Button("Remove Password") { set(nil) } }
+                if viewer.doc.newPassword != nil || viewer.doc.newRestrictions != nil || viewer.doc.pdf.isEncrypted {
+                    Button("Remove Password") { set(nil, nil) }
+                }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
-                Button("Set Password") { set(password) }
+                Button("Set Password") { set(password.isEmpty ? nil : password, restricts ? restrictions : nil) }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(password.isEmpty || password != again || !ascii)
+                    .disabled(!ascii || same || password != again || password.isEmpty && !restricts
+                              || restricts && (restrictions.password.isEmpty || restrictions.password != permissionsAgain))
             }
         }
         .frame(width: 340)
         .padding(20)
     }
 
-    private func set(_ new: String?) {
+    private func set(_ new: String?, _ restrictions: FolioDocument.Restrictions?) {
         // A protected file's pages move to a new document, which would show its first page.
         if viewer.doc.pdf.isEncrypted { viewer.resume = viewer.pageIndex }
-        viewer.doc.setPassword(new)
-        viewer.message = new == nil ? String(localized: "The password comes off once the file is saved")
+        viewer.doc.setPassword(new, restrictions: restrictions)
+        viewer.message = new == nil && restrictions == nil ? String(localized: "The password comes off once the file is saved")
             : String(localized: "The password goes on once the file is saved")
         dismiss()
     }

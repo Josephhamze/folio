@@ -487,9 +487,10 @@ final class ViewerTests: XCTestCase {
         XCTAssertTrue(file.unlock(withPassword: "a"))
         XCTAssertEqual(texts(file), ["B"])
         XCTAssertEqual(file.page(at: 0)?.annotations.count, 1)
-        viewer.doc.setPassword("b")
+        viewer.doc.setPassword("b", restrictions: .init(password: "perm"))
         viewer.extract()
         XCTAssertEqual(viewer.extracted?.newPassword, "b")
+        XCTAssertEqual(viewer.extracted?.newRestrictions?.password, "perm")
     }
 
     func testOrganizingSelectsWhatItInsertsAndEndsOnTheFirstSelectedPage() {

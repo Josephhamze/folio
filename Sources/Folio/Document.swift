@@ -14,6 +14,8 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     var password: String?
     /// The password the file opens with once it's saved, when one was set here. Without one, it's saved as `pdf` is.
     var newPassword: String?
+    /// What the file allows without its permissions password once it's saved, when that was set here.
+    var newRestrictions: Restrictions?
     @ObservationIgnored weak var undo: UndoManager?
 
     init() {
@@ -48,14 +50,31 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     }
 
     func snapshot(contentType: UTType) throws -> Data {
-        let options = newPassword.map { [PDFDocumentWriteOption.userPasswordOption: $0, .ownerPasswordOption: $0] } ?? [:]
+        var options: [PDFDocumentWriteOption: Any] = [:]
+        if let newPassword {
+            options[.userPasswordOption] = newPassword
+            options[.ownerPasswordOption] = newPassword
+        }
+        if let newRestrictions {
+            options[.ownerPasswordOption] = newRestrictions.password
+            options[.accessPermissionsOption] = newRestrictions.permissions
+        }
         guard !pdf.isLocked, let data = pdf.dataRepresentation(options: options) else { throw CocoaError(.fileWriteUnknown) }
         // PDFKit writes a file it can't protect, as with a password not in ASCII, unprotected, and says nothing: the file must
-        // open with the password, or it isn't saved.
-        if let newPassword, PDFDocument(data: data).map({ $0.isEncrypted && $0.unlock(withPassword: newPassword) }) != true {
-            throw CocoaError(.fileWriteUnknown)
-        }
+        // open only with its password, and keep to its restrictions until their password is given, or it isn't saved.
+        if !options.isEmpty, PDFDocument(data: data).map(isProtected) != true { throw CocoaError(.fileWriteUnknown) }
         return data
+    }
+
+    /// Whether the file as saved opens only with the new password, and allows only what the new restrictions do until
+    /// their password is given.
+    private func isProtected(_ file: PDFDocument) -> Bool {
+        guard file.isEncrypted, file.isLocked == (newPassword != nil), newPassword.map(file.unlock(withPassword:)) ?? true else { return false }
+        guard let restrictions = newRestrictions else { return true }
+        let changes = [file.allowsDocumentChanges, file.allowsDocumentAssembly, file.allowsCommenting, file.allowsFormFieldEntry]
+        return file.permissionsStatus == .user && file.allowsPrinting == restrictions.printing && file.allowsCopying == restrictions.copying
+            && changes.allSatisfy { $0 == restrictions.changes } && file.unlock(withPassword: restrictions.password)
+            && file.permissionsStatus == .owner
     }
 
     func fileWrapper(snapshot: Data, configuration: WriteConfiguration) throws -> FileWrapper {
@@ -85,25 +104,41 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         undo?.setActionName(NSLocalizedString(name, comment: ""))
     }
 
-    /// Sets the password that opens the file once it's saved, or with nil takes the file's password off. PDFKit saves a
-    /// protected file with its own protection, whatever it's asked, so the pages of one move into a document without any,
-    /// with its bookmarks, title and other attributes.
-    func setPassword(_ new: String?) {
-        let (old, plain) = ((pdf: pdf, password: newPassword), pdf.isEncrypted ? PDFDocument() : pdf)
+    /// What a file allows without its permissions password. Changes are changing, assembling, commenting and filling in
+    /// forms together, as Folio's own editing needs them all.
+    struct Restrictions: Equatable {
+        var password: String
+        var printing = false, copying = false, changes = false
+
+        /// PDFKit's permission bits, which the Mac's PDFKit has as a plain enum, not a set. Screen readers may always read.
+        var permissions: UInt {
+            var allowed: [PDFAccessPermissions] = [.allowsContentAccessibility]
+            if printing { allowed += [.allowsLowQualityPrinting, .allowsHighQualityPrinting] }
+            if copying { allowed.append(.allowsContentCopying) }
+            if changes { allowed += [.allowsDocumentChanges, .allowsDocumentAssembly, .allowsCommenting, .allowsFormFieldEntry] }
+            return allowed.reduce(UInt(0)) { $0 | $1.rawValue }
+        }
+    }
+
+    /// Sets the password that opens the file once it's saved, and what it allows without its permissions password, taking
+    /// off each that's nil. PDFKit saves a protected file with its own protection, whatever it's asked, so the pages of one
+    /// move into a document without any, with its bookmarks, title and other attributes.
+    func setPassword(_ new: String?, restrictions: Restrictions?) {
+        let (old, plain) = ((pdf: pdf, password: newPassword, restrictions: newRestrictions), pdf.isEncrypted ? PDFDocument() : pdf)
         if plain !== old.pdf {
             // The bookmarks are copied before the pages move, while they still find them.
             plain.outlineRoot = pdf.outlineRoot.map(Self.copied)
             plain.documentAttributes = pdf.documentAttributes
         }
-        change(new == nil ? "Remove Password" : "Set Password", do: {
+        change(new == nil && restrictions == nil ? "Remove Password" : "Set Password", do: {
             if plain !== old.pdf {
                 self.pin()
                 Self.move(from: old.pdf, to: plain)
             }
-            (self.pdf, self.newPassword) = (plain, new)
+            (self.pdf, self.newPassword, self.newRestrictions) = (plain, new, restrictions)
         }, undo: {
             if plain !== old.pdf { Self.move(from: plain, to: old.pdf) }
-            (self.pdf, self.newPassword) = old
+            (self.pdf, self.newPassword, self.newRestrictions) = old
         })
     }
 
@@ -235,8 +270,8 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     var keptPassword: String? { newPassword ?? (pdf.isEncrypted ? password : nil) }
 
     /// Writes the pages into files of `count` pages each, in `folder`: "<name> 1.pdf", "<name> 2.pdf" and so on, each with
-    /// the kept password. It writes over no file: when one of the names is taken, it throws before writing any. When a file
-    /// can't be written, it takes back those it wrote, so trying again finds the names free.
+    /// the kept password and the restrictions set here. It writes over no file: when one of the names is taken, it throws
+    /// before writing any. When a file can't be written, it takes back those it wrote, so trying again finds the names free.
     func split(every count: Int, into folder: URL, name: String) throws -> [URL] {
         let all = pages, starts = Array(stride(from: 0, to: all.count, by: count))
         let urls = starts.indices.map { folder.appendingPathComponent("\(name) \($0 + 1).pdf") }
@@ -247,7 +282,7 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         do {
             for (start, url) in zip(starts, urls) {
                 let piece = FolioDocument(pdf: extract(Array(all[start..<min(start + count, all.count)])))
-                piece.newPassword = keptPassword
+                (piece.newPassword, piece.newRestrictions) = (keptPassword, newRestrictions)
                 try piece.snapshot(contentType: .pdf).write(to: url, options: .withoutOverwriting)
                 written.append(url)
             }
