@@ -36,9 +36,9 @@ if [ "$1" = ios-test ] || [ "$1" = screenshots ]; then
 	xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination "generic/platform=iOS Simulator" -derivedDataPath .build/ios \
 		build-for-testing
 	if [ "$1" = ios-test ]; then
-		# GitHub's workflow names one simulator in $DEVICE, to test each on a runner of its own.
-		if [ -n "$DEVICE" ]; then
-			ios_test "$DEVICE" "$2"
+		# GitHub's workflow names one simulator in $SIMULATOR, to test each on a runner of its own.
+		if [ -n "$SIMULATOR" ]; then
+			ios_test "$SIMULATOR" "$2"
 		else
 			ios_test "iPhone 17 Pro" "$2"
 			ios_test "iPad Pro 13-inch (M5)" "$2"

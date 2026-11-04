@@ -2,6 +2,8 @@
 # and the iPhone and iPad's on the simulators build.sh names, which the macOS 26 image has. The iOS tests' screenshots are
 # kept with the run. Run it by hand to test one iOS test alone, such as FolioUITests/ScreenshotTests/testScreenshots.
 name: Tests
+permissions:
+  contents: read
 on:
   push:
   workflow_dispatch:
@@ -30,7 +32,7 @@ jobs:
       - run: ./build.sh ios-test $ONLY
         env:
           ONLY: ${{ inputs.only }}
-          DEVICE: ${{ matrix.device }}
+          SIMULATOR: ${{ matrix.device }}
       # The log says which tests failed but not why; the summary does.
       - name: Export the screenshots, and say why any test failed
         if: always()
