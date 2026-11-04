@@ -690,7 +690,10 @@ struct Bookmarks: View {
                 Text(item.label ?? "")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
-                    .onTapGesture { if let destination = item.destination { viewer.canvas.go(to: destination) } }
+                    // A bookmark goes to its page by a destination or by a go-to action, which has none.
+                    .onTapGesture {
+                        if let destination = item.destination ?? (item.action as? PDFActionGoTo)?.destination { viewer.canvas.go(to: destination) }
+                    }
             }
         } else {
             ContentUnavailableView("No Bookmarks", systemImage: "bookmark")
