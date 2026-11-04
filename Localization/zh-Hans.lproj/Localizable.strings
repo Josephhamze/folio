@@ -37,6 +37,7 @@
 "Date" = "日期";
 "Delete" = "删除";
 "Delete Pages" = "删除页面";
+"Done" = "完成";
 "Draw" = "绘制";
 "Edit Comment" = "编辑批注";
 "Edit Initials…" = "编辑姓名缩写…";
@@ -52,11 +53,13 @@
 "Find Next" = "查找下一个";
 "Find Previous" = "查找上一个";
 "Find…" = "查找…";
+"Folio saves your changes as you make them" = "Folio 会随时存储你的更改";
 "Found no pages to insert: a PDF with a password or restrictions gives none" = "没有可插入的页面：带密码或限制的 PDF 不提供页面";
 "Found no text to recognize" = "未找到可识别的文本";
 "Highlight" = "高亮";
 "Home" = "主页";
 "Image" = "图像";
+"In Files, touch and hold any PDF, choose Get Info, and next to Always Open With choose Folio. Then choose Always Open PDF Document Files." = "在“文件”App 中，按住任一 PDF，选取“显示简介”，然后在“始终打开方式”中选取 Folio，并应用于所有 PDF 文稿。";
 "Initial" = "姓名缩写";
 "Initials" = "姓名缩写";
 "Insert Blank Page" = "插入空白页";
@@ -70,6 +73,8 @@
 "Make Folio your default PDF app?" = "要将 Folio 设为默认 PDF 应用吗？";
 "Makes %lld files, named “%@ 1”, “%@ 2” and so on." = "将生成 %lld 个文件，依次命名为“%@ 1”“%@ 2”等。";
 "Mark for Redaction" = "标记涂黑";
+"Markup" = "标记";
+"More Tools" = "更多工具";
 "Move" = "移动";
 "Move Pages" = "移动页面";
 "Next" = "下一个";
@@ -81,6 +86,7 @@
 "Note" = "附注";
 "of %lld" = "/ %lld";
 "Once saved, the file asks for this password to open it." = "存储后，打开此文件需要输入这个密码。";
+"Open Files" = "打开“文件”";
 "Open…" = "打开…";
 "Organize Pages" = "整理页面";
 "Oval" = "椭圆";
@@ -88,7 +94,6 @@
 "Page %lld" = "第 %lld 页";
 "Pages" = "页面";
 "Pages in each file: %lld" = "每个文件的页数：%lld";
-"Panes" = "边栏";
 "Password" = "密码";
 "Password…" = "密码…";
 "PDFs you open from Finder, Mail and other apps will open in Folio." = "你从访达、邮件和其他应用打开的 PDF 将在 Folio 中打开。";
@@ -142,6 +147,7 @@
 "Stop Organizing" = "完成整理";
 "Strike Through" = "删除线";
 "Subject" = "主题";
+"Tap where it goes, or drag to size it" = "轻点要放置的位置，或拖移以调整大小";
 "Text Box" = "文本框";
 "The original text stays underneath in the file." = "原来的文本仍保留在文件中，位于下方。";
 "The password comes off once the file is saved" = "文件存储后将移除密码";

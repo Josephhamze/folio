@@ -51,9 +51,13 @@ extension FocusedValues {
 }
 
 /// The end of the responder chain, where iPad's own Edit › Find lands, from the menu or its keys, with or without a first
-/// responder. It takes Find, Find Next and Find Previous before Folio's commands can.
+/// responder. It takes Find, Find Next and Find Previous before Folio's commands can. Find shows the find field, which takes
+/// the keys as it shows, or at once if it shows already.
 final class AppDelegate: UIResponder, UIApplicationDelegate {
-    override func find(_ sender: Any?) { Front.shared.document?.searchFocus.wrappedValue = true }
+    override func find(_ sender: Any?) {
+        Front.shared.document?.viewer.finding = true
+        Front.shared.document?.searchFocus.wrappedValue = true
+    }
     override func findNext(_ sender: Any?) { Front.shared.document?.viewer.step(1) }
     override func findPrevious(_ sender: Any?) { Front.shared.document?.viewer.step(-1) }
 }

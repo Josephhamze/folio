@@ -94,6 +94,24 @@ final class ViewerTests: XCTestCase {
         XCTAssertEqual(squares().count, 0)
     }
 
+    /// Sign, Initial and Stamp ask for theirs while none is saved, and pick their tool once it is.
+    func testPickAsksForTheSignatureOnlyWhileNoneIsSaved() {
+        let saved = Signature[.sign]
+        defer { Signature[.sign] = saved }
+        Signature[.sign] = nil
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["Hi"]])))
+        viewer.pick(.sign)
+        XCTAssertEqual(viewer.sheet, .signature(.sign))
+        XCTAssertEqual(viewer.tool, .select)
+        viewer.sheet = nil
+        Signature[.sign] = .typed("Jo")
+        viewer.pick(.sign)
+        XCTAssertNil(viewer.sheet)
+        XCTAssertEqual(viewer.tool, .sign)
+        viewer.pick(.highlight)
+        XCTAssertEqual(viewer.tool, .highlight)
+    }
+
     func testTapPlacesSignatureAtTheUsualSize() {
         let saved = Signature[.sign]
         defer { Signature[.sign] = saved }

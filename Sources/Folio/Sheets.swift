@@ -98,7 +98,7 @@ struct SignatureSheet: View {
                     case .type: .typed(name)
                     case .image: picture.map(Signature.image)
                     }
-                    viewer.tool = tool
+                    viewer.pick(tool)
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)

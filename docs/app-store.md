@@ -47,7 +47,7 @@ Folio is a PDF editor for iPhone and iPad. No account, no subscription, no ads.
 MARK UP
 • Highlight, underline and strike through text with a finger or Apple Pencil.
 • Add notes, text boxes, rectangles, ovals, lines, arrows and freehand ink, in any colour.
-• Tap a mark to select it, then drag it or delete it. A signature or note you place stays selected, ready to drag into place. Every change can be undone.
+• Tap Markup for the tools: the ones you use most in reach, the rest under More Tools. Tap a mark to select it, then drag it or delete it. A signature or note you place stays selected, ready to drag into place. Every change can be undone, and Done puts the tools away.
 
 TEXT THAT MATCHES
 • Tap with the Text Box tool and type. The text takes the font, size and colour of the nearest text on the page, so it looks typed into the document.
@@ -55,7 +55,7 @@ TEXT THAT MATCHES
 • The Date tool types today's date beside the line you tap, in that line's font.
 
 SIGN AND STAMP
-• Draw or type your signature and initials once, or take them from a photo, then place them with a tap.
+• Tap Sign, at the foot of every document, then tap where your signature goes. Draw or type your signature and initials once, or take them from a photo.
 • Drawn and typed ones are saved as vector outlines, so they stay sharp at any zoom and in other PDF apps.
 • Photograph your company's stamp on white paper, and the Stamp tool places it like a rubber stamp, in its own colour.
 • Add to Every Page puts your initials on each page of a contract, or the stamp on each page of an invoice, at once.
@@ -78,7 +78,8 @@ FILL IN FORMS
 READ
 • Thumbnails, bookmarks and every comment, in a column beside the page on iPad.
 • Find counts the matches and steps through them.
-• Each file reopens at the page you left it on.
+• Each file reopens at the page you left it on, and Folio saves your changes as you make them.
+• Tools › Make Default PDF App shows how to have the PDFs you tap in Files open in Folio.
 • Folio asks for a protected file's password, and respects its author's editing restrictions.
 
 PRIVATE

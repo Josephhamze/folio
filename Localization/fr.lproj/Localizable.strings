@@ -37,6 +37,7 @@
 "Date" = "Date";
 "Delete" = "Supprimer";
 "Delete Pages" = "Supprimer les pages";
+"Done" = "OK";
 "Draw" = "Dessiner";
 "Edit Comment" = "Modifier le commentaire";
 "Edit Initials…" = "Modifier les initiales…";
@@ -52,11 +53,13 @@
 "Find Next" = "Rechercher le suivant";
 "Find Previous" = "Rechercher le précédent";
 "Find…" = "Rechercher…";
+"Folio saves your changes as you make them" = "Folio enregistre vos modifications au fur et à mesure";
 "Found no pages to insert: a PDF with a password or restrictions gives none" = "Aucune page à insérer : un PDF protégé par un mot de passe ou des restrictions n’en donne aucune";
 "Found no text to recognize" = "Aucun texte à reconnaître";
 "Highlight" = "Surligner";
 "Home" = "Accueil";
 "Image" = "Image";
+"In Files, touch and hold any PDF, choose Get Info, and next to Always Open With choose Folio. Then choose Always Open PDF Document Files." = "Dans Fichiers, maintenez le doigt sur un PDF, choisissez Lire les informations, puis Folio dans Toujours ouvrir avec. Choisissez ensuite de l’appliquer à tous les documents PDF.";
 "Initial" = "Parapher";
 "Initials" = "Initiales";
 "Insert Blank Page" = "Insérer une page vierge";
@@ -70,6 +73,8 @@
 "Make Folio your default PDF app?" = "Faire de Folio votre app PDF par défaut ?";
 "Makes %lld files, named “%@ 1”, “%@ 2” and so on." = "Crée %lld fichiers, nommés « %@ 1 », « %@ 2 », etc.";
 "Mark for Redaction" = "Marquer pour caviardage";
+"Markup" = "Annoter";
+"More Tools" = "Autres outils";
 "Move" = "Déplacer";
 "Move Pages" = "Déplacer les pages";
 "Next" = "Suivant";
@@ -81,6 +86,7 @@
 "Note" = "Note";
 "of %lld" = "sur %lld";
 "Once saved, the file asks for this password to open it." = "Une fois enregistré, le fichier demande ce mot de passe pour s’ouvrir.";
+"Open Files" = "Ouvrir Fichiers";
 "Open…" = "Ouvrir…";
 "Organize Pages" = "Organiser les pages";
 "Oval" = "Ovale";
@@ -88,7 +94,6 @@
 "Page %lld" = "Page %lld";
 "Pages" = "Pages";
 "Pages in each file: %lld" = "Pages par fichier : %lld";
-"Panes" = "Panneaux";
 "Password" = "Mot de passe";
 "Password…" = "Mot de passe…";
 "PDFs you open from Finder, Mail and other apps will open in Folio." = "Les PDF que vous ouvrez depuis le Finder, Mail et d’autres apps s’ouvriront dans Folio.";
@@ -142,6 +147,7 @@
 "Stop Organizing" = "Terminer l’organisation";
 "Strike Through" = "Barrer";
 "Subject" = "Sujet";
+"Tap where it goes, or drag to size it" = "Touchez l’endroit voulu, ou faites glisser pour choisir la taille";
 "Text Box" = "Zone de texte";
 "The original text stays underneath in the file." = "Le texte d’origine reste dessous, dans le fichier.";
 "The password comes off once the file is saved" = "Le mot de passe sera retiré à l’enregistrement du fichier";

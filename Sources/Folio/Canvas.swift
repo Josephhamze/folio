@@ -183,7 +183,12 @@ final class Canvas: PDFView {
         switch viewer.tool {
         case .select:
             let hit = page.annotation(at: point)
-            if let hit, hit.isMark {
+            #if os(iOS)
+            let picks = viewer.markingUp   // reading, marks stay where they are: Markup moves them
+            #else
+            let picks = true
+            #endif
+            if let hit, hit.isMark, picks {
                 selected = hit
                 origin = hit.bounds
                 return true

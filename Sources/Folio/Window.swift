@@ -31,6 +31,11 @@ final class Viewer {
     var choosingPages = false
     #if os(iOS)
     var scanning = false
+    /// Whether Markup's tools show in place of the reading bar: any tool but Select starts it, and Done ends it. Marks can be
+    /// picked only then.
+    var markingUp = false
+    /// Whether the find field shows in place of the reading bar.
+    var finding = false
     #endif
     /// The pages Extract Pages… copied out, while the window saves them.
     var extracted: FolioDocument?
@@ -47,8 +52,16 @@ final class Viewer {
             }
         }
     }
-    /// Picking a tool puts down the selected mark: at once, so a tool that places a mark can then select it.
-    var tool = Tool.select { didSet { canvas.selected = nil } }
+    /// Picking a tool puts down the selected mark: at once, so a tool that places a mark can then select it. On iOS any tool
+    /// but Select starts Markup.
+    var tool = Tool.select {
+        didSet {
+            canvas.selected = nil
+            #if os(iOS)
+            if tool != .select { markingUp = true }
+            #endif
+        }
+    }
     /// The mark the select tool picked, for the views: the page view's `selected`.
     var mark: PDFAnnotation?
     var color = NSColor.systemYellow
@@ -64,6 +77,20 @@ final class Viewer {
 
     init(doc: FolioDocument) {
         self.doc = doc
+    }
+
+    /// Picks a tool, first asking for the signature, initials or stamp it places while none is saved. On iOS it says how to
+    /// place one.
+    func pick(_ tool: Tool) {
+        let places = [Tool.sign, .initial, .stamp].contains(tool)
+        if places, Signature[tool] == nil {
+            sheet = .signature(tool)
+            return
+        }
+        self.tool = tool
+        #if os(iOS)
+        if places { message = String(localized: "Tap where it goes, or drag to size it") }
+        #endif
     }
 
     func find() {
@@ -330,6 +357,9 @@ struct DocumentView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     #else
     @Environment(\.scenePhase) private var scenePhase
+    /// Whether Done has said yet that Folio saves as it goes.
+    @AppStorage("toldSaving") private var toldSaving = false
+    @State private var guidingDefault = false
     #endif
 
     init(doc: FolioDocument, url: URL?) {
@@ -457,25 +487,90 @@ struct DocumentView: View {
         .onDisappear { DispatchQueue.main.async { if NSDocumentController.shared.documents.isEmpty { openWindow(id: "home") } } }
     }
     #else
+    /// Reading, the pages show with a bar at their foot to see them all, find, mark up and sign, and the navigation bar shares
+    /// the document and has its tools. Marking up or organizing, their tools take the bar's place, and the navigation bar has
+    /// Undo, Redo and Done, which ends them.
     private var layout: some View {
-        PageView(viewer: viewer)
+        let editing = viewer.markingUp || viewer.organizing
+        return PageView(viewer: viewer)
             .overlay { if viewer.organizing { Organizer(viewer: viewer) } }
             .overlay(alignment: .top) { Bars(viewer: viewer) }
-            .safeAreaInset(edge: .bottom, spacing: 0) { ToolBar(viewer: viewer) }
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    pageBox
-                    Button("Panes", systemImage: "sidebar.right") { viewer.showsPanes.toggle() }
-                    organizeButton
-                    // iPhone has no menu bar for the Tools menu.
-                    Menu("Tools", systemImage: "ellipsis.circle") { ToolsMenu(viewer: viewer) }
-                    ShareButton(viewer: viewer, name: name)
+            // What acts on the selected mark, over the foot of the page.
+            .overlay(alignment: .bottom) {
+                if viewer.mark != nil {
+                    HStack {
+                        Button("Add to Every Page", systemImage: "rectangle.portrait.on.rectangle.portrait") { viewer.addToEveryPage() }
+                            .disabled(!viewer.canAddToEveryPage)
+                        Button("Delete", systemImage: "trash", role: .destructive) { viewer.canvas.deleteMark() }
+                    }
+                    .buttonStyle(.glass)
+                    .disabled(!viewer.isIdle)
+                    .padding(.bottom, 8)
                 }
             }
-            .searchable(text: $viewer.query, prompt: "Find")
-            .searchFocused($searching)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Group {
+                    if editing { ToolBar(viewer: viewer) } else if viewer.finding { findBar } else { readingBar }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    // The undo manager says nothing when it changes; each change bumps the revision.
+                    let _ = viewer.doc.revision
+                    // A tap here leaves the words being typed in their field, so they become a change of their own first.
+                    Button("Undo", systemImage: "arrow.uturn.backward") {
+                        viewer.settle()
+                        undoManager?.undo()
+                    }
+                    .disabled(!viewer.isIdle || undoManager?.canUndo != true)
+                    Button("Redo", systemImage: "arrow.uturn.forward") {
+                        viewer.settle()
+                        undoManager?.redo()
+                    }
+                    .disabled(!viewer.isIdle || undoManager?.canRedo != true)
+                }
+                .hidden(!editing)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        if viewer.organizing {
+                            viewer.organize()
+                        } else {
+                            viewer.settle()
+                            viewer.tool = .select
+                            viewer.markingUp = false
+                        }
+                        // There's no Save: the first Done says so.
+                        if !toldSaving {
+                            toldSaving = true
+                            viewer.message = String(localized: "Folio saves your changes as you make them")
+                        }
+                    }
+                }
+                .hidden(!editing)
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    ShareButton(viewer: viewer, name: name)
+                    // iPhone has no menu bar for the Tools menu.
+                    Menu("Tools", systemImage: "ellipsis.circle") {
+                        Button("Organize Pages") { viewer.organize() }.disabled(viewer.doc.pdf.isLocked)
+                        Divider()
+                        ToolsMenu(viewer: viewer)
+                        Divider()
+                        Button("Make Default PDF App") { guidingDefault = true }
+                    }
+                }
+                .hidden(editing)
+            }
+            // iOS has no switch an app can turn: Files sets the app a PDF opens in.
+            .alert("Make Default PDF App", isPresented: $guidingDefault) {
+                Button("Open Files") { UIApplication.shared.open(URL(string: "shareddocuments://")!) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("In Files, touch and hold any PDF, choose Get Info, and next to Always Open With choose Folio. Then choose Always Open PDF Document Files.")
+            }
             // The inspector only ever closes the panes: once in a while, as a document opened, it set them shown without
-            // showing them, and the next tap on Panes hid them.
+            // showing them, and the next tap on Pages hid them.
             .inspector(isPresented: Binding { viewer.showsPanes } set: { if !$0 { viewer.showsPanes = false } }) {
                 Sidebar(viewer: viewer).presentationDetents([.medium, .large])
             }
@@ -490,6 +585,58 @@ struct DocumentView: View {
             .onReceive(NotificationCenter.default.publisher(for: UIWindow.didBecomeKeyNotification)) {
                 if $0.object as? UIWindow === viewer.canvas.window { Front.shared.document = (viewer, $searching) }
             }
+    }
+
+    /// The pages and Find, the page in view, Markup, and Sign, the one most looked for.
+    private var readingBar: some View {
+        HStack {
+            HStack(spacing: 0) {
+                Button("Pages", systemImage: "rectangle.grid.1x2") { viewer.showsPanes.toggle() }
+                Button("Find", systemImage: "magnifyingglass") { viewer.finding = true }
+            }
+            .buttonStyle(Tile())
+            .glassEffect()
+            .disabled(viewer.doc.pdf.isLocked)
+            Spacer(minLength: 4)
+            if !viewer.doc.pdf.isLocked {
+                pageBox.fixedSize().padding(.horizontal, 12).frame(height: 44).glassEffect()
+            }
+            Spacer(minLength: 4)
+            Group {
+                Button("Markup", systemImage: "pencil.tip.crop.circle") { viewer.markingUp = true }
+                    .buttonStyle(Tile())
+                    .glassEffect()
+                Button("Sign", systemImage: "signature") { viewer.pick(.sign) }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+            }
+            .disabled(!viewer.isIdle)
+        }
+    }
+
+    /// Find's field, over what it found, which the bar over the pages counts and steps through. Cancel puts it away.
+    private var findBar: some View {
+        HStack {
+            HStack {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Find", text: $viewer.query)
+                    .focused($searching)
+                    .submitLabel(.search)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit { viewer.step(1) }
+                    .onAppear { searching = true }
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .glassEffect()
+            Button("Cancel", systemImage: "xmark") {
+                viewer.query = ""
+                viewer.finding = false
+            }
+            .buttonStyle(Tile())
+            .glassEffect()
+        }
     }
     #endif
 }
@@ -529,50 +676,25 @@ struct SharedPDF: Transferable {
 #endif
 
 /// The tools, the colour, and Add to Every Page and Delete for the selected mark, in a bar across the top of the pages, or
-/// what acts on pages while organizing. On iOS it's at the bottom, the tools scroll where they don't fit, and it has Undo
-/// and Redo.
+/// what acts on pages while organizing. On iOS it floats at the foot of the pages, in Markup or while organizing: the tools
+/// used most in reach and the rest in a menu, as Apple's Markup has them, and the selected mark's actions float over the page.
 struct ToolBar: View {
     @Bindable var viewer: Viewer
-    #if os(iOS)
-    @Environment(\.undoManager) private var undoManager
-    #endif
 
     var body: some View {
+        #if os(macOS)
         HStack {
             if viewer.organizing {
                 PageActions(viewer: viewer)
                 Spacer()
             } else {
-                #if os(macOS)
-                tools
-                #else
-                ScrollView(.horizontal) { tools }.scrollIndicators(.hidden)
-                #endif
-                ColorPicker("Colour", selection: Binding(get: { viewer.color.cgColor }, set: {
-                    #if os(macOS)
-                    viewer.color = NSColor(cgColor: $0) ?? .black
-                    #else
-                    viewer.color = NSColor(cgColor: $0)
-                    #endif
-                }))
-                    .labelsHidden()
-            }
-            #if os(iOS)
-            // The undo manager says nothing when it changes; each change bumps the revision.
-            let _ = viewer.doc.revision
-            // A tap here leaves the words being typed in their field, so they become a change of their own first.
-            Button("Undo", systemImage: "arrow.uturn.backward") {
-                viewer.settle()
-                undoManager?.undo()
-            }
-            .disabled(undoManager?.canUndo != true)
-            Button("Redo", systemImage: "arrow.uturn.forward") {
-                viewer.settle()
-                undoManager?.redo()
-            }
-            .disabled(undoManager?.canRedo != true)
-            #endif
-            if !viewer.organizing {
+                Picker("Tool", selection: $viewer.tool) {
+                    ForEach(Tool.allCases) { Label($0.name, systemImage: $0.symbol).help("\($0.name) (\($0.key.uppercased()))") }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                colour
                 Button("Add to Every Page", systemImage: "rectangle.portrait.on.rectangle.portrait") { viewer.addToEveryPage() }
                     .help("Add to Every Page")
                     .disabled(!viewer.canAddToEveryPage)
@@ -586,18 +708,66 @@ struct ToolBar: View {
         .padding(6)
         .frame(maxWidth: .infinity)
         .background(.bar)
+        #else
+        HStack(spacing: 0) {
+            if viewer.organizing {
+                PageActions(viewer: viewer)
+            } else {
+                let inReach: [Tool] = [.select, .highlight, .pen, .text, .sign]
+                ForEach(inReach) { tool in
+                    Button(tool.name, systemImage: tool.symbol) { viewer.pick(tool) }.buttonStyle(Tile(picked: viewer.tool == tool))
+                }
+                let more = Tool.allCases.filter { !inReach.contains($0) }, picked = more.contains(viewer.tool)
+                Menu {
+                    ForEach(more) { tool in Button(tool.name, systemImage: tool.symbol) { viewer.pick(tool) } }
+                } label: {
+                    Label("More Tools", systemImage: picked ? viewer.tool.symbol : "ellipsis")
+                }
+                .menuStyle(.button)
+                .buttonStyle(Tile(picked: picked))
+                colour.frame(width: 44, height: 44)
+            }
+        }
+        .buttonStyle(Tile())
+        .labelStyle(.iconOnly)
+        .disabled(!viewer.isIdle)
+        .padding(4)
+        .glassEffect()
+        #endif
     }
 
-    private var tools: some View {
-        Picker("Tool", selection: $viewer.tool) {
-            ForEach(Tool.allCases) { Label($0.name, systemImage: $0.symbol).help("\($0.name) (\($0.key.uppercased()))") }
-        }
-        .pickerStyle(.segmented)
-        .labelStyle(.iconOnly)
+    private var colour: some View {
+        ColorPicker("Colour", selection: Binding(get: { viewer.color.cgColor }, set: {
+            #if os(macOS)
+            viewer.color = NSColor(cgColor: $0) ?? .black
+            #else
+            viewer.color = NSColor(cgColor: $0)
+            #endif
+        }))
         .labelsHidden()
-        .fixedSize()
     }
 }
+
+#if os(iOS)
+/// A tool or a page action at the foot of the pages: its icon on a 44-point square, white on the accent while it's the tool
+/// in use, red when it deletes, and faint while it's off.
+struct Tile: ButtonStyle {
+    var picked = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .labelStyle(.iconOnly)
+            .imageScale(.large)
+            .frame(width: 44, height: 44)
+            .foregroundStyle(picked ? Color.white : configuration.role == .destructive ? Color.red : Color.primary)
+            .background(picked ? Color.accentColor : Color.clear, in: .circle)
+            .contentShape(.circle)
+            .opacity(isEnabled ? configuration.isPressed ? 0.6 : 1 : 0.3)
+            .accessibilityAddTraits(picked ? .isSelected : [])
+    }
+}
+#endif
 
 #if os(macOS)
 struct PageView: NSViewRepresentable {

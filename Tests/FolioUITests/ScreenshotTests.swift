@@ -4,39 +4,41 @@ import XCTest
 final class ScreenshotTests: XCTestCase {
     private let app = XCUIApplication()
 
-    /// The App Store's screenshots, which `./build.sh screenshots` takes: a sample highlighted, noted and signed, the
-    /// signature pad, and the panes.
+    /// The App Store's screenshots, which `./build.sh screenshots` takes: a sample marked up and signed, the signature pad,
+    /// the panes, the password sheet and the organizer.
     func testScreenshots() {
         openSample("Garden Brief")
         // A point on the first page, in its 612 by 792 points from the top left.
         let page = app.textViews.firstMatch.children(matching: .other).firstMatch
         let at = { (x: CGFloat, y: CGFloat) in page.coordinate(withNormalizedOffset: CGVector(dx: x / 612, dy: y / 792)) }
 
-        choose("highlighter")
+        choose("Highlight")
         drag(at(76, 357), at(404, 357))   // the first goal
-        choose("textformat")
+        choose("Text Box")
         at(360, 379).tap()   // beside the second
         app.typeText("Love this!")
         at(580, 300).tap()   // in the margin
-        choose("signature")
-        at(450, 675).tap()   // under the budget
+        choose("Sign")
+        // The pad, unless an earlier test saved a signature.
         if app.buttons["Type"].waitForExistence(timeout: 2) {
             app.buttons["Type"].tap()
             app.textFields["Your name"].tap()
             app.typeText("Maria Santos")
             shot("2 Sign")
             app.buttons["Save"].tap()
-            at(450, 675).tap()
         }
+        at(450, 675).tap()   // under the budget
         at(580, 300).tap()   // in the margin, to put down the signature, which is selected once placed
+        waitUntilGone("Tap where")
         shot("1 Mark up")
 
+        done()
+        waitUntilGone("Folio saves")
         showPanes()
         shot("3 Pages")
 
         closePanes()
-        barButton("Tools")
-        app.buttons["Password…"].tap()
+        tools("Password…")
         let restrict = app.switches["Restrict printing, copying and changes"]
         XCTAssertTrue(restrict.waitForExistence(timeout: 5))
         // A switch turns where its knob is, not where its words are.
@@ -45,7 +47,7 @@ final class ScreenshotTests: XCTestCase {
         app.buttons["Cancel"].tap()
 
         // Last, since organizing leaves the page out of reach.
-        barButton("Organize Pages")
+        tools("Organize Pages")
         let second = app.buttons["Page 2"]
         XCTAssertTrue(second.waitForExistence(timeout: 5))
         second.tap()
@@ -55,53 +57,52 @@ final class ScreenshotTests: XCTestCase {
     /// Marks up the sample by touch, as a person would, with a screenshot after each step.
     func testMarkUpByTouch() {
         openSample()
-        let undo = app.buttons["Undo"], line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
+        choose("Highlight")
+        let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
         let blank = point(line.maxX - 60, line.minY - 30)
-
-        choose("highlighter")
         drag(point(line.minX + 2, line.minY + 5), point(line.maxX - 2, line.minY + 5))
         XCTAssertTrue(undo.isEnabled)
         // From where the finger went down: the line's first letters are marked.
         XCTAssertGreaterThan(yellow(in: CGRect(x: line.minX, y: line.minY + 1, width: 8, height: 7)), 0.3)
         shot("highlight")
 
-        choose("rectangle")
+        choose("Rectangle")
         drag(point(line.maxX - 120, line.minY - 45), point(line.maxX - 10, line.minY - 15))
         shot("rectangle")
 
-        choose("textformat")
+        choose("Text Box")
         point(line.minX + 10, line.maxY + 140).tap()
         app.typeText("Typed on a phone")
         shot("typing")
         blank.tap()
         shot("text box")
 
-        choose("signature")
-        point(line.midX, line.maxY + 60).tap()
+        choose("Sign")
         if app.buttons["Type"].waitForExistence(timeout: 2) {
             app.buttons["Type"].tap()
             app.textFields["Your name"].tap()
             app.typeText("Joseph Hamze")
             shot("signature pad")
             app.buttons["Save"].tap()
-            point(line.midX, line.maxY + 60).tap()
         }
+        point(line.midX, line.maxY + 60).tap()
         shot("signature")
 
+        // What acts on a mark shows while one is selected.
         let delete = app.buttons["Delete"]
-        XCTAssertTrue(delete.isEnabled)   // the signature, selected once placed
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))   // the signature, selected once placed
         undo.tap()
         shot("undone")
-        XCTAssertFalse(delete.isEnabled)
-        choose("cursorarrow")
+        XCTAssertTrue(delete.waitForNonExistence(timeout: 5))
+        choose("Select")
         point(line.maxX - 65, line.minY - 30).tap()
-        expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: delete)
-        waitForExpectations(timeout: 5)
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
         shot("selected")
         delete.tap()
         shot("deleted")
-        XCTAssertFalse(delete.isEnabled)
+        XCTAssertTrue(delete.waitForNonExistence(timeout: 5))
 
+        done()
         showPanes()
         for pane in ["Thumbnails", "Bookmarks", "Comments"] {
             app.buttons[pane].firstMatch.tap()
@@ -109,14 +110,13 @@ final class ScreenshotTests: XCTestCase {
         }
         closePanes()
 
-        app.searchFields["Find"].tap()
-        app.typeText("Folio")
+        find("Folio")
         XCTAssertTrue(app.staticTexts["1 of 42"].waitForExistence(timeout: 5))
         shot("find")
         app.buttons["Next"].tap()
         XCTAssertTrue(app.staticTexts["2 of 42"].exists)
         shot("find next")
-        app.buttons[pad ? "Clear text" : "close"].tap()
+        app.buttons["Cancel"].tap()
 
         barButton("Share")
         XCTAssertTrue(app.descendants(matching: .any)["Copy"].waitForExistence(timeout: 10))
@@ -124,12 +124,15 @@ final class ScreenshotTests: XCTestCase {
         point(200, 700).tap()   // below the sheet
 
         // Words being typed are kept when the app goes to the background.
-        choose("textformat")
+        choose("Text Box")
         point(line.minX + 10, line.maxY + 330).tap()
         app.typeText("Kept after Home")
         XCUIDevice.shared.press(.home)
         XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
         app.activate()
+        // Going ended the typing, so no keyboard waits for more, and Done has nothing left to put in.
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        done()
         showPanes()
         app.buttons["Comments"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "value == 'Kept after Home'")).firstMatch.waitForExistence(timeout: 5))
@@ -137,7 +140,7 @@ final class ScreenshotTests: XCTestCase {
         closePanes()
 
         // Two fingers zoom, and draw nothing, with the pen.
-        choose("pencil.tip")
+        choose("Pen")
         app.textViews.firstMatch.pinch(withScale: 2, velocity: 1)
         shot("pen pinch")
     }
@@ -146,18 +149,17 @@ final class ScreenshotTests: XCTestCase {
     /// press still selects text.
     func testHeldDragSizesTheSignature() {
         openSample()
-        let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 3.'")).firstMatch.frame
-        choose("signature")
-        point(line.midX, line.minY - 30).tap()   // none saved yet: the pad
-        XCTAssertTrue(app.buttons["Type"].waitForExistence(timeout: 2))
+        choose("Sign")   // none saved yet: the pad, at once
+        XCTAssertTrue(app.buttons["Type"].waitForExistence(timeout: 5))
         app.buttons["Type"].tap()
         app.textFields["Your name"].tap()
         app.typeText("Joseph Hamze")
         app.buttons["Save"].tap()
+        let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 3.'")).firstMatch.frame
         point(line.minX + 20, line.minY + 10).press(forDuration: 1, thenDragTo: point(line.minX + 250, line.maxY + 60), withVelocity: .slow,
                                                      thenHoldForDuration: 0.1)
         shot("held drag")
-        XCTAssertTrue(app.buttons["arrow.uturn.backward"].isEnabled)
+        XCTAssertTrue(undo.isEnabled)
         XCTAssertFalse(app.menuItems["Copy"].exists)
         point(line.minX + 20, line.minY + 10).press(forDuration: 1)
         XCTAssertTrue(app.menuItems["Copy"].waitForExistence(timeout: 3))
@@ -168,14 +170,16 @@ final class ScreenshotTests: XCTestCase {
     func testMenuBarActsOnTheDocument() throws {
         try XCTSkipUnless(pad, "The menu bar is iPad's.")
         openSample()
-        XCTAssertTrue(app.buttons["rectangle.fill"].isHittable)   // the last tool: the bar fits
         let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
         app.typeKey("f", modifierFlags: .command)
-        XCTAssertEqual(app.searchFields["Find"].value(forKey: "hasKeyboardFocus") as? Bool, true)
+        let field = app.textFields["Find"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        expectation(for: NSPredicate(format: "hasKeyboardFocus == true"), evaluatedWith: field)
+        waitForExpectations(timeout: 5)
         app.typeText("Folio")
         app.typeKey("g", modifierFlags: .command)
         XCTAssertTrue(app.staticTexts["2 of 42"].waitForExistence(timeout: 5))
-        // Off the search field nothing is first responder, and the keys still find.
+        // Off the find field nothing is first responder, and the keys still find.
         point(line.midX, line.minY - 30).tap()
         app.typeKey("g", modifierFlags: [.command, .shift])
         XCTAssertTrue(app.staticTexts["1 of 42"].waitForExistence(timeout: 5))
@@ -188,40 +192,39 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(options.waitForExistence(timeout: 5))
         shot("print")
         options.buttons["Close"].tap()
-        choose("rectangle")
+        app.buttons["Cancel"].tap()   // Find, for the reading bar's Markup
+        choose("Rectangle")
         drag(point(line.minX + 20, line.minY - 40), point(line.minX + 120, line.minY - 10))
-        XCTAssertTrue(app.buttons["Undo"].isEnabled)
+        XCTAssertTrue(undo.isEnabled)
         app.typeKey("z", modifierFlags: .command)
-        XCTAssertTrue(app.buttons["Redo"].waitForExistence(timeout: 2) && app.buttons["Redo"].isEnabled)
+        XCTAssertTrue(redo.waitForExistence(timeout: 2) && redo.isEnabled)
         shot("undone by key")
     }
 
-    /// The date tool's date, put on every page from the tool bar, the Tools menu's stamp pad, which takes a picture of the
-    /// company's stamp, and its Properties… and Password… sheets, the latter restricting printing, copying and changes.
+    /// The date tool's date, put on every page from what acts on the selected mark, the Tools menu's stamp pad, which takes a
+    /// picture of the company's stamp, and its Properties… and Password… sheets, the latter restricting printing, copying and
+    /// changes.
     func testDateOnEveryPageAndTheStampPad() {
         openSample()
+        choose("Date")
         let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
-        choose("calendar")
         point(line.maxX - 80, line.minY - 30).tap()
         let every = app.buttons["Add to Every Page"].firstMatch
+        XCTAssertTrue(every.waitForExistence(timeout: 5))
         XCTAssertTrue(every.isEnabled)
         every.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Added to'")).firstMatch.waitForExistence(timeout: 3))
         shot("date on every page")
-        barButton("Tools")
-        let stamp = app.buttons["Edit Stamp…"]
-        XCTAssertTrue(stamp.waitForExistence(timeout: 5))
-        stamp.tap()
+        done()
+        tools("Edit Stamp…")
         XCTAssertTrue(app.buttons["Photos…"].waitForExistence(timeout: 5))
         shot("stamp pad")
         app.buttons["Cancel"].tap()
-        barButton("Tools")
-        app.buttons["Properties…"].tap()
+        tools("Properties…")
         XCTAssertTrue(app.textFields["Title"].waitForExistence(timeout: 5))
         shot("properties")
         app.buttons["Cancel"].tap()
-        barButton("Tools")
-        app.buttons["Password…"].tap()
+        tools("Password…")
         let restrict = app.switches["Restrict printing, copying and changes"]
         XCTAssertTrue(restrict.waitForExistence(timeout: 5))
         // A switch turns where its knob is, not where its words are.
@@ -234,7 +237,7 @@ final class ScreenshotTests: XCTestCase {
     /// Pages are named by their place, so with one of the sample's three gone, the last name goes.
     func testOrganizePages() {
         openSample()
-        barButton("Organize Pages")
+        tools("Organize Pages")
         let second = app.buttons["Page 2"], third = app.buttons["Page 3"]
         XCTAssertTrue(third.waitForExistence(timeout: 5))
         second.tap()
@@ -244,7 +247,7 @@ final class ScreenshotTests: XCTestCase {
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: third)
         waitForExpectations(timeout: 5)
         XCTAssertFalse(second.isSelected)
-        app.buttons["arrow.uturn.backward"].tap()
+        undo.tap()
         XCTAssertTrue(third.waitForExistence(timeout: 5))
         app.buttons["Split…"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Makes 3 files'")).firstMatch.waitForExistence(timeout: 5))
@@ -255,14 +258,13 @@ final class ScreenshotTests: XCTestCase {
     /// Undo while typing takes back the typing, not the change before it.
     func testUndoWhileTyping() {
         openSample()
+        choose("Rectangle")
         let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
-        choose("rectangle")
         drag(point(line.minX + 20, line.maxY + 200), point(line.minX + 120, line.maxY + 240))
-        choose("textformat")
+        choose("Text Box")
         point(line.minX + 10, line.maxY + 100).tap()
         app.typeText("Never mind")
-        let undo = app.buttons["arrow.uturn.backward"], redo = app.buttons["arrow.uturn.forward"]   // the bar's, not the keyboard's
-        undo.tap()
+        undo.tap()   // the navigation bar's, not the keyboard's
         XCTAssertTrue(redo.isEnabled)
         XCTAssertTrue(undo.isEnabled)   // the rectangle's still there to undo
         XCTAssertFalse(app.textFields.matching(NSPredicate(format: "value == 'Never mind'")).firstMatch.exists)
@@ -271,20 +273,20 @@ final class ScreenshotTests: XCTestCase {
     /// Words being typed are kept when the document closes, and the field stays in sight above the keyboard.
     func testTypingKeptWhenTheDocumentCloses() {
         openSample()
-        choose("textformat")
+        choose("Text Box")
         point(app.frame.midX, app.frame.maxY * 0.72).tap()
         app.typeText("Kept after closing")
         let field = app.textFields.matching(NSPredicate(format: "value == 'Kept after closing'")).firstMatch, back = app.navigationBars.buttons["BackButton"]
-        // In sight: under the navigation bar, and over the tool bar, which rides on the keyboard. Told by its frame:
+        // In sight: under the navigation bar, and over Markup's tools, which ride on the keyboard. Told by its frame:
         // isHittable has said no while the field showed whole, just over the bar.
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         XCTAssertGreaterThanOrEqual(field.frame.minY, back.frame.maxY)
-        XCTAssertLessThanOrEqual(field.frame.maxY, app.buttons["cursorarrow"].frame.minY)
+        XCTAssertLessThanOrEqual(field.frame.maxY, app.buttons["Select"].frame.minY)
         back.tap()
         let sample = app.cells["Quarterly Brief, pdf"]
         XCTAssert(sample.waitForExistence(timeout: 10))
         sample.tap()
-        XCTAssert(app.buttons["highlighter"].waitForExistence(timeout: 10))
+        XCTAssert(app.buttons["Markup"].waitForExistence(timeout: 10))
         showPanes()
         app.buttons["Comments"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "value == 'Kept after closing'")).firstMatch.waitForExistence(timeout: 5))
@@ -294,8 +296,8 @@ final class ScreenshotTests: XCTestCase {
     func testCommentKeptWhenTheDocumentCloses() throws {
         try XCTSkipUnless(pad, "On iPhone the comments cover Back.")
         openSample()
+        choose("Note")
         let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
-        choose("note.text")
         point(line.minX + 40, line.maxY + 250).tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         app.typeText("Noted before closing")
@@ -303,7 +305,7 @@ final class ScreenshotTests: XCTestCase {
         let sample = app.cells["Quarterly Brief, pdf"]
         XCTAssert(sample.waitForExistence(timeout: 10))
         sample.tap()
-        XCTAssert(app.buttons["highlighter"].waitForExistence(timeout: 10))
+        XCTAssert(app.buttons["Markup"].waitForExistence(timeout: 10))
         showPanes()
         app.buttons["Comments"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "value == 'Noted before closing'")).firstMatch.waitForExistence(timeout: 5))
@@ -311,10 +313,10 @@ final class ScreenshotTests: XCTestCase {
 
     /// A note's comment being typed is kept when the app goes, as if the field had been left.
     func testCommentKeptWhenTheAppGoes() throws {
-        try XCTSkipUnless(pad, "On iPhone the comments cover the tool bar's Undo.")
+        try XCTSkipUnless(pad, "On iPhone the comments cover the tools.")
         openSample()
+        choose("Note")
         let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Section 1.'")).firstMatch.frame
-        choose("note.text")
         point(line.minX + 10, line.maxY + 250).tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         app.typeText("Noted")
@@ -322,7 +324,6 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.wait(for: .runningBackground, timeout: 10))
         app.activate()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-        let undo = app.buttons["arrow.uturn.backward"], redo = app.buttons["arrow.uturn.forward"]
         undo.tap()
         XCTAssertTrue(redo.isEnabled)
         XCTAssertTrue(undo.isEnabled)   // the comment was taken back, and the note's still there
@@ -330,18 +331,60 @@ final class ScreenshotTests: XCTestCase {
 
     private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
+    /// The navigation bar's Undo and Redo, in Markup and while organizing: the keyboard has its own.
+    private var undo: XCUIElement { app.navigationBars.buttons["Undo"] }
+    private var redo: XCUIElement { app.navigationBars.buttons["Redo"] }
+
     /// Shows the panes, unless they show already. A tap as the app comes back on screen can be lost, so where they don't
     /// show, it's made again.
     private func showPanes() {
         let shown = app.buttons["Thumbnails"]
-        if !shown.exists { barButton("Panes") }
-        if !shown.waitForExistence(timeout: 3) { barButton("Panes") }
+        if !shown.exists { app.buttons["Pages"].tap() }
+        if !shown.waitForExistence(timeout: 3) { app.buttons["Pages"].tap() }
     }
 
     /// Closes the panes: a column on iPad, a sheet on iPhone, put away by a tap above it.
     private func closePanes() {
         guard app.buttons["Thumbnails"].exists else { return }
-        if pad { barButton("Panes") } else { point(200, 140).tap() }
+        if pad { app.buttons["Pages"].tap() } else { point(200, 140).tap() }
+    }
+
+    /// Picks a Markup tool, starting Markup first, from the More Tools menu when it isn't in reach.
+    private func choose(_ tool: String) {
+        let markup = app.buttons["Markup"], button = app.buttons[tool].firstMatch   // the reading bar's Sign does as Markup's
+        if markup.exists { markup.tap() }
+        if !button.waitForExistence(timeout: 2) { app.buttons["More Tools"].tap() }
+        XCTAssertTrue(button.waitForExistence(timeout: 5), app.debugDescription)
+        button.tap()
+    }
+
+    /// Ends Markup or organizing.
+    private func done() {
+        app.navigationBars.buttons["Done"].tap()
+    }
+
+    /// Picks an item of the navigation bar's Tools menu.
+    private func tools(_ item: String) {
+        barButton("Tools")
+        let button = app.buttons[item]
+        XCTAssertTrue(button.waitForExistence(timeout: 5), app.debugDescription)
+        button.tap()
+    }
+
+    /// Opens Find and types `text` in it.
+    private func find(_ text: String) {
+        app.buttons["Find"].tap()
+        let field = app.textFields["Find"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), app.debugDescription)
+        if field.value(forKey: "hasKeyboardFocus") as? Bool != true { field.tap() }
+        app.typeText(text)
+    }
+
+    /// Waits for the line over the pages that starts with `text` to go, for a screenshot without it.
+    private func waitUntilGone(_ text: String) {
+        let line = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", text)).firstMatch
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: line)
+        waitForExpectations(timeout: 10)
     }
 
     /// Launches Folio and opens a sample from its folder in the document browser.
@@ -350,7 +393,7 @@ final class ScreenshotTests: XCTestCase {
     /// slides in, so it takes whichever step shows until the document opens. A simulator just started there also leaves a
     /// tapped document unopened for the first ten minutes or so, so Folio launches again each minute until it opens.
     private func openSample(_ name: String = "Quarterly Brief") {
-        let sample = app.cells["\(name), pdf"], opened = app.buttons["highlighter"]
+        let sample = app.cells["\(name), pdf"], opened = app.buttons["Markup"]
         let steps = [sample, app.cells["Folio, Container"], app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'On My i'")).firstMatch]
         let deadline = Date.now + 900
         repeat {
@@ -376,16 +419,6 @@ final class ScreenshotTests: XCTestCase {
 
     private func drag(_ from: XCUICoordinate, _ to: XCUICoordinate) {
         from.press(forDuration: 0.1, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.1)
-    }
-
-    /// Picks a tool, first scrolling the bar to it where it's out of sight.
-    private func choose(_ tool: String) {
-        let button = app.buttons[tool], bar = app.scrollViews.containing(.button, identifier: "cursorarrow").firstMatch
-        if !button.isHittable {
-            let middle = bar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            drag(middle, middle.withOffset(CGVector(dx: bar.frame.midX - button.frame.midX, dy: 0)))
-        }
-        button.tap()
     }
 
     /// Taps a button of the navigation bar, from its More menu where it doesn't fit.

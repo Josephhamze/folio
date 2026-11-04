@@ -158,12 +158,17 @@ final class TouchTests: XCTestCase {
         XCTAssertEqual(onScreen, editor.box.font!.pointSize * 2, accuracy: 0.01)
     }
 
+    /// Reading, a tap leaves a mark unpicked; in Markup it picks it, and a drag on it moves it while others scroll.
     func testSelectedMarkDragsAndOthersScroll() throws {
         let (viewer, undo) = host(makePDF([["Hi"]]))
         let canvas = viewer.canvas, page = viewer.doc.pages[0], at = { (point: CGPoint) in canvas.convert(point, from: page) }
         let square = shape(.rect, from: CGPoint(x: 100, y: 300), to: CGPoint(x: 200, y: 360), color: .red)
         page.addAnnotation(square)
-        canvas.selected = square
+        canvas.tapped(at: at(CGPoint(x: 150, y: 330)))
+        XCTAssertNil(canvas.selected)
+        viewer.markingUp = true
+        canvas.tapped(at: at(CGPoint(x: 150, y: 330)))
+        XCTAssertTrue(canvas.selected === square)
         XCTAssertTrue(canvas.pans(at: at(CGPoint(x: 150, y: 330))))
         XCTAssertFalse(canvas.pans(at: at(CGPoint(x: 300, y: 500))))
         XCTAssertEqual(canvas.pan.maximumNumberOfTouches, 1)
