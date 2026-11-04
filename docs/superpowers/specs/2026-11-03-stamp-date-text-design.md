@@ -56,7 +56,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - The navigation bar gets a Tools menu with what the menu bar's Tools menu has. Without it, a signature saved on an iPhone could never be changed: the pad opened only when none was saved, and only iPad has a menu bar.
 
 **Tests on GitHub**
-- A workflow runs the Mac tests on macOS 27 and the iOS tests on the simulators `build.sh` names, on every push, on GitHub's free runners for public repositories. The iOS screenshots are kept with each run. `./build.sh ios-test <test>` runs one test alone.
+- A workflow runs the Mac tests on macOS 27 and the iOS tests on the simulators `build.sh` names, on every push, on GitHub's free runners for public repositories, the iPhone and the iPad each on a runner of its own. The iOS screenshots are kept with each run. `./build.sh ios-test <test>` runs one test alone.
 
 ## Non-goals
 
