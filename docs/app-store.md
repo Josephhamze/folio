@@ -24,6 +24,7 @@ What goes into App Store Connect for Folio on iPhone and iPad.
 - **Privacy policy URL:** https://github.com/Josephhamze/folio/blob/main/PRIVACY.md
 - **Copyright:** 2026 Joseph Hamze
 - **What's New** (1.0): First release on iPhone and iPad.
+- **What's New** (the next release): A Stamp tool for your company's stamp, a Date tool, signatures from a photo, and Add to Every Page. Organize, scan and split pages. Recognize Text, Apply Redactions, Password and Properties. Send a page as a picture. And Folio now speaks French and Simplified Chinese.
 
 ### Description
 
@@ -37,10 +38,25 @@ MARK UP
 TEXT THAT MATCHES
 • Tap with the Text Box tool and type. The text takes the font, size and colour of the nearest text on the page, so it looks typed into the document.
 • Fix a line of text by typing over it.
+• The Date tool types today's date beside the line you tap, in that line's font.
 
-SIGN
-• Draw or type your signature and initials once, then place them with a tap.
-• They're saved as vector outlines, so they stay sharp at any zoom and in other PDF apps.
+SIGN AND STAMP
+• Draw or type your signature and initials once, or take them from a photo, then place them with a tap.
+• Drawn and typed ones are saved as vector outlines, so they stay sharp at any zoom and in other PDF apps.
+• Photograph your company's stamp on white paper, and the Stamp tool places it like a rubber stamp, in its own colour.
+• Add to Every Page puts your initials on each page of a contract, or the stamp on each page of an invoice, at once.
+
+PAGES
+• Organize Pages: drag pages into a new order, rotate them, insert blank pages or pages from PDFs and pictures, extract them into a file of their own, or delete them.
+• Scan paper with the camera into the document.
+• Split a document into files of a few pages each.
+
+SCANS, REDACTIONS AND PASSWORDS
+• Recognize Text reads the words on scanned pages, in English, French, Chinese and many other languages, on your device, so Find finds them.
+• Box what must go, then Apply Redactions: the words under the boxes are gone from the file, not just covered.
+• Set the password that opens a file, change it or take it off.
+• Set a file's title, author, subject and keywords.
+• Send the page you're on as a picture, for a chat app.
 
 FILL IN FORMS
 • Type into a PDF's form fields.
@@ -53,6 +69,8 @@ READ
 
 PRIVATE
 • Folio collects nothing and makes no network connections. Your files stay where you keep them: on your device, in iCloud Drive or in any other Files location.
+
+Folio's menus and buttons follow your device's language: English, French or Simplified Chinese.
 
 On iPad, the keyboard works too: ⌘F finds, ⌘Z undoes and ⌘P prints.
 
