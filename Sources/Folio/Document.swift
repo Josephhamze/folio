@@ -82,7 +82,9 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     }
 
     func unlock(_ password: String) -> Bool {
-        guard pdf.unlock(withPassword: password) else { return false }
+        // PDFKit says yes to any password for a file that's already open, where only the permissions password does anything.
+        let opening = pdf.isLocked
+        guard pdf.unlock(withPassword: password), opening || pdf.permissionsStatus == .owner else { return false }
         self.password = password
         revision += 1
         return true
