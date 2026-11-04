@@ -235,7 +235,7 @@ final class Viewer {
     func extract() {
         settle()
         extracted = FolioDocument(pdf: doc.extract(targetPages))
-        extracted?.newPassword = doc.newPassword ?? (doc.pdf.isEncrypted ? doc.password : nil)
+        extracted?.newPassword = doc.keptPassword
     }
 
     /// A PDF can't be saved without a page, so the last ones stay.
@@ -356,6 +356,7 @@ struct DocumentView: View {
             .sheet(item: $viewer.sheet) { sheet in
                 if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
                 if sheet == .protect { PasswordSheet(viewer: viewer) }
+                if sheet == .split { SplitSheet(viewer: viewer, name: url?.deletingPathExtension().lastPathComponent ?? "Untitled") }
             }
             .fileImporter(isPresented: $viewer.choosingPages, allowedContentTypes: [.pdf, .image], allowsMultipleSelection: true) { result in
                 guard let urls = try? result.get().sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }),

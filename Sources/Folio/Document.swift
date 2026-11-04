@@ -167,14 +167,21 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         return out
     }
 
+    /// The password a file made from this one's pages opens with: the one set here, or the one this one opened with.
+    var keptPassword: String? { newPassword ?? (pdf.isEncrypted ? password : nil) }
+
+    /// Writes the pages into files of `count` pages each, in `folder`: "<name> 1.pdf", "<name> 2.pdf" and so on, each with
+    /// the kept password. It writes over no file: when one of the names is taken, it throws before writing any.
     func split(every count: Int, into folder: URL, name: String) throws -> [URL] {
         let all = pages, starts = Array(stride(from: 0, to: all.count, by: count))
         let urls = starts.indices.map { folder.appendingPathComponent("\(name) \($0 + 1).pdf") }
         if let taken = urls.first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
             throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: taken.path])
         }
-        for (start, url) in zip(starts, urls) where !extract(Array(all[start..<min(start + count, all.count)])).write(to: url) {
-            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path])
+        for (start, url) in zip(starts, urls) {
+            let piece = FolioDocument(pdf: extract(Array(all[start..<min(start + count, all.count)])))
+            piece.newPassword = keptPassword
+            try piece.snapshot(contentType: .pdf).write(to: url, options: .withoutOverwriting)
         }
         return urls
     }

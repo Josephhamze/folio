@@ -101,6 +101,12 @@ struct PageActions: View {
         Button("Extract Pages…", systemImage: "square.and.arrow.up") { viewer?.extract() }
             .help("Extract Pages…")
             .disabled(!chosen || viewer?.doc.pdf.hasFullRights != true)
+        Button("Split…", systemImage: "scissors") {
+            viewer?.settle()
+            viewer?.sheet = .split
+        }
+        .help("Split…")
+        .disabled(!idle || viewer?.doc.pdf.hasFullRights != true || (viewer?.doc.pdf.pageCount ?? 0) < 2)
         Button("Delete Pages", systemImage: "trash", role: .destructive) { viewer?.deletePages() }
             .help("Delete Pages")
             .disabled(!idle || viewer?.canDelete != true)

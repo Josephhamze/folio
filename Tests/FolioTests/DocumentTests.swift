@@ -263,6 +263,21 @@ final class DocumentTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Doc 1.pdf").path))
     }
 
+    /// Each file split off a protected document opens with its password, and a password PDFKit can't protect with writes none.
+    func testSplitKeepsThePassword() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let doc = FolioDocument(pdf: makePDF([["1"], ["2"], ["3"]]))
+        doc.newPassword = "pw"
+        let pieces = try doc.split(every: 2, into: folder, name: "Doc").map { try XCTUnwrap(PDFDocument(url: $0)) }
+        XCTAssertEqual(pieces.map(\.isLocked), [true, true])
+        XCTAssertEqual(pieces.map { $0.unlock(withPassword: "pw") }, [true, true])
+        XCTAssertEqual(pieces.map(texts), [["1", "2"], ["3"]])
+        doc.newPassword = "密码"
+        XCTAssertThrowsError(try doc.split(every: 2, into: folder, name: "Other"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Other 1.pdf").path))
+    }
+
     func testPagesFromFilesFitPhotosToPaper() {
         let pdfURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).pdf")
         makePDF([["One"], ["Two"]]).write(to: pdfURL)

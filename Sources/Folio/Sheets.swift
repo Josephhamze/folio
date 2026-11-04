@@ -162,3 +162,45 @@ struct PasswordSheet: View {
         dismiss()
     }
 }
+
+/// Splits the document into files of a few pages each, in a folder chosen next, named after the document and numbered.
+struct SplitSheet: View {
+    let viewer: Viewer
+    let name: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var every = 1
+    @State private var choosing = false
+    @State private var problem: String?
+
+    var body: some View {
+        let count = viewer.doc.pdf.pageCount
+        VStack(spacing: 16) {
+            Text("Split into Files").font(.headline)
+            Stepper("Pages in each file: \(every)", value: $every, in: 1...max(1, count - 1))
+            Text("Makes \((count + every - 1) / every) files, named “\(name) 1”, “\(name) 2” and so on.").foregroundStyle(.secondary)
+            if let problem { Text(problem).foregroundStyle(.red) }
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }
+                Button("Choose Folder…") { choosing = true }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .frame(width: 340)
+        .padding(20)
+        .fileImporter(isPresented: $choosing, allowedContentTypes: [.folder]) { result in
+            guard case .success(let folder) = result else { return }
+            let open = folder.startAccessingSecurityScopedResource()
+            defer { if open { folder.stopAccessingSecurityScopedResource() } }
+            do {
+                let urls = try viewer.doc.split(every: every, into: folder, name: name)
+                viewer.message = "Saved \(urls.count) files in \(folder.lastPathComponent)"
+                dismiss()
+            } catch let error as CocoaError where error.code == .fileWriteFileExists {
+                let taken = (error.userInfo[NSFilePathErrorKey] as? String).map { URL(fileURLWithPath: $0).lastPathComponent } ?? name
+                problem = "“\(taken)” is already in \(folder.lastPathComponent). Choose another folder."
+            } catch {
+                problem = "Couldn't save the files in \(folder.lastPathComponent)."
+            }
+        }
+    }
+}

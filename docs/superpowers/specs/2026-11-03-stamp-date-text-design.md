@@ -34,6 +34,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 **Organize Pages** (added once the rest was built)
 - The first design planned it; its document side was built and tested, but not its screens. Organize Pages, in the window's bar and the new Pages menu (⌥⌘O), lays the pages out as a grid over the page view. A click selects a page, ⌘ and ⇧ clicks select more, and on iPhone and iPad a tap selects or deselects one. Pages dragged in the grid move in front of the page they're dropped on, or to the end.
 - The bar then rotates the selected pages (⌘L, ⌘R), inserts a blank page or pages from PDFs and pictures after them, extracts them into a file of their own, and deletes them. The Pages menu does the same to the page in view when not organizing. Leaving the grid shows the first selected page.
+- Split…, in the bar and the Pages menu, opens a sheet: a stepper for the pages in each file, from 1 to one fewer than the document has, then Choose Folder…. The files are named after the document and numbered, "Report 1.pdf" and so on, keep the password the document has or opens with, and are written over nothing: when a name is taken in the folder, the sheet says so and writes none. It isn't there for a file its author restricted, as with Extract.
 
 **Apply Redactions** (added once the rest was built)
 - The Redact tool marked areas, but nothing applied them, so the words stayed in the file under a red box. Tools › Apply Redactions now burns them in: each page with marks becomes a picture of itself with the marked areas black, and gets back the words read from the picture, so the rest can still be found. Marks that overlap a redaction go, since they could tell what it hid. It's one undo step, and all or nothing: a page that can't be redacted leaves every page as it was.
@@ -54,7 +55,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 
 ## Non-goals
 
-- Splitting files; restrictions on printing, copying and changes, and the properties sheet; French and Chinese for Folio's own words. They are next.
+- Restrictions on printing, copying and changes, and the properties sheet; French and Chinese for Folio's own words. They are next.
 - Choosing the date's format, or a stamp's colour. The date follows the region; the stamp keeps its ink.
 - Resizing a placed stamp: as with signatures, it's placed again at another size.
 - Recognizing text on pages that have some, or on parts of pages.
@@ -98,4 +99,4 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - Password: a password set goes on when saved and undoes; a new one replaces a file's own; removing one keeps the pages, marks, bookmarks, each to its page, and title, and undoes; a password PDFKit can't protect with fails the save rather than saving the file unprotected.
 - A restricted file opened without its permissions password takes marks but gives no pages to another file; its permissions password lifts that.
 - Scanning: what another device hands over, a PDF's pages and a picture, goes in after the page in view in its order, and scanned pages go in with word of Recognize Text. The camera itself can't be tested in the simulator.
-- Organizing: drops take only pages dragged in the same window; inserted pages are selected; leaving shows the first selected page; extracted pages keep their marks and the file's password. On iOS, a tap selects a page in the grid, the bar deletes it, and Undo puts it back.
+- Organizing: drops take only pages dragged in the same window; inserted pages are selected; leaving shows the first selected page; extracted pages keep their marks and the file's password, and so do split files, while a password PDFKit can't protect with writes none. On iOS, a tap selects a page in the grid, the bar deletes it, and Undo puts it back.
