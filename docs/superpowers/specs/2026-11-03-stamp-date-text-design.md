@@ -47,6 +47,11 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - Receipts, delivery notes and signed paper are scanned on a phone. On iPhone and iPad, Scan Pages… in the Pages menu and the organizer's bar opens the system's document scanner, which finds the page's edges and straightens it; the pages it scans go in after the target pages, as Insert from File puts in pictures, as one undo step. It says that Tools › Recognize Text makes them searchable. Where there's no camera, as in the simulator, the button isn't there.
 - On the Mac, File › Import from iPhone or iPad (Take Photo, Scan Documents, Add Sketch) takes the same from a nearby iPhone or iPad, by Continuity Camera, and puts it in the same way.
 
+**French and Chinese** (added once the rest was built)
+- The team works in English, French and Chinese, so Folio's own words, in the menus, buttons, messages and Edit › Undo, follow the device's language, or the language set for Folio alone in the system's settings. The system's own words, such as the File and Edit menus and the file dialogs, already did.
+- The translations are `Localizable.strings` tables in `Localization/fr.lproj` and `Localization/zh-Hans.lproj`, keyed by Folio's English, with the camera's reason in `InfoPlist.strings`. `build.sh` copies them into the Mac app and XcodeGen into the iOS app. Words SwiftUI shows from a literal are looked up by themselves; words Folio builds as strings, its messages, the find count and the tool names, are looked up with `String(localized:)`, and undo names where Edit › Undo gets them.
+- French uses Apple's French terms ("caviarder" for redact, "Rechercher" for find) and its spacing before ":" and "?" and inside « »; Chinese uses Simplified Chinese and Apple's terms ("存储" for save, "访达" for Finder).
+
 **Tools on iPhone**
 - The navigation bar gets a Tools menu with what the menu bar's Tools menu has. Without it, a signature saved on an iPhone could never be changed: the pad opened only when none was saved, and only iPad has a menu bar.
 
@@ -55,7 +60,7 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 
 ## Non-goals
 
-- Restrictions on printing, copying and changes, and the properties sheet; French and Chinese for Folio's own words. They are next.
+- Restrictions on printing, copying and changes, and the properties sheet. They are next.
 - Choosing the date's format, or a stamp's colour. The date follows the region; the stamp keeps its ink.
 - Resizing a placed stamp: as with signatures, it's placed again at another size.
 - Recognizing text on pages that have some, or on parts of pages.
@@ -100,3 +105,4 @@ The owner asked for what Folio is missing, chosen by the builder. The owner's bu
 - A restricted file opened without its permissions password takes marks but gives no pages to another file; its permissions password lifts that.
 - Scanning: what another device hands over, a PDF's pages and a picture, goes in after the page in view in its order, and scanned pages go in with word of Recognize Text. The camera itself can't be tested in the simulator.
 - Organizing: drops take only pages dragged in the same window; inserted pages are selected; leaving shows the first selected page; extracted pages keep their marks and the file's password, and so do split files, while a password PDFKit can't protect with writes none. On iOS, a tap selects a page in the grid, the bar deletes it, and Undo puts it back.
+- Languages: the French and Chinese tables have the same English, each translation takes the numbers and names its English takes, and every English is still in Folio's code; the iOS app carries both tables and the camera's reason in both.

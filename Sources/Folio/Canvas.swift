@@ -205,7 +205,7 @@ final class Canvas: PDFView {
             guard let cover = coverLine(at: point, on: page) else { return true }
             if !Self.warned {
                 Self.warned = true
-                viewer.message = "The original text stays underneath in the file."
+                viewer.message = String(localized: "The original text stays underneath in the file.")
             }
             edit(cover, on: page, adding: "Edit Text")
         case .sign, .initial, .stamp:
@@ -262,7 +262,7 @@ final class Canvas: PDFView {
             page.removeAnnotation(draft)
             viewer.doc.add(draft, to: page, name: viewer.tool == .pen ? "Draw" : viewer.tool == .redact ? "Mark for Redaction" : "Add Shape")
             // A mark alone hides nothing in the file.
-            if viewer.tool == .redact { viewer.message = "Tools › Apply Redactions takes out what's under the marks" }
+            if viewer.tool == .redact { viewer.message = String(localized: "Tools › Apply Redactions takes out what's under the marks") }
         case .sign, .initial, .stamp:
             guard let signature = Signature[viewer.tool] else { return }
             draft.map(page.removeAnnotation)
@@ -379,8 +379,8 @@ final class Canvas: PDFView {
         viewer.tool = .select
         selected = mark
         // Its own target: sent down the responder chain, Delete would go to a text field that has the keys.
-        let items = [NSMenuItem(title: "Delete", action: #selector(deleteMark), keyEquivalent: "")]
-            + (viewer.doc.pdf.pageCount > 1 ? [NSMenuItem(title: "Add to Every Page", action: #selector(addToEveryPage), keyEquivalent: "")] : [])
+        let items = [NSMenuItem(title: String(localized: "Delete"), action: #selector(deleteMark), keyEquivalent: "")]
+            + (viewer.doc.pdf.pageCount > 1 ? [NSMenuItem(title: String(localized: "Add to Every Page"), action: #selector(addToEveryPage), keyEquivalent: "")] : [])
         for (index, item) in (items + [.separator()]).enumerated() {
             item.target = self
             menu.insertItem(item, at: index)

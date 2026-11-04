@@ -19,6 +19,7 @@ targets:
       - path: Sources/Folio
         type: syncedFolder
       - iOS
+      - Localization
     settings:
       base:
         INFOPLIST_FILE: iOS/Info.plist

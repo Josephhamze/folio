@@ -144,7 +144,9 @@ final class Viewer {
         comment?.commit()
     }
 
-    var matchLabel: String { query.isEmpty ? "" : matches.isEmpty ? "No matches" : "\(match + 1) of \(matches.count)" }
+    var matchLabel: String {
+        query.isEmpty ? "" : matches.isEmpty ? String(localized: "No matches") : String(localized: "\(match + 1) of \(matches.count)")
+    }
 
     /// The pages that page commands act on: the selected ones while organizing, otherwise the one in view.
     var targetPages: [PDFPage] {
@@ -208,8 +210,8 @@ final class Viewer {
         let pages = images.compactMap(FolioDocument.page(from:))
         guard !pages.isEmpty else { return }
         insert(pages)
-        message = pages.count == 1 ? "Scanned 1 page. Tools › Recognize Text makes it searchable"
-            : "Scanned \(pages.count) pages. Tools › Recognize Text makes them searchable"
+        message = pages.count == 1 ? String(localized: "Scanned 1 page. Tools › Recognize Text makes it searchable")
+            : String(localized: "Scanned \(pages.count) pages. Tools › Recognize Text makes them searchable")
     }
 
     /// Puts the pages of PDFs and pictures another device hands over, such as a scan from an iPhone by Continuity Camera,
@@ -225,7 +227,7 @@ final class Viewer {
                 }
                 pages += data.map { FolioDocument.pages(from: $0, isPDF: type.conforms(to: .pdf)) } ?? []
             }
-            if pages.isEmpty { message = "Found no pages to insert" } else { insert(pages) }
+            if pages.isEmpty { message = String(localized: "Found no pages to insert") } else { insert(pages) }
         }
         return true
     }
@@ -260,34 +262,35 @@ final class Viewer {
         settle()
         guard let mark = canvas.selected else { return }
         let count = doc.addToEveryPage(mark)
-        message = count == 1 ? "Added to 1 more page" : "Added to \(count) more pages"
+        message = count == 1 ? String(localized: "Added to 1 more page") : String(localized: "Added to \(count) more pages")
     }
 
     /// Reads the words on the pages that have no text, showing how far it's got, then says how it went. It stays on the page:
     /// the pages it puts back would show the first.
     func recognizeText() {
         settle()
-        busy = "Recognizing text…"
+        busy = String(localized: "Recognizing text…")
         let at = pageIndex
         Task { @MainActor in
-            let (read, of) = await doc.recognizeText { done, count in self.busy = "Recognizing text… \(done + 1) of \(count)" }
+            let (read, of) = await doc.recognizeText { done, count in self.busy = String(localized: "Recognizing text… \(done + 1) of \(count)") }
             busy = nil
             go(toPage: at + 1)
-            message = of == 0 ? "Every page has its text already" : read == 0 ? "Found no text to recognize"
-                : read == 1 ? "Recognized the text on 1 page" : "Recognized the text on \(read) pages"
+            message = of == 0 ? String(localized: "Every page has its text already") : read == 0 ? String(localized: "Found no text to recognize")
+                : read == 1 ? String(localized: "Recognized the text on 1 page") : String(localized: "Recognized the text on \(read) pages")
         }
     }
 
     /// Burns in the redaction marks, showing it's at work, then says how it went, staying on the page.
     func applyRedactions() {
         settle()
-        busy = "Applying redactions…"
+        busy = String(localized: "Applying redactions…")
         let at = pageIndex
         Task { @MainActor in
             let count = await doc.applyRedactions()
             busy = nil
             go(toPage: at + 1)
-            message = count.map { $0 == 1 ? "Redacted 1 page" : "Redacted \($0) pages" } ?? "Couldn't apply the redactions"
+            message = count.map { $0 == 1 ? String(localized: "Redacted 1 page") : String(localized: "Redacted \($0) pages") }
+                ?? String(localized: "Couldn't apply the redactions")
         }
     }
 
@@ -295,14 +298,14 @@ final class Viewer {
     /// Rewrites the document smaller, staying on its page, and says by how much, or that it can't be.
     func reduceFileSize() {
         settle()
-        busy = "Reducing file size…"
+        busy = String(localized: "Reducing file size…")
         Task { @MainActor in
             resume = pageIndex
             let sizes = await doc.reduceFileSize()
             busy = nil
             guard let sizes else {
                 resume = nil
-                message = "Already as small as it gets"
+                message = String(localized: "Already as small as it gets")
                 return
             }
             let size = { (bytes: Int) in ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file) }
@@ -316,6 +319,8 @@ struct DocumentView: View {
     @State var viewer: Viewer
     /// Where the document is saved, if it is.
     let url: URL?
+    /// What files made from the document are named after.
+    private var name: String { url?.deletingPathExtension().lastPathComponent ?? String(localized: "Untitled") }
     @FocusState private var searching: Bool
     @Environment(\.undoManager) private var undoManager
     #if os(macOS)
@@ -356,7 +361,7 @@ struct DocumentView: View {
             .sheet(item: $viewer.sheet) { sheet in
                 if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
                 if sheet == .protect { PasswordSheet(viewer: viewer) }
-                if sheet == .split { SplitSheet(viewer: viewer, name: url?.deletingPathExtension().lastPathComponent ?? "Untitled") }
+                if sheet == .split { SplitSheet(viewer: viewer, name: name) }
             }
             .fileImporter(isPresented: $viewer.choosingPages, allowedContentTypes: [.pdf, .image], allowsMultipleSelection: true) { result in
                 guard let urls = try? result.get().sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }),
@@ -364,14 +369,14 @@ struct DocumentView: View {
                 let opened = urls.map { $0.startAccessingSecurityScopedResource() }
                 let pages = FolioDocument.pages(from: urls)
                 for (url, isOpen) in zip(urls, opened) where isOpen { url.stopAccessingSecurityScopedResource() }
-                if pages.isEmpty { viewer.message = "Found no pages to insert" } else { viewer.insert(pages) }
+                if pages.isEmpty { viewer.message = String(localized: "Found no pages to insert") } else { viewer.insert(pages) }
             }
             // On a view of its own: a second file dialog on the same view never shows.
             .background {
                 Color.clear.fileExporter(isPresented: Binding { viewer.extracted != nil } set: { if !$0 { viewer.extracted = nil } },
                                          document: viewer.extracted, contentType: .pdf,
-                                         defaultFilename: "\(url?.deletingPathExtension().lastPathComponent ?? "Untitled") pages") { result in
-                    if case .success(let saved) = result { viewer.message = "Saved \(saved.lastPathComponent)" }
+                                         defaultFilename: String(localized: "\(name) pages")) { result in
+                    if case .success(let saved) = result { viewer.message = String(localized: "Saved \(saved.lastPathComponent)") }
                 }
             }
             #if os(macOS)
@@ -451,8 +456,7 @@ struct DocumentView: View {
     }
     #else
     private var layout: some View {
-        let name = url?.deletingPathExtension().lastPathComponent ?? "Untitled"
-        return PageView(viewer: viewer)
+        PageView(viewer: viewer)
             .overlay { if viewer.organizing { Organizer(viewer: viewer) } }
             .overlay(alignment: .top) { Bars(viewer: viewer) }
             .safeAreaInset(edge: .bottom, spacing: 0) { ToolBar(viewer: viewer) }
@@ -624,7 +628,7 @@ struct Sidebar: View {
         @Bindable var viewer = viewer
         VStack(spacing: 0) {
             Picker("Show", selection: $viewer.pane) {
-                ForEach(Viewer.Pane.allCases) { Label($0.rawValue, systemImage: $0.symbol).help($0.rawValue) }
+                ForEach(Viewer.Pane.allCases) { Label(LocalizedStringKey($0.rawValue), systemImage: $0.symbol).help(LocalizedStringKey($0.rawValue)) }
             }
             .pickerStyle(.segmented)
             .labelsHidden()

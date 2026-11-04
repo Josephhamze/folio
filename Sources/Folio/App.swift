@@ -143,7 +143,7 @@ struct PagePicture: Transferable {
                 return data
             }
         }
-        .suggestedFileName { "Page \($0.viewer.pageIndex + 1)" }
+        .suggestedFileName { String(localized: "Page \($0.viewer.pageIndex + 1)") }
     }
 }
 

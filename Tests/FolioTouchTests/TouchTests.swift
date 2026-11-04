@@ -71,6 +71,15 @@ final class TouchTests: XCTestCase {
         XCTAssertNotNil(host(FolioDocument().pdf).0.canvas.document)
     }
 
+    /// The app carries Folio's French and Chinese, and the camera's reason in both.
+    func testAppSpeaksFrenchAndChinese() throws {
+        for (language, organize, camera) in [("fr", "Organiser les pages", "Folio numérise"), ("zh-Hans", "整理页面", "Folio 使用相机")] {
+            let bundle = try XCTUnwrap(Bundle.main.path(forResource: language, ofType: "lproj").flatMap(Bundle.init(path:)))
+            XCTAssertEqual(bundle.localizedString(forKey: "Organize Pages", value: nil, table: nil), organize)
+            XCTAssertTrue(bundle.localizedString(forKey: "NSCameraUsageDescription", value: nil, table: "InfoPlist").hasPrefix(camera))
+        }
+    }
+
     func testDragAcrossTextHighlightsIt() {
         let (viewer, undo) = host(makePDF([["Highlight this line"]]))
         let canvas = viewer.canvas, page = viewer.doc.pages[0], line = ends(ofLine: 0, on: page, in: canvas)

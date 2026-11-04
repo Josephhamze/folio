@@ -88,6 +88,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Folio "$APP/Contents/MacOS/"
 cp Info.plist "$APP/Contents/"
 cp icon/Folio.icns "$APP/Contents/Resources/"
+cp -R Localization/*.lproj "$APP/Contents/Resources/"
 
 if [ "$1" = dmg ]; then
 	ID=$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application[^"]*\)".*/\1/p' | head -1)

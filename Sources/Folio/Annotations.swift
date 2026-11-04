@@ -7,8 +7,9 @@ enum Tool: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
+    /// In the language Folio shows.
     var name: String {
-        switch self {
+        let english = switch self {
         case .select: "Select"
         case .highlight: "Highlight"
         case .underline: "Underline"
@@ -27,6 +28,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .editText: "Edit Text"
         case .redact: "Redact"
         }
+        return NSLocalizedString(english, comment: "")
     }
 
     var symbol: String {

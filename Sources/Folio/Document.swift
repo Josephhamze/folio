@@ -73,12 +73,13 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
             || pdf.allowsDocumentChanges && pdf.allowsDocumentAssembly && pdf.allowsCommenting && pdf.allowsFormFieldEntry)
     }
 
-    /// Runs `redo` and registers `revert` under `name`. Undoing registers the pair the other way round, so redo works.
+    /// Runs `redo` and registers `revert` under `name`, in English, which Edit › Undo shows in the language Folio shows.
+    /// Undoing registers the pair the other way round, so redo works.
     func change(_ name: String, do redo: @escaping () -> Void, undo revert: @escaping () -> Void) {
         redo()
         revision += 1
         undo?.registerUndo(withTarget: self) { $0.change(name, do: revert, undo: redo) }
-        undo?.setActionName(name)
+        undo?.setActionName(NSLocalizedString(name, comment: ""))
     }
 
     /// Sets the password that opens the file once it's saved, or with nil takes the file's password off. PDFKit saves a

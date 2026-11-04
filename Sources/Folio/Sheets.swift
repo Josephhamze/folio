@@ -158,7 +158,8 @@ struct PasswordSheet: View {
         // A protected file's pages move to a new document, which would show its first page.
         if viewer.doc.pdf.isEncrypted { viewer.resume = viewer.pageIndex }
         viewer.doc.setPassword(new)
-        viewer.message = new == nil ? "The password comes off once the file is saved" : "The password goes on once the file is saved"
+        viewer.message = new == nil ? String(localized: "The password comes off once the file is saved")
+            : String(localized: "The password goes on once the file is saved")
         dismiss()
     }
 }
@@ -193,13 +194,13 @@ struct SplitSheet: View {
             defer { if open { folder.stopAccessingSecurityScopedResource() } }
             do {
                 let urls = try viewer.doc.split(every: every, into: folder, name: name)
-                viewer.message = "Saved \(urls.count) files in \(folder.lastPathComponent)"
+                viewer.message = String(localized: "Saved \(urls.count) files in \(folder.lastPathComponent)")
                 dismiss()
             } catch let error as CocoaError where error.code == .fileWriteFileExists {
                 let taken = (error.userInfo[NSFilePathErrorKey] as? String).map { URL(fileURLWithPath: $0).lastPathComponent } ?? name
-                problem = "“\(taken)” is already in \(folder.lastPathComponent). Choose another folder."
+                problem = String(localized: "“\(taken)” is already in \(folder.lastPathComponent). Choose another folder.")
             } catch {
-                problem = "Couldn't save the files in \(folder.lastPathComponent)."
+                problem = String(localized: "Couldn't save the files in \(folder.lastPathComponent).")
             }
         }
     }

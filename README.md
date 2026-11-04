@@ -37,6 +37,7 @@
 - **Protected files.** Folio asks for a file's password in the window. It respects an author's restrictions until you enter the permissions password, and saving keeps the file encrypted. Tools › Password… sets the password that opens a file, changes it, or takes it off, once the file is saved.
 - **Save.** Your changes stay out of the file until you save them with ⌘S. Closing or quitting with unsaved changes asks whether to save them. File › Save As… (⌥⇧⌘S) saves the document under a new name, and you keep working in the new file.
 - **Undo.** Every change can be undone and redone.
+- **English, French and Chinese.** Folio's menus, buttons and messages follow your device's language: English, French or Simplified Chinese. On the Mac, System Settings › General › Language & Region › Applications sets Folio's language alone, and on iPhone and iPad, Settings › Apps › Folio › Language does.
 - **Print**, and open PDFs from Finder. Folio asks once to be your default PDF app, and Home offers it while it isn't.
 
 ## Install
@@ -65,10 +66,10 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 - `./build.sh ios-release` uploads a build to App Store Connect. [`docs/app-store.md`](docs/app-store.md) has the one-time setup and the listing.
 - `swift icon/icon.swift` draws the icon and the dmg window's background from code, into `icon/Folio.icns`, `icon/logo.png` and `icon/dmg.png`.
 - The design and the build plan are in [`docs/superpowers`](docs/superpowers).
+- [`Localization`](Localization) has Folio's French and Chinese, each line a translation of Folio's English. Words added to Folio need a line in both, and `swift test` checks that the two tables match each other, the code and the numbers and names each line takes.
 
 ## Roadmap
 
-- **French and Chinese:** Folio's menus, buttons and messages in French and Chinese.
 - **Restrictions and properties:** restrict printing, copying and changes with a permissions password, and a sheet for the title, author and keywords.
 
 ## License
