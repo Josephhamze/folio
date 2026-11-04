@@ -179,6 +179,23 @@ final class AnnotationTests: XCTestCase {
         XCTAssertNil(Signature.lifted(from: Data("not a picture".utf8)))
     }
 
+    /// The saved stamp and its picture are decoded once while they stay the same, as through a drag, and afresh once changed.
+    func testSignatureIsReadAfreshOnceChanged() throws {
+        let saved = Signature[.stamp]
+        defer { Signature[.stamp] = saved }
+        let png = try XCTUnwrap(Signature.lifted(from: stampPhoto()))
+        Signature[.stamp] = .typed("ACME")
+        XCTAssertEqual(Signature[.stamp], .typed("ACME"))
+        Signature[.stamp] = .image(png)
+        XCTAssertEqual(Signature[.stamp], .image(png))
+        Signature[.stamp] = nil
+        XCTAssertNil(Signature[.stamp])
+        let picture = try XCTUnwrap(Signature.picture(png))
+        XCTAssertTrue(Signature.picture(png) === picture)
+        XCTAssertNil(Signature.picture(Data("not a picture".utf8)))
+        XCTAssertEqual(Signature.picture(png)?.width, picture.width)
+    }
+
     /// The picture's pixels as red, green, blue and alpha, premultiplied, row by row from the top.
     private func rgba(_ picture: CGImage) -> [UInt8] {
         let context = CGContext(data: nil, width: picture.width, height: picture.height, bitsPerComponent: 8, bytesPerRow: picture.width * 4,

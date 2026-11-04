@@ -80,6 +80,14 @@ func manualUndo(_ doc: FolioDocument) -> UndoManager {
     return undo
 }
 
+/// XCTAssertThrowsError for an expression that awaits, which XCTest's own can't take.
+func assertThrowsAsync<T>(_ expression: @autoclosure () async throws -> T, file: StaticString = #filePath, line: UInt = #line) async {
+    do {
+        _ = try await expression()
+        XCTFail("No error thrown", file: file, line: line)
+    } catch {}
+}
+
 func act(_ undo: UndoManager, _ change: () -> Void) {
     undo.beginUndoGrouping()
     change()
@@ -332,42 +340,43 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual(doc.pdf.pageCount, 3)
     }
 
-    func testSplitEveryTwo() throws {
+    func testSplitEveryTwo() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Folio Split \(UUID())")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let urls = try FolioDocument(pdf: makePDF([["1"], ["2"], ["3"], ["4"], ["5"]])).split(every: 2, into: folder, name: "Report")
+        let urls = try await FolioDocument(pdf: makePDF([["1"], ["2"], ["3"], ["4"], ["5"]])).split(every: 2, into: folder, name: "Report")
         XCTAssertEqual(urls.map(\.lastPathComponent), ["Report 1.pdf", "Report 2.pdf", "Report 3.pdf"])
         XCTAssertEqual(urls.map { PDFDocument(url: $0)!.pageCount }, [2, 2, 1])
         XCTAssertEqual(texts(PDFDocument(url: urls[2])!), ["5"])
     }
 
-    func testSplitNeverOverwrites() throws {
+    func testSplitNeverOverwrites() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let mine = folder.appendingPathComponent("Doc 2.pdf")
         try Data("keep".utf8).write(to: mine)
         let doc = FolioDocument(pdf: makePDF([["1"], ["2"]]))
-        XCTAssertThrowsError(try doc.split(every: 1, into: folder, name: "Doc"))
+        await assertThrowsAsync(try await doc.split(every: 1, into: folder, name: "Doc"))
         XCTAssertEqual(try Data(contentsOf: mine), Data("keep".utf8))
         XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Doc 1.pdf").path))
     }
 
     /// Each file split off a protected document opens with its password, and a password PDFKit can't protect with writes none.
-    func testSplitKeepsThePassword() throws {
+    func testSplitKeepsThePassword() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let doc = FolioDocument(pdf: makePDF([["1"], ["2"], ["3"]]))
         doc.newPassword = "pw"
-        let pieces = try doc.split(every: 2, into: folder, name: "Doc").map { try XCTUnwrap(PDFDocument(url: $0)) }
+        let pieces = try await doc.split(every: 2, into: folder, name: "Doc").map { try XCTUnwrap(PDFDocument(url: $0)) }
         XCTAssertEqual(pieces.map(\.isLocked), [true, true])
         XCTAssertEqual(pieces.map { $0.unlock(withPassword: "pw") }, [true, true])
         XCTAssertEqual(pieces.map(texts), [["1", "2"], ["3"]])
         doc.newRestrictions = .init(password: "perm")
-        let restricted = try XCTUnwrap(PDFDocument(url: try XCTUnwrap(doc.split(every: 3, into: folder, name: "Restricted").first)))
+        let whole = try await doc.split(every: 3, into: folder, name: "Restricted")
+        let restricted = try XCTUnwrap(PDFDocument(url: whole[0]))
         XCTAssertTrue(restricted.unlock(withPassword: "pw"))
         XCTAssertFalse(restricted.allowsCopying)
         doc.newPassword = "密码"
-        XCTAssertThrowsError(try doc.split(every: 2, into: folder, name: "Other"))
+        await assertThrowsAsync(try await doc.split(every: 2, into: folder, name: "Other"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("Other 1.pdf").path))
     }
 

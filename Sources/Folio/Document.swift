@@ -274,25 +274,31 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     /// Writes the pages into files of `count` pages each, in `folder`: "<name> 1.pdf", "<name> 2.pdf" and so on, each with
     /// the kept password and the restrictions set here. It writes over no file: when one of the names is taken, it throws
     /// before writing any. When a file can't be written, it takes back those it wrote, so trying again finds the names free.
-    func split(every count: Int, into folder: URL, name: String) throws -> [URL] {
+    /// The pages are copied here, into documents of their own, and the files written away from the window.
+    @MainActor func split(every count: Int, into folder: URL, name: String) async throws -> [URL] {
         let all = pages, starts = Array(stride(from: 0, to: all.count, by: count))
         let urls = starts.indices.map { folder.appendingPathComponent("\(name) \($0 + 1).pdf") }
         if let taken = urls.first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
             throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: taken.path])
         }
-        var written: [URL] = []
-        do {
-            for (start, url) in zip(starts, urls) {
-                let piece = FolioDocument(pdf: extract(Array(all[start..<min(start + count, all.count)])))
-                (piece.newPassword, piece.newRestrictions) = (keptPassword, newRestrictions)
-                try piece.snapshot(contentType: .pdf).write(to: url, options: .withoutOverwriting)
-                written.append(url)
-            }
-        } catch {
-            written.forEach { try? FileManager.default.removeItem(at: $0) }
-            throw error
+        let pieces = starts.map { start in
+            let piece = FolioDocument(pdf: extract(Array(all[start..<min(start + count, all.count)])))
+            (piece.newPassword, piece.newRestrictions) = (keptPassword, newRestrictions)
+            return piece
         }
-        return urls
+        return try await Task.detached {
+            var written: [URL] = []
+            do {
+                for (piece, url) in zip(pieces, urls) {
+                    try piece.snapshot(contentType: .pdf).write(to: url, options: .withoutOverwriting)
+                    written.append(url)
+                }
+            } catch {
+                written.forEach { try? FileManager.default.removeItem(at: $0) }
+                throw error
+            }
+            return urls
+        }.value
     }
 
     /// Pages from files. Each file is read whole at once, while a file chosen in a panel may still be read.

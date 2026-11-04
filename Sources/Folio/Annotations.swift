@@ -213,11 +213,19 @@ enum Signature: Codable, Equatable {
     case typed(String)
     case image(Data)
 
-    /// The signature the sign tool places, the initials for the initial tool, or the stamp for the stamp tool.
+    /// The signature the sign tool places, the initials for the initial tool, or the stamp for the stamp tool. It's read on
+    /// every step of a drag, so the last one decoded is kept for as long as it's the one saved.
     static subscript(tool: Tool) -> Signature? {
-        get { UserDefaults.standard.data(forKey: tool.rawValue).flatMap { try? JSONDecoder().decode(Signature.self, from: $0) } }
+        get {
+            let data = UserDefaults.standard.data(forKey: tool.rawValue)
+            if let read, read.data == data { return read.signature }
+            let signature = data.flatMap { try? JSONDecoder().decode(Signature.self, from: $0) }
+            read = (data, signature)
+            return signature
+        }
         set { UserDefaults.standard.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: tool.rawValue) }
     }
+    private static var read: (data: Data?, signature: Signature?)?
 
     /// Its outline, to fill, y up: the strokes in ink, or the name's letters with no line finer than a pen's. A picture has
     /// none.
@@ -278,10 +286,16 @@ enum Signature: Codable, Equatable {
         return a
     }
 
-    /// The picture in a PNG.
+    /// The picture in a PNG, decoded now rather than each time it's drawn. Asked for on every step of a drag, so the last
+    /// one is kept for its PNG.
     static func picture(_ png: Data) -> CGImage? {
-        CGImageSourceCreateWithData(png as CFData, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
+        if let decoded, decoded.png == png { return decoded.picture }
+        let now = [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
+        let picture = CGImageSourceCreateWithData(png as CFData, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, now) }
+        decoded = (png, picture)
+        return picture
     }
+    private static var decoded: (png: Data, picture: CGImage?)?
 
     /// A photo or scan of a signature or stamp on paper, as a PNG of its ink alone: the paper made clear, the ink in its own
     /// colour, turned upright, at most 1,000 pixels a side and cropped to the ink. Nil for a file that isn't a picture, or
