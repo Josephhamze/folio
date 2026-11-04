@@ -196,6 +196,22 @@ final class ToolsTests: XCTestCase {
         XCTAssertTrue(doc.hasRedactions)
     }
 
+    /// A bookmark to a redacted page goes to the page that replaces it, and back with undo.
+    func testBookmarkFollowsItsRedactedPage() async throws {
+        let doc = FolioDocument(pdf: try XCTUnwrap(PDFDocument(data: outlinedPDF()))), undo = manualUndo(doc)
+        let page = doc.pages[1]
+        page.addAnnotation(shape(.redact, from: CGPoint(x: 100, y: 100), to: CGPoint(x: 200, y: 150), color: .red))
+        undo.beginUndoGrouping()
+        let redacted = await doc.applyRedactions()
+        undo.endUndoGrouping()
+        XCTAssertEqual(redacted, 1)
+        XCTAssertIdentical(doc.pdf.outlineRoot?.child(at: 0)?.destination?.page, doc.pages[1])
+        let saved = try XCTUnwrap(PDFDocument(data: try doc.snapshot(contentType: .pdf)))
+        XCTAssertEqual(saved.outlineRoot?.child(at: 0)?.destination?.page.map(saved.index(for:)), 1)
+        undo.undo()
+        XCTAssertIdentical(doc.pdf.outlineRoot?.child(at: 0)?.destination?.page, page)
+    }
+
     /// A redacted page is kept as a JPEG: drawn as it is, a page-sized photo would weigh over 20 MB.
     func testRedactedPhotoStaysAJPEG() async throws {
         let doc = FolioDocument(pdf: photoPDF())

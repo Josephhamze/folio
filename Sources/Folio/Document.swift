@@ -114,7 +114,7 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     private static func copied(_ outline: PDFOutline) -> PDFOutline {
         let copy = PDFOutline()
         (copy.label, copy.isOpen) = (outline.label, outline.isOpen)
-        if let to = outline.destination, let page = to.page {
+        if let to = outline.destination ?? (outline.action as? PDFActionGoTo)?.destination, let page = to.page {
             copy.destination = PDFDestination(page: page, at: to.point)
         } else {
             copy.action = outline.action
@@ -127,15 +127,28 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
 
     var pages: [PDFPage] { (0..<pdf.pageCount).compactMap { pdf.page(at: $0) } }
 
-    /// Puts these pages in the document, in this order. Undo puts the same page objects back as they were.
-    func setPages(_ new: [PDFPage], name: String) {
-        let old = pages
-        change(name, do: { self.fill(new) }, undo: { self.fill(old) })
+    /// Puts these pages in the document, in this order, and a bookmark to a page in `replacing` on the page that replaces it.
+    /// Undo puts the same page objects back as they were, and the bookmarks with them.
+    func setPages(_ new: [PDFPage], name: String, replacing: [PDFPage: PDFPage] = [:]) {
+        let old = pages, back = Dictionary(uniqueKeysWithValues: replacing.map { ($1, $0) })
+        change(name, do: { self.fill(new, replacing: replacing) }, undo: { self.fill(old, replacing: back) })
     }
 
-    private func fill(_ list: [PDFPage]) {
+    private func fill(_ list: [PDFPage], replacing: [PDFPage: PDFPage]) {
+        pdf.outlineRoot.map { Self.repoint($0, replacing) }
         while pdf.pageCount > 0 { pdf.removePage(at: pdf.pageCount - 1) }
         for page in list { pdf.insert(page, at: pdf.pageCount) }
+    }
+
+    /// Points each bookmark at its page itself, or at the page that replaces it, as the pages are about to leave: a file's
+    /// own bookmark finds its page through the file, so would lose it, and open the first page once saved.
+    private static func repoint(_ outline: PDFOutline, _ replacing: [PDFPage: PDFPage]) {
+        if let to = outline.destination, let page = to.page {
+            outline.destination = PDFDestination(page: replacing[page] ?? page, at: to.point)
+        } else if let to = (outline.action as? PDFActionGoTo)?.destination, let page = to.page {
+            outline.action = PDFActionGoTo(destination: PDFDestination(page: replacing[page] ?? page, at: to.point))
+        }
+        for i in 0..<outline.numberOfChildren { outline.child(at: i).map { repoint($0, replacing) } }
     }
 
     func rotate(_ chosen: [PDFPage], by degrees: Int) {

@@ -24,17 +24,19 @@ func makePDF(styled pages: [[NSAttributedString]], size: CGSize = CGSize(width: 
     return PDFDocument(data: data as Data)!
 }
 
-/// Two blank pages, titled "Q3", with a bookmark, "Second", to the second, written out by hand: PDFKit saves the bookmarks
-/// of a file it read as the file had them, not ones added to it.
+/// Two blank pages, titled "Q3", with bookmarks, "Second" to the second and "First" to the first, the way some files have
+/// it, by a go-to action. Written out by hand: PDFKit saves the bookmarks of a file it read as the file had them, not ones
+/// added to it.
 func outlinedPDF() -> Data {
     let objects = [
         "<< /Type /Catalog /Pages 2 0 R /Outlines 5 0 R >>",
         "<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
         "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>",
         "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>",
-        "<< /Type /Outlines /First 6 0 R /Last 6 0 R /Count 1 >>",
-        "<< /Title (Second) /Parent 5 0 R /Dest [4 0 R /XYZ 0 792 0] >>",
+        "<< /Type /Outlines /First 6 0 R /Last 8 0 R /Count 2 >>",
+        "<< /Title (Second) /Parent 5 0 R /Next 8 0 R /Dest [4 0 R /XYZ 0 792 0] >>",
         "<< /Title (Q3) >>",
+        "<< /Title (First) /Parent 5 0 R /Prev 6 0 R /A << /S /GoTo /D [3 0 R /XYZ 0 792 0] >> >>",
     ]
     var pdf = "%PDF-1.4\n", offsets: [Int] = []
     for (i, object) in objects.enumerated() {
@@ -147,6 +149,28 @@ final class DocumentTests: XCTestCase {
         XCTAssertFalse(file.unlock(withPassword: "a"))
         XCTAssertTrue(file.unlock(withPassword: "b"))
         XCTAssertEqual(texts(file), ["A"])
+    }
+
+    /// Inserting, moving and deleting pages keeps each of the file's bookmarks to its page once saved, and undoes.
+    func testOrganizingKeepsEachBookmarkToItsPage() throws {
+        let doc = FolioDocument(pdf: try XCTUnwrap(PDFDocument(data: outlinedPDF()))), undo = manualUndo(doc)
+        let second = doc.pages[1]
+        act(undo) { doc.insert([FolioDocument.blankPage(), FolioDocument.blankPage()], at: 0) }
+        act(undo) { doc.move([second], to: 1) }
+        act(undo) { doc.delete([doc.pages[2]]) }
+        // A blank, Second, First: none on the first page, where a lost bookmark goes.
+        XCTAssertEqual(bookmarked(try reopened(doc)), [1, 2])
+        undo.undo()
+        undo.undo()
+        undo.undo()
+        XCTAssertEqual(bookmarked(try reopened(doc)), [1, 0])
+    }
+
+    /// The pages the bookmarks go to, by the bookmark or by its go-to action.
+    private func bookmarked(_ file: PDFDocument) -> [Int?] {
+        (0..<(file.outlineRoot?.numberOfChildren ?? 0)).map { i in
+            file.outlineRoot?.child(at: i).flatMap { $0.destination ?? ($0.action as? PDFActionGoTo)?.destination }?.page.map(file.index(for:))
+        }
     }
 
     /// Taking off a file's password keeps its pages, marks, title and bookmarks, each to its page, and undoes.
