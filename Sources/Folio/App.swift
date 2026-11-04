@@ -51,11 +51,21 @@ extension FocusedValues {
 }
 
 /// The end of the responder chain, where iPad's own Edit › Find lands with or without a first responder. It takes ⌘F, ⌘G
-/// and ⇧⌘G before Folio's commands can.
+/// and ⇧⌘G before Folio's commands can. On iPadOS 26 the page, which has the keys from the moment a document opens, keeps
+/// those three from Edit › Find, so they're asked for here too, ahead of what the system does with them.
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     override func find(_ sender: Any?) { Front.shared.document?.searchFocus.wrappedValue = true }
     override func findNext(_ sender: Any?) { Front.shared.document?.viewer.step(1) }
     override func findPrevious(_ sender: Any?) { Front.shared.document?.viewer.step(-1) }
+
+    override var keyCommands: [UIKeyCommand]? {
+        [UIKeyCommand(input: "f", modifierFlags: .command, action: #selector(find(_:))),
+         UIKeyCommand(input: "g", modifierFlags: .command, action: #selector(findNext(_:))),
+         UIKeyCommand(input: "g", modifierFlags: [.command, .shift], action: #selector(findPrevious(_:)))].map {
+            $0.wantsPriorityOverSystemBehavior = true
+            return $0
+        }
+    }
 }
 #endif
 
