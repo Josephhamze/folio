@@ -257,10 +257,13 @@ final class ScreenshotTests: XCTestCase {
         choose("textformat")
         point(app.frame.midX, app.frame.maxY * 0.72).tap()
         app.typeText("Kept after closing")
-        let field = app.textFields.matching(NSPredicate(format: "value == 'Kept after closing'")).firstMatch
-        expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: field)
-        waitForExpectations(timeout: 3)
-        app.navigationBars.buttons["BackButton"].tap()
+        let field = app.textFields.matching(NSPredicate(format: "value == 'Kept after closing'")).firstMatch, back = app.navigationBars.buttons["BackButton"]
+        // In sight: under the navigation bar, and over the tool bar, which rides on the keyboard. Told by its frame:
+        // isHittable has said no while the field showed whole, just over the bar.
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(field.frame.minY, back.frame.maxY)
+        XCTAssertLessThanOrEqual(field.frame.maxY, app.buttons["cursorarrow"].frame.minY)
+        back.tap()
         let sample = app.cells["Quarterly Brief, pdf"]
         XCTAssert(sample.waitForExistence(timeout: 10))
         sample.tap()
