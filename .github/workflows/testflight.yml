@@ -5,10 +5,7 @@
 name: TestFlight
 permissions:
   contents: read
-on:
-  workflow_dispatch:
-  push:
-    branches: [testflight]   # TEMPORARY: the first upload, before merging
+on: workflow_dispatch
 # Two at once would both take the same build number, from the commit count.
 concurrency: testflight
 jobs:
