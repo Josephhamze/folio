@@ -49,9 +49,12 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
 
     func snapshot(contentType: UTType) throws -> Data {
         let options = newPassword.map { [PDFDocumentWriteOption.userPasswordOption: $0, .ownerPasswordOption: $0] } ?? [:]
-        // PDFKit writes a file it can't protect, as with a password not in ASCII, unprotected, and says nothing.
-        guard !pdf.isLocked, let data = pdf.dataRepresentation(options: options),
-              newPassword == nil || PDFDocument(data: data)?.isEncrypted == true else { throw CocoaError(.fileWriteUnknown) }
+        guard !pdf.isLocked, let data = pdf.dataRepresentation(options: options) else { throw CocoaError(.fileWriteUnknown) }
+        // PDFKit writes a file it can't protect, as with a password not in ASCII, unprotected, and says nothing: the file must
+        // open with the password, or it isn't saved.
+        if let newPassword, PDFDocument(data: data).map({ $0.isEncrypted && $0.unlock(withPassword: newPassword) }) != true {
+            throw CocoaError(.fileWriteUnknown)
+        }
         return data
     }
 
