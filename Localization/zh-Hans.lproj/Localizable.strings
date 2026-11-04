@@ -46,7 +46,7 @@
 "Find Next" = "查找下一个";
 "Find Previous" = "查找上一个";
 "Find…" = "查找…";
-"Found no pages to insert" = "没有可插入的页面";
+"Found no pages to insert: a PDF with a password or restrictions gives none" = "没有可插入的页面：带密码或限制的 PDF 不提供页面";
 "Found no text to recognize" = "未找到可识别的文本";
 "Highlight" = "高亮";
 "Home" = "主页";

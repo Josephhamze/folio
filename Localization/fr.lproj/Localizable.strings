@@ -46,7 +46,7 @@
 "Find Next" = "Rechercher le suivant";
 "Find Previous" = "Rechercher le précédent";
 "Find…" = "Rechercher…";
-"Found no pages to insert" = "Aucune page à insérer";
+"Found no pages to insert: a PDF with a password or restrictions gives none" = "Aucune page à insérer : un PDF protégé par un mot de passe ou des restrictions n’en donne aucune";
 "Found no text to recognize" = "Aucun texte à reconnaître";
 "Highlight" = "Surligner";
 "Home" = "Accueil";

@@ -227,7 +227,7 @@ final class Viewer {
                 }
                 pages += data.map { FolioDocument.pages(from: $0, isPDF: type.conforms(to: .pdf)) } ?? []
             }
-            if pages.isEmpty { message = String(localized: "Found no pages to insert") } else { insert(pages) }
+            if pages.isEmpty { message = String(localized: "Found no pages to insert: a PDF with a password or restrictions gives none") } else { insert(pages) }
         }
         return true
     }
@@ -369,7 +369,7 @@ struct DocumentView: View {
                 let opened = urls.map { $0.startAccessingSecurityScopedResource() }
                 let pages = FolioDocument.pages(from: urls)
                 for (url, isOpen) in zip(urls, opened) where isOpen { url.stopAccessingSecurityScopedResource() }
-                if pages.isEmpty { viewer.message = String(localized: "Found no pages to insert") } else { viewer.insert(pages) }
+                if pages.isEmpty { viewer.message = String(localized: "Found no pages to insert: a PDF with a password or restrictions gives none") } else { viewer.insert(pages) }
             }
             // On a view of its own: a second file dialog on the same view never shows.
             .background {
