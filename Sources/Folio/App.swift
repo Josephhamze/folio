@@ -50,49 +50,12 @@ extension FocusedValues {
     var document: (viewer: Viewer, searchFocus: FocusState<Bool>.Binding)?
 }
 
-/// The end of the responder chain, where iPad's own Edit › Find lands with or without a first responder. It takes Find, Find
-/// Next and Find Previous before Folio's commands can.
+/// The end of the responder chain, where iPad's own Edit › Find lands, from the menu or its keys, with or without a first
+/// responder. It takes Find, Find Next and Find Previous before Folio's commands can.
 final class AppDelegate: UIResponder, UIApplicationDelegate {
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        let app: AnyClass = type(of: application)
-        if let theirs = class_getInstanceMethod(app, #selector(UIApplication.sendEvent(_:))),
-           let mine = class_getInstanceMethod(app, #selector(UIApplication.findKeysFirst(_:))) {
-            method_exchangeImplementations(theirs, mine)
-        }
-        return true
-    }
-
     override func find(_ sender: Any?) { Front.shared.document?.searchFocus.wrappedValue = true }
     override func findNext(_ sender: Any?) { Front.shared.document?.viewer.step(1) }
     override func findPrevious(_ sender: Any?) { Front.shared.document?.viewer.step(-1) }
-}
-
-extension UIApplication {
-    /// Edit › Find's keys, ⌘F, ⌘G and ⇧⌘G, as they arrive: on iPadOS 26 the page and the search field, whichever has the
-    /// keys, keep those three to themselves, so the menu never hears them.
-    /// shortcut: this stands in for sendEvent(_:), swapped in at launch, as nothing in UIKit or SwiftUI sees a key before what
-    /// has the keys does. Drop it once Folio needs an iPadOS whose page and search field let those keys by.
-    @objc fileprivate func findKeysFirst(_ event: UIEvent) {
-        guard let presses = event as? UIPressesEvent, let document = Front.shared.document,
-              let press = presses.allPresses.first(where: { $0.key.map(Self.findsWith) ?? false }), let key = press.key else {
-            return findKeysFirst(event)   // swapped: UIKit's own sendEvent(_:)
-        }
-        guard press.phase == .began else { return }
-        if key.charactersIgnoringModifiers.lowercased() == "f" {
-            document.searchFocus.wrappedValue = true
-        } else {
-            document.viewer.step(key.modifierFlags.contains(.shift) ? -1 : 1)
-        }
-    }
-
-    private static func findsWith(_ key: UIKey) -> Bool {
-        let modifiers = key.modifierFlags.intersection([.command, .shift, .alternate, .control])
-        switch key.charactersIgnoringModifiers.lowercased() {
-        case "f": return modifiers == .command
-        case "g": return modifiers == .command || modifiers == [.command, .shift]
-        default: return false
-        }
-    }
 }
 #endif
 

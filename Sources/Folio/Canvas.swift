@@ -115,11 +115,22 @@ final class Canvas: PDFView {
     #endif
 
     #if os(iOS)
-    /// The press watches the whole window.
+    /// The press watches the whole window. And the window's view controller, which the page and the search field both answer
+    /// to, asks for Edit › Find's keys, ⌘F, ⌘G and ⇧⌘G, ahead of the system: on iPadOS 26 the system keeps them otherwise,
+    /// and the menu never hears them.
     override func didMoveToWindow() {
         super.didMoveToWindow()
         press.view?.removeGestureRecognizer(press)
         window?.addGestureRecognizer(press)
+        guard window != nil, let top = sequence(first: self as UIResponder, next: \.next).compactMap({ $0 as? UIViewController }).last,
+              top.keyCommands?.contains(where: { $0.action == #selector(UIResponder.find(_:)) }) != true else { return }
+        for (input, modifiers, action) in [("f", UIKeyModifierFlags.command, #selector(UIResponder.find(_:))),
+                                           ("g", .command, #selector(UIResponder.findNext(_:))),
+                                           ("g", [.command, .shift], #selector(UIResponder.findPrevious(_:)))] {
+            let command = UIKeyCommand(input: input, modifierFlags: modifiers, action: action)
+            command.wantsPriorityOverSystemBehavior = true
+            top.addKeyCommand(command)
+        }
     }
     #endif
 
