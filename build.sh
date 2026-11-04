@@ -11,7 +11,7 @@
 # "./build.sh screenshots" takes the App Store's screenshots, on an iPhone 17 Pro Max and an iPad Pro 13-inch, into
 # build/app-store.
 # "./build.sh ios-release" uploads a build to App Store Connect. Xcode signs it with the team's Apple Account, added in
-# Xcode › Settings › Accounts.
+# Xcode › Settings › Accounts; on GitHub, the TestFlight workflow runs it with an App Store Connect API key instead.
 set -e
 cd "$(dirname "$0")"
 
@@ -66,10 +66,25 @@ if [ "$1" = ios-release ]; then
 	[ -z "$(git status --porcelain)" ] || { echo "Commit your changes first"; exit 1; }
 	xcodegen --quiet
 	rm -rf build/Folio.xcarchive
-	xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination generic/platform=iOS -archivePath build/Folio.xcarchive \
-		-allowProvisioningUpdates archive CURRENT_PROJECT_VERSION="$(git rev-list --count HEAD)"
-	xcodebuild -quiet -exportArchive -archivePath build/Folio.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath build/ios \
-		-allowProvisioningUpdates
+	if [ -z "$ASC_KEY_ID" ]; then
+		xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination generic/platform=iOS -archivePath build/Folio.xcarchive \
+			-allowProvisioningUpdates archive CURRENT_PROJECT_VERSION="$(git rev-list --count HEAD)"
+		xcodebuild -quiet -exportArchive -archivePath build/Folio.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath build/ios \
+			-allowProvisioningUpdates
+	else
+		# On GitHub (testflight.yml), where Xcode has no Apple Account: signed by hand with the certificate and profile the
+		# workflow installed, since automatic signing would have Xcode make a new certificate on every run, and uploaded with
+		# the App Store Connect API key.
+		xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination generic/platform=iOS -archivePath build/Folio.xcarchive \
+			archive CURRENT_PROJECT_VERSION="$(git rev-list --count HEAD)" \
+			CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution" PROVISIONING_PROFILE_SPECIFIER="Folio App Store"
+		cp ExportOptions.plist build/ExportOptions.plist
+		plutil -replace signingStyle -string manual build/ExportOptions.plist
+		plutil -insert provisioningProfiles -json '{"com.josephhamze.folio": "Folio App Store"}' build/ExportOptions.plist
+		xcodebuild -quiet -exportArchive -archivePath build/Folio.xcarchive -exportOptionsPlist build/ExportOptions.plist \
+			-exportPath build/ios -authenticationKeyPath "$ASC_KEY_PATH" -authenticationKeyID "$ASC_KEY_ID" \
+			-authenticationKeyIssuerID "$ASC_ISSUER_ID"
+	fi
 	echo "Uploaded build $(git rev-list --count HEAD) to App Store Connect"
 	exit
 fi

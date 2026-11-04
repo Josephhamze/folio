@@ -1,0 +1,49 @@
+# Uploads the iPhone and iPad app to TestFlight from one of GitHub's Macs, free for a public repository: run it from the
+# Actions tab, or with `gh workflow run testflight.yml`. It signs with the Apple Distribution certificate and the App
+# Store profile in the repository's secrets, and uploads with the App Store Connect API key there; docs/app-store.md
+# says what each secret holds.
+name: TestFlight
+permissions:
+  contents: read
+on: workflow_dispatch
+# Two at once would both take the same build number, from the commit count.
+concurrency: testflight
+jobs:
+  upload:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # all of it, for the commit count
+      - run: brew install xcodegen
+      # The runner is thrown away after the job, and its keychain and files with it.
+      - name: Install the certificate, the profile and the key
+        env:
+          DIST_P12: ${{ secrets.DIST_P12 }}
+          DIST_P12_PASSWORD: ${{ secrets.DIST_P12_PASSWORD }}
+          APP_STORE_PROFILE: ${{ secrets.APP_STORE_PROFILE }}
+          ASC_KEY: ${{ secrets.ASC_KEY }}
+        run: |
+          K=$RUNNER_TEMP/signing.keychain-db
+          security create-keychain -p "" "$K"
+          security set-keychain-settings -lut 3600 "$K"
+          security unlock-keychain -p "" "$K"
+          printf %s "$DIST_P12" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -k "$K" -P "$DIST_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$K" > /dev/null
+          security list-keychains -d user -s "$K" login.keychain-db
+          security find-identity -v -p codesigning "$K" | grep -q "Apple Distribution" \
+            || { echo "::error::DIST_P12 holds no Apple Distribution certificate: see docs/app-store.md"; exit 1; }
+          printf %s "$APP_STORE_PROFILE" | base64 --decode > "$RUNNER_TEMP/folio.mobileprovision"
+          security cms -D -i "$RUNNER_TEMP/folio.mobileprovision" -o "$RUNNER_TEMP/profile.plist"
+          UUID=$(plutil -extract UUID raw "$RUNNER_TEMP/profile.plist")
+          for D in ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles ~/Library/MobileDevice/Provisioning\ Profiles; do
+            mkdir -p "$D" && cp "$RUNNER_TEMP/folio.mobileprovision" "$D/$UUID.mobileprovision"
+          done
+          printf '%s\n' "$ASC_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+      - run: xcodebuild -version && ./build.sh ios-release
+        env:
+          ASC_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}

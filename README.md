@@ -64,7 +64,7 @@ This builds and signs `build/Folio.app`, then opens it. To keep Folio, copy `bui
 - `./build.sh ios-test` runs the iOS tests, on an iPhone 17 Pro and an iPad Pro 13-inch simulator. Give it a test's name to run only that one, such as `./build.sh ios-test FolioTouchTests`.
 - GitHub runs the Mac and iOS tests on every push, and keeps the iOS tests' screenshots with each run.
 - `./build.sh screenshots` takes the App Store's screenshots, into `build/app-store`.
-- `./build.sh ios-release` uploads a build to App Store Connect. [`docs/app-store.md`](docs/app-store.md) has the one-time setup and the listing.
+- `./build.sh ios-release` uploads a build to App Store Connect, and the TestFlight workflow does the same from GitHub. [`docs/app-store.md`](docs/app-store.md) has the one-time setup and the listing.
 - `swift icon/icon.swift` draws the icon and the dmg window's background from code, into `icon/Folio.icns`, `icon/logo.png` and `icon/dmg.png`.
 - The design and the build plan are in [`docs/superpowers`](docs/superpowers).
 - [`Localization`](Localization) has Folio's French and Chinese, each line a translation of Folio's English. Words added to Folio need a line in both, and `swift test` checks that the two tables match each other, the code and the numbers and names each line takes.

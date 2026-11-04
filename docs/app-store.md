@@ -9,6 +9,20 @@ What goes into App Store Connect for Folio on iPhone and iPad.
 3. **Upload.** `./build.sh ios-release` archives the app and uploads it. Each build's number is the commit count, so it always goes up.
 4. **Screenshots.** `./build.sh screenshots` takes them, into `build/app-store`: three for the 6.9-inch iPhone (1320 × 2868) and three for the 13-inch iPad (2064 × 2752). App Store Connect scales them down for the smaller sizes.
 
+## TestFlight from GitHub
+
+The TestFlight workflow uploads a build from one of GitHub's Macs, with no Mac of your own: run it from the Actions tab, or with `gh workflow run testflight.yml` (add `--ref <branch>` for a branch other than main). Once App Store Connect has processed a build, in 10 to 30 minutes, it reaches the internal testing group "Me" in the TestFlight app.
+
+It signs and uploads with these repository secrets:
+
+| Secret | Holds |
+| --- | --- |
+| `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY` | An App Store Connect API key with Admin access, from Users and Access › Integrations; `ASC_KEY` is the `.p8` file's text. |
+| `DIST_P12`, `DIST_P12_PASSWORD` | An Apple Distribution certificate with its private key, as a `.p12` in base64, and the `.p12`'s password. |
+| `APP_STORE_PROFILE` | The App Store provisioning profile "Folio App Store", for `com.josephhamze.folio` and that certificate, in base64. |
+
+The key made the certificate and the profile through the App Store Connect API. They expire after a year, and the workflow then fails at signing: make a new private key and certificate signing request with `openssl`, a certificate from them (`POST /v1/certificates`, type `DISTRIBUTION`), and a profile for it (`POST /v1/profiles`, type `IOS_APP_STORE`, named "Folio App Store"), then replace the three signing secrets.
+
 ## The listing
 
 - **Name:** Folio: Mark Up & Sign PDFs
