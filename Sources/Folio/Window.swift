@@ -506,8 +506,8 @@ struct DocumentView: View {
     }
     #else
     /// Reading, the pages show with a bar at their foot to see them all, find, mark up and sign, and the navigation bar shares
-    /// the document and has its tools. Marking up or organizing, their tools take the bar's place, and the navigation bar has
-    /// Undo, Redo and Done, which ends them.
+    /// the document and has its tools. Marking up or organizing, their tools take the foot's bar's place, and a bar of Undo,
+    /// Redo and Done, which ends them, the navigation bar's.
     private var layout: some View {
         let editing = viewer.markingUp || viewer.organizing
         return PageView(viewer: viewer)
@@ -533,20 +533,15 @@ struct DocumentView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
             }
+            // Not in the navigation bar: there, as Markup started beside a long document name, iOS moved Done into a More
+            // menu, and kept it there once the name had gone. Its height is the navigation bar's, so the pages stay put.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if editing { editingBar.padding(.horizontal).padding(.vertical, 5) }
+            }
+            .toolbar(editing ? .hidden : .visible, for: .navigationBar)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    if editing {
-                        undoRedo
-                        Button("Done") {
-                            viewer.backToReading()
-                            // There's no Save: the first Done says so.
-                            if !toldSaving {
-                                toldSaving = true
-                                viewer.message = String(localized: "Folio saves your changes as you make them")
-                            }
-                        }
-                        .fontWeight(.semibold)
-                    } else {
+                    if !editing {
                         ShareButton(viewer: viewer, name: name)
                         // iPhone has no menu bar for the Tools menu. Undo is in it for what it does, which Markup doesn't show.
                         Menu("Tools", systemImage: "ellipsis.circle") {
@@ -560,9 +555,6 @@ struct DocumentView: View {
                     }
                 }
             }
-            // An iPhone's bar fits Undo, Redo and Done beside the back button only without the document's name: with it, iOS
-            // moves Done into a More menu.
-            .toolbar(removing: editing ? .title : nil)
             // iOS has no switch an app can turn: Files sets the app a PDF opens in.
             .alert("Make Default PDF App", isPresented: $guidingDefault) {
                 Button("Open Files") { UIApplication.shared.open(URL(string: "shareddocuments://")!) }
@@ -586,6 +578,30 @@ struct DocumentView: View {
             .onReceive(NotificationCenter.default.publisher(for: UIWindow.didBecomeKeyNotification)) {
                 if $0.object as? UIWindow === viewer.canvas.window { Front.shared.document = (viewer, $searching) }
             }
+    }
+
+    /// Undo, Redo and Done, in the navigation bar's place while marking up or organizing, as Photos has its own while editing.
+    private var editingBar: some View {
+        HStack {
+            HStack(spacing: 0) { undoRedo }
+                .buttonStyle(Tile())
+                .glassEffect()
+            Spacer()
+            Button("Done") {
+                viewer.backToReading()
+                // There's no Save: the first Done says so.
+                if !toldSaving {
+                    toldSaving = true
+                    viewer.message = String(localized: "Folio saves your changes as you make them")
+                }
+            }
+            .fontWeight(.semibold)
+            .buttonStyle(.glassProminent)
+            .controlSize(.large)
+        }
+        .frame(height: 44)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("Editing")
     }
 
     /// Undo and Redo. A tap leaves the words being typed in their field, so they become a change of their own first.

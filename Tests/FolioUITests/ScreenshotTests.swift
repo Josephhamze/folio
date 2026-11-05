@@ -264,25 +264,27 @@ final class ScreenshotTests: XCTestCase {
         choose("Text Box")
         point(line.minX + 10, line.maxY + 100).tap()
         app.typeText("Never mind")
-        undo.tap()   // the navigation bar's, not the keyboard's
+        undo.tap()   // the bar's, not the keyboard's
         XCTAssertTrue(redo.isEnabled)
         XCTAssertTrue(undo.isEnabled)   // the rectangle's still there to undo
         XCTAssertFalse(app.textFields.matching(NSPredicate(format: "value == 'Never mind'")).firstMatch.exists)
     }
 
-    /// Words being typed are kept when the document closes, and the field stays in sight above the keyboard.
+    /// Words being typed are kept by Done, for the document to close with them, and the field stays in sight above the
+    /// keyboard.
     func testTypingKeptWhenTheDocumentCloses() {
         openSample()
         choose("Text Box")
         point(app.frame.midX, app.frame.maxY * 0.72).tap()
         app.typeText("Kept after closing")
-        let field = app.textFields.matching(NSPredicate(format: "value == 'Kept after closing'")).firstMatch, back = app.navigationBars.buttons["BackButton"]
-        // In sight: under the navigation bar, and over Markup's tools, which ride on the keyboard. Told by its frame:
+        let field = app.textFields.matching(NSPredicate(format: "value == 'Kept after closing'")).firstMatch
+        // In sight: under Undo, Redo and Done, and over Markup's tools, which ride on the keyboard. Told by its frame:
         // isHittable has said no while the field showed whole, just over the bar.
         XCTAssertTrue(field.waitForExistence(timeout: 5))
-        XCTAssertGreaterThanOrEqual(field.frame.minY, back.frame.maxY)
+        XCTAssertGreaterThanOrEqual(field.frame.minY, editingBar.frame.maxY)
         XCTAssertLessThanOrEqual(field.frame.maxY, app.buttons["Select"].frame.minY)
-        back.tap()
+        done()
+        app.navigationBars.buttons["BackButton"].tap()
         let sample = app.cells["Quarterly Brief, pdf"]
         XCTAssert(sample.waitForExistence(timeout: 10))
         sample.tap()
@@ -292,7 +294,7 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "value == 'Kept after closing'")).firstMatch.waitForExistence(timeout: 5))
     }
 
-    /// A note's comment being typed is kept when the document closes. On iPad the panes leave Back in reach.
+    /// A note's comment being typed is kept by Done, for the document to close with it. On iPad the panes leave Done in reach.
     func testCommentKeptWhenTheDocumentCloses() throws {
         try XCTSkipUnless(pad, "On iPhone the comments cover Back.")
         openSample()
@@ -301,6 +303,7 @@ final class ScreenshotTests: XCTestCase {
         point(line.minX + 40, line.maxY + 250).tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         app.typeText("Noted before closing")
+        done()
         app.navigationBars.buttons["BackButton"].tap()
         let sample = app.cells["Quarterly Brief, pdf"]
         XCTAssert(sample.waitForExistence(timeout: 10))
@@ -331,9 +334,11 @@ final class ScreenshotTests: XCTestCase {
 
     private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
-    /// The navigation bar's Undo and Redo, in Markup and while organizing: the keyboard has its own.
-    private var undo: XCUIElement { app.navigationBars.buttons["Undo"] }
-    private var redo: XCUIElement { app.navigationBars.buttons["Redo"] }
+    /// The bar of Undo, Redo and Done in the navigation bar's place, in Markup and while organizing.
+    private var editingBar: XCUIElement { app.descendants(matching: .any).matching(identifier: "Editing").firstMatch }
+    /// The bar's Undo and Redo: the iPad's keyboard has its own.
+    private var undo: XCUIElement { editingBar.buttons["Undo"] }
+    private var redo: XCUIElement { editingBar.buttons["Redo"] }
 
     /// Shows the panes, unless they show already. A tap as the app comes back on screen can be lost, so where they don't
     /// show, it's made again.
@@ -360,7 +365,7 @@ final class ScreenshotTests: XCTestCase {
 
     /// Ends Markup or organizing.
     private func done() {
-        app.navigationBars.buttons["Done"].tap()
+        editingBar.buttons["Done"].tap()
     }
 
     /// Picks an item of the navigation bar's Tools menu.
