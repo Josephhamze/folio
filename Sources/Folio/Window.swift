@@ -592,6 +592,8 @@ struct DocumentView: View {
             .buttonStyle(.glassProminent)
             .controlSize(.large)
         }
+        // Clear of the close and minimize buttons in an iPad window's corner, which the navigation bar made room for.
+        .containerCornerOffset(.horizontal, sizeToFit: true)
         .frame(height: 44)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Editing")

@@ -164,7 +164,7 @@ struct PasswordSheet: View {
         let same = restricts && !password.isEmpty && restrictions.password == password
         let ready = ascii && !same && password == again && !(password.isEmpty && !restricts)
             && !(restricts && (restrictions.password.isEmpty || restrictions.password != permissionsAgain))
-        VStack(spacing: 16) {
+        let form = VStack(spacing: 16) {
             #if os(macOS)
             Text("Password").font(.headline)
             #endif
@@ -202,7 +202,10 @@ struct PasswordSheet: View {
         .frame(width: 340)
         .padding(20)
         #if os(iOS)
-        .sheetBar("Password", "Set Password", enabled: ready, cancel: { dismiss() }, confirmed: setChosen)
+        // With Restrict on, its fields don't all fit above an iPhone's keyboard.
+        ScrollView { form }.sheetBar("Password", "Set Password", enabled: ready, cancel: { dismiss() }, confirmed: setChosen)
+        #else
+        form
         #endif
     }
 

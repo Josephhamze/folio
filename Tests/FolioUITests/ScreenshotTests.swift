@@ -230,6 +230,13 @@ final class ScreenshotTests: XCTestCase {
         // A switch turns where its knob is, not where its words are.
         restrict.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
         shot("password and restrictions")
+        // Not all of them fit above the keyboard: the sheet scrolls to the one being typed in, under its buttons.
+        let last = app.secureTextFields.matching(identifier: "Again").element(boundBy: 1)
+        last.tap()
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        XCTAssertLessThanOrEqual(last.frame.maxY, keyboard.frame.minY)
+        XCTAssertTrue(app.buttons["Set Password"].isHittable)
         app.buttons["Cancel"].tap()
     }
 
