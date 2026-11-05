@@ -25,12 +25,17 @@ ios_test() {
 	# Photos for Create from Photos to choose, whatever the simulator came with.
 	xcrun simctl addmedia "$DEVICE" icon/logo.png icon/dmg.png
 	xcrun simctl uninstall "$DEVICE" com.alphapms.folio
-	xcrun simctl install "$DEVICE" .build/ios/Build/Products/Debug-iphonesimulator/Folio.app
-	DOCS=$(xcrun simctl get_app_container "$DEVICE" com.alphapms.folio data)/Documents
-	mkdir -p "$DOCS" && cp Tests/FolioUITests/*.pdf "$DOCS"
 	rm -rf ".build/ios/$1.xcresult"
 	xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination "id=$DEVICE" -derivedDataPath .build/ios \
-		-resultBundlePath ".build/ios/$1.xcresult" test-without-building ${2:+"-only-testing:$2"}
+		-resultBundlePath ".build/ios/$1.xcresult" test-without-building ${2:+"-only-testing:$2"} &
+	# The samples go in once the tests have installed Folio. Each install moves its files to a new folder, and a slow
+	# simulator's Files can take note of them before the move and lose them after it: a tap on one then opens nothing.
+	until DATA=$(xcrun simctl get_app_container "$DEVICE" com.alphapms.folio data 2>/dev/null); do
+		kill -0 $! 2>/dev/null || break
+		sleep 1
+	done
+	[ -z "$DATA" ] || { mkdir -p "$DATA/Documents" && cp Tests/FolioUITests/*.pdf "$DATA/Documents"; }
+	wait $!
 }
 
 if [ "$1" = ios-test ] || [ "$1" = screenshots ]; then
