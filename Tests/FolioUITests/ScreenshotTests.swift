@@ -253,7 +253,9 @@ final class ScreenshotTests: XCTestCase {
 
     /// Create from Photos makes a PDF of the photos chosen, a page each, Insert from Photos… adds another, and Done saves it.
     func testCreateFromPhotos() {
-        create("Create from Photos") { self.choosePhotos(2) }
+        launchScreen("Create from Photos")
+        choosePhotos(2)
+        XCTAssertTrue(app.buttons["Markup"].waitForExistence(timeout: 30), app.debugDescription)
         tools("Organize Pages")
         XCTAssertTrue(app.buttons["Page 2"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.buttons["Page 3"].exists)
@@ -398,32 +400,9 @@ final class ScreenshotTests: XCTestCase {
     /// Create Document makes a blank document, with no Photos' picker: iOS 26 and 27 tell its button apart from Create from
     /// Photos differently.
     func testCreateDocument() {
-        create("Create Document")
+        launchScreen("Create Document")
+        XCTAssertTrue(app.buttons["Markup"].waitForExistence(timeout: 30), app.debugDescription)
         XCTAssertFalse(photos.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
-    }
-
-    /// Makes a document with a button of the launch screen, `choosing` answering Photos' picker, until it opens: a simulator
-    /// can lose a new file for a while, as it does a sample (see openSample), saying "Unable to Import Document", so Folio
-    /// launches again and makes another.
-    private func create(_ button: String, choosing: (() -> Void)? = nil) {
-        let photo = photos.firstMatch, opened = app.buttons["Markup"], lost = app.alerts["Unable to Import Document"]
-        let deadline = Date.now + 1200
-        repeat {
-            launchScreen(button)
-            // iOS 26 shows the picker before it makes the document, and iOS 27 once it's open.
-            if let choosing, first(of: [photo, lost]) === photo { choosing() }
-            if first(of: [opened, lost]) === opened { return }
-        } while Date.now < deadline
-        XCTFail("The new document didn't open")
-    }
-
-    /// The first of `elements` to show in 30 seconds.
-    private func first(of elements: [XCUIElement]) -> XCUIElement? {
-        let deadline = Date.now + 30
-        repeat {
-            if let shown = elements.first(where: \.exists) { return shown }
-        } while Date.now < deadline
-        return nil
     }
 
     /// Launches Folio and taps a button of its launch screen.
