@@ -28,8 +28,8 @@ ios_test() {
 	rm -rf ".build/ios/$1.xcresult"
 	xcodebuild -quiet -project Folio.xcodeproj -scheme Folio -destination "id=$DEVICE" -derivedDataPath .build/ios \
 		-resultBundlePath ".build/ios/$1.xcresult" test-without-building ${2:+"-only-testing:$2"} &
-	# The samples go in once the tests have installed Folio. Each install moves its files to a new folder, and a slow
-	# simulator's Files can take note of them before the move and lose them after it: a tap on one then opens nothing.
+	# Each install moves Folio's files to a folder of a new name, and Files on a slow simulator could keep looking in
+	# the old one, so the samples go in once the tests have installed Folio.
 	until DATA=$(xcrun simctl get_app_container "$DEVICE" com.alphapms.folio data 2>/dev/null); do
 		kill -0 $! 2>/dev/null || break
 		sleep 1
