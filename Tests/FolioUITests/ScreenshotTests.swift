@@ -5,7 +5,7 @@ final class ScreenshotTests: XCTestCase {
     private let app = XCUIApplication()
 
     /// The App Store's screenshots, which `./build.sh screenshots` takes: a sample marked up and signed, the signature pad,
-    /// the launch screen, the organizer full of a longer sample's pages, and the password sheet filled in.
+    /// the launch screen, the organizer full of a longer sample's pages, and the sample redacted.
     func testScreenshots() {
         openSample("Garden Brief")
         // A point on the first page, in its 612 by 792 points from the top left.
@@ -34,24 +34,16 @@ final class ScreenshotTests: XCTestCase {
 
         done()
         waitUntilGone("Saved")
-        tools("Password…")
-        let restrict = app.switches["Restrict printing, copying and changes"], again = app.secureTextFields.matching(identifier: "Again")
-        XCTAssertTrue(restrict.waitForExistence(timeout: 5))
-        app.secureTextFields["Password"].tap()
-        app.typeText("harbor-street")
-        again.element(boundBy: 0).tap()
-        app.typeText("harbor-street")
-        // A switch turns where its knob is, not where its words are.
-        restrict.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-        app.switches["Allow printing"].coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-        app.secureTextFields["Permissions password"].tap()
-        app.typeText("committee")
-        again.element(boundBy: 1).tap()
-        app.typeText("committee\n")   // Return puts the keyboard away
-        _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 5)
-        XCTAssertTrue(app.buttons["Set Password"].isEnabled)
+        // The address and the sums, marked and then taken out of the file: a password sheet would do, but iOS leaves typed
+        // passwords out of screenshots.
+        for (from, to) in [(at(156, 252), at(255, 270)), (at(336, 605), at(381, 622)), (at(130, 622), at(175, 639))] {
+            choose("Redact")
+            drag(from, to)
+        }
+        done()
+        tools("Apply Redactions")
+        XCTAssertTrue(app.staticTexts["Redacted 1 page"].waitForExistence(timeout: 60), app.debugDescription)
         shot("5 Protect")
-        app.buttons["Cancel"].tap()
 
         // A sample of twelve pages, to fill the organizer.
         openSample("Harvest Report")
@@ -449,11 +441,11 @@ final class ScreenshotTests: XCTestCase {
     /// Opens a sample from Folio's folder. Browse opens where it was left: at its locations, in On My iPhone or iPad, or in
     /// Folio's folder. A slow Mac, such as GitHub's, can take a while to show a folder, and let a tap go while the folder
     /// slides in, so it takes whichever step shows until the document opens. A simulator just started there also leaves a
-    /// tapped document unopened for the first ten minutes or so, so Folio launches again each minute until it opens.
+    /// tapped document unopened for the first ten to twenty minutes, so Folio launches again each minute until it opens.
     private func openSample(_ name: String = "Quarterly Brief") {
         let sample = app.cells["\(name), pdf"], opened = app.buttons["Markup"]
         let steps = [sample, app.cells["Folio, Container"], app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'On My i'")).firstMatch]
-        let deadline = Date.now + 900
+        let deadline = Date.now + 1800
         repeat {
             app.launch()
             let browse = app.buttons["Browse"].firstMatch   // the tab, or the back button to it

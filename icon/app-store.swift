@@ -9,18 +9,22 @@ extension Color {
 }
 
 /// What each of testScreenshots' shots shows, by the shot's name: its title, the end of the title in the highlighter's
-/// yellow, and a subtitle in two lines on an iPhone.
-let captions = [
-    "1 Mark up": ("Mark up", "any PDF", "Highlight, write and draw\nwith a finger or Apple Pencil"),
-    "2 Sign": ("Sign", "in seconds", "Draw or type your signature once,\nthen place it with a tap"),
-    "3 Start": ("PDFs from", "photos", "A page for each photo,\nin the order you pick them"),
-    "4 Organize": ("Put pages", "in order", "Reorder, rotate, insert,\nextract and split"),
-    "5 Protect": ("Keep it", "private", "Passwords, restrictions\nand real redactions"),
+/// yellow, a subtitle in two lines on an iPhone, and the part of the screen to magnify, if any, as fractions of an
+/// iPhone's screenshot and of an iPad's.
+let captions: [String: (title: String, accent: String, subtitle: String, phone: CGRect?, pad: CGRect?)] = [
+    "1 Mark up": ("Mark up", "any PDF", "Highlight, write and draw\nwith a finger or Apple Pencil",
+                  CGRect(x: 0.08, y: 0.377, width: 0.62, height: 0.061), CGRect(x: 0.08, y: 0.483, width: 0.62, height: 0.092)),
+    "2 Sign": ("Sign", "in seconds", "Draw or type your signature once,\nthen place it with a tap", nil, nil),
+    "3 Start": ("PDFs from", "photos", "A page for each photo,\nin the order you pick them", nil, nil),
+    "4 Organize": ("Put pages", "in order", "Reorder, rotate, insert,\nextract and split", nil, nil),
+    "5 Protect": ("Keep it", "private", "Redact for real, and lock\nfiles with a password",
+                  CGRect(x: 0.08, y: 0.549, width: 0.62, height: 0.057), CGRect(x: 0.08, y: 0.762, width: 0.62, height: 0.084)),
 ]
 
-/// The screenshot in a drawn iPhone or iPad, on the icon's red lit from above, under its title and subtitle.
+/// The screenshot in a drawn iPhone or iPad, on the icon's red lit from above, under its title and subtitle, with a part of it
+/// magnified on a card over the device.
 struct Listing: View {
-    let shot: NSImage, size: CGSize, caption: (String, String, String)
+    let shot: NSImage, size: CGSize, caption: (title: String, accent: String, subtitle: String, phone: CGRect?, pad: CGRect?)
 
     var body: some View {
         // An iPad's screen is nearly square and a phone's tall, so on an iPad the words are sized to less of the width.
@@ -45,11 +49,11 @@ struct Listing: View {
             RadialGradient(colors: [Color(hex: 0xFF8C8C).opacity(0.55), .clear], center: UnitPoint(x: 0.5, y: 0.02), startRadius: 0,
                            endRadius: max(size.width * 0.8, size.height * 0.4))
             VStack(spacing: unit * 0.022) {
-                Text("\(caption.0) \(Text(caption.1).foregroundStyle(Color(hex: 0xFFE08A)))")
+                Text("\(caption.title) \(Text(caption.accent).foregroundStyle(Color(hex: 0xFFE08A)))")
                     .font(.system(size: unit * 0.094, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                Text(pad ? caption.2.replacingOccurrences(of: "\n", with: " ") : caption.2)
+                Text(pad ? caption.subtitle.replacingOccurrences(of: "\n", with: " ") : caption.subtitle)
                     .font(.system(size: unit * 0.041, weight: .medium))
                     .opacity(0.86)
             }
@@ -101,6 +105,21 @@ struct Listing: View {
                     .fill(.black)
                     .frame(width: screen.width * 126 / 440, height: screen.width * 37 / 440)
                     .offset(x: (size.width - screen.width * 126 / 440) / 2, y: top + edge + bezel + screen.width * 11 / 440)
+            }
+            if let zoom = pad ? caption.pad : caption.phone {
+                // Wider than the device, at the height of what it magnifies, kept clear of the words and the bottom.
+                let cardWidth = size.width * (pad ? 0.8 : 0.9), scale = cardWidth / (zoom.width * screen.width)
+                let cardHeight = zoom.height * screen.height * scale, corner = cardWidth * 0.035
+                let middle = min(max(top + edge + bezel + zoom.midY * screen.height, top + cardHeight / 2), size.height * 0.93 - cardHeight / 2)
+                Image(nsImage: shot).resizable()
+                    .frame(width: screen.width * scale, height: screen.height * scale)
+                    .offset(x: -zoom.minX * screen.width * scale, y: -zoom.minY * screen.height * scale)
+                    .frame(width: cardWidth, height: cardHeight, alignment: .topLeading)
+                    .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: corner, style: .continuous)
+                        .strokeBorder(.white.opacity(0.9), lineWidth: max(2, cardWidth * 0.004)))
+                    .shadow(color: shade.opacity(0.5), radius: cardWidth * 0.035, y: cardWidth * 0.025)
+                    .offset(x: (size.width - cardWidth) / 2, y: middle - cardHeight / 2)
             }
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
