@@ -529,6 +529,19 @@ struct DocumentView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 if editing { editingBar.padding(.horizontal).padding(.vertical, 5) }
             }
+            // iOS has no switch an app can turn: Files sets the app a PDF opens in.
+            .alert("Make Default PDF App", isPresented: $guidingDefault) {
+                Button("Open Files") { UIApplication.shared.open(URL(string: "shareddocuments://")!) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("In Files, touch and hold any PDF, choose Get Info, and next to Always Open With choose Folio. Then choose Always Open PDF Document Files.")
+            }
+            // The inspector only ever closes the panes: once in a while, as a document opened, it set them shown without
+            // showing them, and the next tap on Pages hid them.
+            .inspector(isPresented: Binding { viewer.showsPanes } set: { if !$0 { viewer.showsPanes = false } }) {
+                Sidebar(viewer: viewer).presentationDetents([.medium, .large])
+            }
+            // After the inspector: on iOS 27, a toolbar inside it never reaches the navigation bar.
             .toolbar(editing ? .hidden : .visible, for: .navigationBar)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -553,18 +566,6 @@ struct DocumentView: View {
                         }
                     }
                 }
-            }
-            // iOS has no switch an app can turn: Files sets the app a PDF opens in.
-            .alert("Make Default PDF App", isPresented: $guidingDefault) {
-                Button("Open Files") { UIApplication.shared.open(URL(string: "shareddocuments://")!) }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("In Files, touch and hold any PDF, choose Get Info, and next to Always Open With choose Folio. Then choose Always Open PDF Document Files.")
-            }
-            // The inspector only ever closes the panes: once in a while, as a document opened, it set them shown without
-            // showing them, and the next tap on Pages hid them.
-            .inspector(isPresented: Binding { viewer.showsPanes } set: { if !$0 { viewer.showsPanes = false } }) {
-                Sidebar(viewer: viewer).presentationDetents([.medium, .large])
             }
             // Words being typed, and form fills, are kept when the app or the document goes.
             .onChange(of: scenePhase) { if scenePhase != .active { viewer.settle() } }
