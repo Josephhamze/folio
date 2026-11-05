@@ -5,7 +5,7 @@ final class ScreenshotTests: XCTestCase {
     private let app = XCUIApplication()
 
     /// The App Store's screenshots, which `./build.sh screenshots` takes: a sample marked up and signed, the signature pad,
-    /// the panes, the password sheet and the organizer.
+    /// the launch screen, the organizer full of a longer sample's pages, and the password sheet filled in.
     func testScreenshots() {
         openSample("Garden Brief")
         // A point on the first page, in its 612 by 792 points from the top left.
@@ -34,24 +34,38 @@ final class ScreenshotTests: XCTestCase {
 
         done()
         waitUntilGone("Saved")
-        showPanes()
-        shot("3 Pages")
-
-        closePanes()
         tools("Password…")
-        let restrict = app.switches["Restrict printing, copying and changes"]
+        let restrict = app.switches["Restrict printing, copying and changes"], again = app.secureTextFields.matching(identifier: "Again")
         XCTAssertTrue(restrict.waitForExistence(timeout: 5))
+        app.secureTextFields["Password"].tap()
+        app.typeText("harbor-street")
+        again.element(boundBy: 0).tap()
+        app.typeText("harbor-street")
         // A switch turns where its knob is, not where its words are.
         restrict.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        app.switches["Allow printing"].coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        app.secureTextFields["Permissions password"].tap()
+        app.typeText("committee")
+        again.element(boundBy: 1).tap()
+        app.typeText("committee\n")   // Return puts the keyboard away
+        _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 5)
+        XCTAssertTrue(app.buttons["Set Password"].isEnabled)
         shot("5 Protect")
         app.buttons["Cancel"].tap()
 
-        // Last, since organizing leaves the page out of reach.
+        // A sample of twelve pages, to fill the organizer.
+        openSample("Harvest Report")
         tools("Organize Pages")
         let second = app.buttons["Page 2"]
         XCTAssertTrue(second.waitForExistence(timeout: 5))
         second.tap()
         shot("4 Organize")
+
+        // The launch screen, with the samples in the browser under it.
+        done()
+        app.navigationBars.buttons["BackButton"].tap()
+        XCTAssertTrue(app.staticTexts["Create from Photos"].waitForExistence(timeout: 10), app.debugDescription)
+        shot("3 Start")
     }
 
     /// Marks up the sample by touch, as a person would, with a screenshot after each step.
