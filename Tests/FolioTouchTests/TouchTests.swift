@@ -82,13 +82,14 @@ final class TouchTests: XCTestCase {
 
     /// A phone's photo, kept on its side with a note to turn it, goes on its page as it's seen: here red over blue.
     func testPhotoGoesOnItsPageUpright() throws {
-        // Kept 200 by 100, red left and blue right, with the note an iPhone puts on a photo taken upright: turn it right.
-        let kept = CGContext(data: nil, width: 200, height: 100, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+        // Kept 1600 by 800, bigger than a page, red left and blue right, with the note an iPhone puts on a photo taken upright:
+        // turn it right. A picture smaller than a page sits in its middle, as it is.
+        let kept = CGContext(data: nil, width: 1600, height: 800, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
                              bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
         kept.setFillColor(UIColor.red.cgColor)
-        kept.fill(CGRect(x: 0, y: 0, width: 100, height: 100))
+        kept.fill(CGRect(x: 0, y: 0, width: 800, height: 800))
         kept.setFillColor(UIColor.blue.cgColor)
-        kept.fill(CGRect(x: 100, y: 0, width: 100, height: 100))
+        kept.fill(CGRect(x: 800, y: 0, width: 800, height: 800))
         let photo = NSMutableData(), file = CGImageDestinationCreateWithData(photo, "public.jpeg" as CFString, 1, nil)!
         CGImageDestinationAddImage(file, kept.makeImage()!, [kCGImagePropertyOrientation: 6] as CFDictionary)
         CGImageDestinationFinalize(file)

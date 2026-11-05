@@ -243,7 +243,8 @@ final class ScreenshotTests: XCTestCase {
     /// Create from Photos makes a PDF of the photos chosen, a page each, Insert from Photos… adds another, and Done saves it.
     func testCreateFromPhotos() {
         app.launch()
-        let create = app.buttons["Create from Photos"], back = app.navigationBars.buttons["BackButton"]
+        // Its words: the launch screen also has a hidden button of the same name.
+        let create = app.staticTexts["Create from Photos"], back = app.navigationBars.buttons["BackButton"]
         // Folio can reopen the document it last had open, over the launch screen.
         if !create.waitForExistence(timeout: 20), back.exists { back.tap() }
         XCTAssertTrue(create.waitForExistence(timeout: 30), app.debugDescription)
