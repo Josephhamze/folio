@@ -1,10 +1,16 @@
 import PDFKit
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 @main
 struct FolioApp: App {
     #if os(iOS)
     @UIApplicationDelegateAdaptor private var delegate: AppDelegate
+    /// Create from Photos, waiting for its PDF while Photos chooses the photos for it.
+    @State private var making: CheckedContinuation<URL?, any Error>?
+    @State private var choosingPhotos = false
+    @State private var photos: [PhotosPickerItem] = []
     #else
     /// SwiftUI's documents save themselves as they change, with no switch to stop it. Folio's wait for ⌘S, so closing or
     /// quitting with changes asks whether to save them.
@@ -33,10 +39,47 @@ struct FolioApp: App {
         #else
         DocumentGroupLaunchScene("Folio", backgroundStyle: LinearGradient(colors: [Color(red: 0xE5 / 255, green: 0x48 / 255, blue: 0x4D / 255),
                                                                                     Color(red: 0x9E / 255, green: 0x1B / 255, blue: 0x25 / 255)],
-                                                                           startPoint: .top, endPoint: .bottom))
+                                                                           startPoint: .top, endPoint: .bottom)) {
+            NewDocumentButton()
+            // A page for each photo, in the order chosen; Cancel makes no document.
+            NewDocumentButton("Create from Photos", contentType: .pdf) { @MainActor in
+                try await withCheckedThrowingContinuation { making = $0; choosingPhotos = true }
+            }
+            .photosPicker(isPresented: $choosingPhotos, selection: $photos, selectionBehavior: .ordered, matching: .images)
+            // Add sets the photos as Photos goes, and Cancel sets none, in an order that isn't said: so this waits a turn.
+            .onChange(of: choosingPhotos) { if !choosingPhotos { DispatchQueue.main.async(execute: chosePhotos) } }
+        }
         #endif
     }
 }
+
+#if os(iOS)
+extension FolioApp {
+    /// Hands Create from Photos the PDF of the photos chosen, or calls it off when there are none.
+    private func chosePhotos() {
+        guard let request = making else { return }
+        let chosen = photos
+        (making, photos) = (nil, [])
+        guard !chosen.isEmpty else { return request.resume(throwing: CancellationError()) }
+        Task {
+            do { request.resume(returning: try await Self.pdf(of: chosen)) } catch { request.resume(throwing: error) }
+        }
+    }
+
+    /// A PDF of the photos, a page each, named for the day, in a folder of its own for the new document to be made from.
+    private static func pdf(of photos: [PhotosPickerItem]) async throws -> URL {
+        let pdf = PDFDocument()
+        for page in await FolioDocument.pages(from: photos) { pdf.insert(page, at: pdf.pageCount) }
+        guard pdf.pageCount > 0 else { throw CocoaError(.fileReadCorruptFile) }
+        let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let day = Date.now.formatted(.iso8601.year().month().day())
+        let file = folder.appending(path: String(localized: "Photos \(day)") + ".pdf")
+        guard pdf.write(to: file) else { throw CocoaError(.fileWriteUnknown) }
+        return file
+    }
+}
+#endif
 
 #if os(macOS)
 extension FocusedValues {

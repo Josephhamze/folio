@@ -85,18 +85,14 @@ struct PageActions: View {
             .keyboardShortcut("r")
             .help("Rotate Right")
             .disabled(!chosen)
-        Button("Insert Blank Page", systemImage: "doc.badge.plus") { viewer?.insert([FolioDocument.blankPage()]) }
-            .help("Insert Blank Page")
-            .disabled(!idle)
-        Button("Insert from File…", systemImage: "folder.badge.plus") { viewer?.choosingPages = true }
-            .help("Insert from File…")
-            .disabled(!idle)
         #if os(iOS)
-        if VNDocumentCameraViewController.isSupported {
-            Button("Scan Pages…", systemImage: "doc.viewfinder") { viewer?.scanning = true }
-                .help("Scan Pages…")
-                .disabled(!idle)
-        }
+        // One tile at the foot of the pages, where one for each way to insert would not fit across an iPhone.
+        Menu("Insert Pages", systemImage: "plus") { inserts(idle) }
+            .menuStyle(.button)
+            .buttonStyle(Tile())
+            .disabled(!idle)
+        #else
+        inserts(idle)
         #endif
         Button("Extract Pages…", systemImage: "square.and.arrow.up") { viewer?.extract() }
             .help("Extract Pages…")
@@ -110,6 +106,23 @@ struct PageActions: View {
         Button("Delete Pages", systemImage: "trash", role: .destructive) { viewer?.deletePages() }
             .help("Delete Pages")
             .disabled(!idle || viewer?.canDelete != true)
+    }
+
+    @ViewBuilder private func inserts(_ idle: Bool) -> some View {
+        Button("Insert Blank Page", systemImage: "doc.badge.plus") { viewer?.insert([FolioDocument.blankPage()]) }
+            .help("Insert Blank Page")
+            .disabled(!idle)
+        Button("Insert from File…", systemImage: "folder.badge.plus") { viewer?.choosingPages = true }
+            .help("Insert from File…")
+            .disabled(!idle)
+        #if os(iOS)
+        Button("Insert from Photos…", systemImage: "photo.badge.plus") { viewer?.choosingPhotos = true }
+            .disabled(!idle)
+        if VNDocumentCameraViewController.isSupported {
+            Button("Scan Pages…", systemImage: "doc.viewfinder") { viewer?.scanning = true }
+                .disabled(!idle)
+        }
+        #endif
     }
 }
 

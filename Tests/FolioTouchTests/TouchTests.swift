@@ -80,6 +80,35 @@ final class TouchTests: XCTestCase {
         }
     }
 
+    /// A phone's photo, kept on its side with a note to turn it, goes on its page as it's seen: here red over blue.
+    func testPhotoGoesOnItsPageUpright() throws {
+        // Kept 200 by 100, red left and blue right, with the note an iPhone puts on a photo taken upright: turn it right.
+        let kept = CGContext(data: nil, width: 200, height: 100, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                             bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        kept.setFillColor(UIColor.red.cgColor)
+        kept.fill(CGRect(x: 0, y: 0, width: 100, height: 100))
+        kept.setFillColor(UIColor.blue.cgColor)
+        kept.fill(CGRect(x: 100, y: 0, width: 100, height: 100))
+        let photo = NSMutableData(), file = CGImageDestinationCreateWithData(photo, "public.jpeg" as CFString, 1, nil)!
+        CGImageDestinationAddImage(file, kept.makeImage()!, [kCGImagePropertyOrientation: 6] as CFDictionary)
+        CGImageDestinationFinalize(file)
+
+        let page = try XCTUnwrap(FolioDocument.pages(from: photo as Data, isPDF: false).first)
+        let box = page.bounds(for: .mediaBox)
+        XCTAssertLessThan(box.width, box.height)
+        let seen = try XCTUnwrap(page.thumbnail(of: CGSize(width: box.width / 10, height: box.height / 10), for: .mediaBox).cgImage)
+        let (width, height) = (seen.width, seen.height)
+        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.draw(seen, in: CGRect(x: 0, y: 0, width: width, height: height))
+        // Row by row from the top: red and blue down the middle of the page, a third of the way down, and two thirds.
+        let pixels = UnsafeBufferPointer(start: context.data!.assumingMemoryBound(to: UInt8.self), count: width * height * 4)
+        let colour = { (down: Double) in (red: pixels[(Int(Double(height) * down) * width + width / 2) * 4],
+                                          blue: pixels[(Int(Double(height) * down) * width + width / 2) * 4 + 2]) }
+        XCTAssertGreaterThan(colour(1 / 3).red, colour(1 / 3).blue)
+        XCTAssertGreaterThan(colour(2 / 3).blue, colour(2 / 3).red)
+    }
+
     func testDragAcrossTextHighlightsIt() {
         let (viewer, undo) = host(makePDF([["Highlight this line"]]))
         let canvas = viewer.canvas, page = viewer.doc.pages[0], line = ends(ofLine: 0, on: page, in: canvas)

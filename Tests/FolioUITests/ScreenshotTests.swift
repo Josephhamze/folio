@@ -33,7 +33,7 @@ final class ScreenshotTests: XCTestCase {
         shot("1 Mark up")
 
         done()
-        waitUntilGone("Folio saves")
+        waitUntilGone("Saved")
         showPanes()
         shot("3 Pages")
 
@@ -240,6 +240,27 @@ final class ScreenshotTests: XCTestCase {
         app.buttons["Cancel"].tap()
     }
 
+    /// Create from Photos makes a PDF of the photos chosen, a page each, Insert from Photos… adds another, and Done saves it.
+    func testCreateFromPhotos() {
+        app.launch()
+        let create = app.buttons["Create from Photos"], back = app.navigationBars.buttons["BackButton"]
+        // Folio can reopen the document it last had open, over the launch screen.
+        if !create.waitForExistence(timeout: 20), back.exists { back.tap() }
+        XCTAssertTrue(create.waitForExistence(timeout: 30), app.debugDescription)
+        create.tap()
+        choosePhotos(2)
+        XCTAssertTrue(app.buttons["Markup"].waitForExistence(timeout: 30), app.debugDescription)
+        tools("Organize Pages")
+        XCTAssertTrue(app.buttons["Page 2"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["Page 3"].exists)
+        app.buttons["Insert Pages"].tap()
+        app.buttons["Insert from Photos…"].tap()
+        choosePhotos(1)
+        XCTAssertTrue(app.buttons["Page 3"].waitForExistence(timeout: 10), app.debugDescription)
+        done()
+        XCTAssertTrue(app.staticTexts["Saved"].waitForExistence(timeout: 10), app.debugDescription)
+    }
+
     /// Organizing the pages: a tap selects one, the bar deletes it, Undo puts it back, and Split… asks how to split them.
     /// Pages are named by their place, so with one of the sample's three gone, the last name goes.
     func testOrganizePages() {
@@ -368,6 +389,16 @@ final class ScreenshotTests: XCTestCase {
         if !button.waitForExistence(timeout: 2) { app.buttons["More Tools"].tap() }
         XCTAssertTrue(button.waitForExistence(timeout: 5), app.debugDescription)
         button.tap()
+    }
+
+    /// Chooses the first photos in Apple's picker, which runs apart from Folio, and adds them.
+    private func choosePhotos(_ count: Int) {
+        let photos = app.images.matching(NSPredicate(format: "identifier == 'PXGGridLayout-Info' OR label BEGINSWITH 'Photo'"))
+        XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 30), app.debugDescription)
+        for index in 0..<count { photos.element(boundBy: index).tap() }
+        let add = app.buttons["Add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5), app.debugDescription)
+        add.tap()
     }
 
     /// Ends Markup or organizing.

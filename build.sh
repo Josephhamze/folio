@@ -22,6 +22,8 @@ ios_test() {
 	[ -n "$DEVICE" ] || { echo "No $1 simulator: add one in Xcode › Window › Devices and Simulators"; exit 1; }
 	xcrun simctl bootstatus "$DEVICE" -b >/dev/null
 	xcrun simctl status_bar "$DEVICE" override --time 9:41 --batteryState charged --batteryLevel 100
+	# Photos for Create from Photos to choose, whatever the simulator came with.
+	xcrun simctl addmedia "$DEVICE" icon/logo.png icon/dmg.png
 	xcrun simctl uninstall "$DEVICE" com.alphapms.folio
 	xcrun simctl install "$DEVICE" .build/ios/Build/Products/Debug-iphonesimulator/Folio.app
 	DOCS=$(xcrun simctl get_app_container "$DEVICE" com.alphapms.folio data)/Documents

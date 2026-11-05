@@ -1,4 +1,5 @@
 import PDFKit
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -31,6 +32,8 @@ final class Viewer {
     var choosingPages = false
     #if os(iOS)
     var scanning = false
+    /// Whether Insert from Photos… is choosing its photos.
+    var choosingPhotos = false
     /// Whether Markup's tools show in place of the reading bar: any tool but Select starts it, and Done ends it. Marks can be
     /// picked only then. It ends Find, whose field it takes the place of.
     var markingUp = false {
@@ -39,7 +42,7 @@ final class Viewer {
     /// Whether the find field shows in place of the reading bar.
     var finding = false
     #endif
-    /// The pages Extract Pages… copied out, while the window saves them.
+    /// The pages Extract Pages… copied out, or on iOS the document itself for Save a Copy…, while the window saves them.
     var extracted: FolioDocument?
     var readMode = false
     var sheet: Sheet?
@@ -368,8 +371,8 @@ struct DocumentView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     #else
     @Environment(\.scenePhase) private var scenePhase
-    /// Whether Done has said yet that Folio saves as it goes.
-    @AppStorage("toldSaving") private var toldSaving = false
+    /// The photos Insert from Photos… chose, while their pages are made.
+    @State private var photos: [PhotosPickerItem] = []
     @State private var guidingDefault = false
     #endif
 
@@ -418,7 +421,7 @@ struct DocumentView: View {
             .background {
                 Color.clear.fileExporter(isPresented: Binding { viewer.extracted != nil } set: { if !$0 { viewer.extracted = nil } },
                                          document: viewer.extracted, contentType: .pdf,
-                                         defaultFilename: String(localized: "\(name) pages")) { result in
+                                         defaultFilename: viewer.extracted === viewer.doc ? name : String(localized: "\(name) pages")) { result in
                     if case .success(let saved) = result { viewer.message = String(localized: "Saved \(saved.lastPathComponent)") }
                 }
             }
@@ -434,6 +437,13 @@ struct DocumentView: View {
                     viewer.insertScanned(images)
                 }
                 .ignoresSafeArea()
+            }
+            .photosPicker(isPresented: $viewer.choosingPhotos, selection: $photos, selectionBehavior: .ordered, matching: .images)
+            .onChange(of: photos) {
+                guard !photos.isEmpty else { return }
+                let chosen = photos
+                photos = []
+                Task { viewer.insert(await FolioDocument.pages(from: chosen)) }
             }
             #endif
             .onAppear { viewer.doc.undo = undoManager }
@@ -538,6 +548,14 @@ struct DocumentView: View {
                         ShareButton(viewer: viewer, name: name)
                         // iPhone has no menu bar for the Tools menu. Undo is in it for what it does, which Markup doesn't show.
                         Menu("Tools", systemImage: "ellipsis.circle") {
+                            Button("Save", systemImage: "square.and.arrow.down", action: save)
+                            // A copy in a folder of your choice, as it is now, protection and all.
+                            Button("Save a Copy…", systemImage: "doc.on.doc") {
+                                viewer.settle()
+                                viewer.extracted = viewer.doc
+                            }
+                            .disabled(viewer.doc.pdf.isLocked)
+                            Divider()
                             ControlGroup { undoRedo }
                             Button("Organize Pages") { viewer.organize() }.disabled(viewer.doc.pdf.isLocked)
                             Divider()
@@ -582,11 +600,7 @@ struct DocumentView: View {
             Spacer()
             Button("Done") {
                 viewer.backToReading()
-                // There's no Save: the first Done says so.
-                if !toldSaving {
-                    toldSaving = true
-                    viewer.message = String(localized: "Folio saves your changes as you make them")
-                }
+                save()
             }
             .fontWeight(.semibold)
             .buttonStyle(.glassProminent)
@@ -597,6 +611,27 @@ struct DocumentView: View {
         .frame(height: 44)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("Editing")
+    }
+
+    /// Saves the file now, which iOS otherwise does every so often and as it closes, and says so. A file another app handed
+    /// over can be one Folio may only read: then Save a Copy… keeps the changes.
+    private func save() {
+        viewer.settle()
+        guard let url, let file = NSFileCoordinator.filePresenters.first(where: {
+            $0.presentedItemURL?.resolvingSymlinksInPath() == url.resolvingSymlinksInPath()
+        }) else {
+            viewer.message = String(localized: "Folio saves your changes as you make them")
+            return
+        }
+        // On the file's own queue, where the system asks it to save.
+        file.presentedItemOperationQueue.addOperation {
+            file.savePresentedItemChanges? { error in
+                Task { @MainActor in
+                    viewer.message = error == nil ? String(localized: "Saved")
+                        : String(localized: "Folio can't save to this file. Tools › Save a Copy… keeps your changes")
+                }
+            }
+        }
     }
 
     /// Undo and Redo. A tap leaves the words being typed in their field, so they become a change of their own first.

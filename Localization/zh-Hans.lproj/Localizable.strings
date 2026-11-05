@@ -34,6 +34,7 @@
 "Continuous" = "连续滚动";
 "Couldn't apply the redactions" = "无法应用涂黑";
 "Couldn't save the files in %@." = "无法将文件存储到“%@”。";
+"Create from Photos" = "从照片创建";
 "Date" = "日期";
 "Delete" = "删除";
 "Delete Pages" = "删除页面";
@@ -53,6 +54,7 @@
 "Find Next" = "查找下一个";
 "Find Previous" = "查找上一个";
 "Find…" = "查找…";
+"Folio can't save to this file. Tools › Save a Copy… keeps your changes" = "Folio 无法存储到此文件。“工具” › “存储副本…”可保留你的更改";
 "Folio saves your changes as you make them" = "Folio 会随时存储你的更改";
 "Found no pages to insert: a PDF with a password or restrictions gives none" = "没有可插入的页面：带密码或限制的 PDF 不提供页面";
 "Found no text to recognize" = "未找到可识别的文本";
@@ -64,6 +66,7 @@
 "Initials" = "姓名缩写";
 "Insert Blank Page" = "插入空白页";
 "Insert from File…" = "从文件插入…";
+"Insert from Photos…" = "从照片插入…";
 "Insert Pages" = "插入页面";
 "Keywords" = "关键词";
 "Leave Read Mode" = "退出阅读模式";
@@ -100,6 +103,7 @@
 "PDFs you open show up here. You can also drop one on this window." = "你打开的 PDF 会显示在这里。你也可以将 PDF 拖到此窗口。";
 "Pen" = "画笔";
 "Permissions password" = "权限密码";
+"Photos %@" = "照片 %@";
 "Photos…" = "照片…";
 "Previous" = "上一个";
 "Print…" = "打印…";
@@ -125,7 +129,9 @@
 "Rotate Left" = "向左旋转";
 "Rotate Right" = "向右旋转";
 "Save" = "存储";
+"Save a Copy…" = "存储副本…";
 "Save As…" = "存储为…";
+"Saved" = "已存储";
 "Saved %@" = "已存储“%@”";
 "Saved %lld files in %@" = "已将 %lld 个文件存储到“%@”";
 "Scan Pages…" = "扫描页面…";

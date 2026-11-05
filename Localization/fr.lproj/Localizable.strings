@@ -34,6 +34,7 @@
 "Continuous" = "Défilement continu";
 "Couldn't apply the redactions" = "Impossible d’appliquer les caviardages";
 "Couldn't save the files in %@." = "Impossible d’enregistrer les fichiers dans %@.";
+"Create from Photos" = "Créer à partir de photos";
 "Date" = "Date";
 "Delete" = "Supprimer";
 "Delete Pages" = "Supprimer les pages";
@@ -53,6 +54,7 @@
 "Find Next" = "Rechercher le suivant";
 "Find Previous" = "Rechercher le précédent";
 "Find…" = "Rechercher…";
+"Folio can't save to this file. Tools › Save a Copy… keeps your changes" = "Folio ne peut pas enregistrer dans ce fichier. Outils › Enregistrer une copie… conserve vos modifications";
 "Folio saves your changes as you make them" = "Folio enregistre vos modifications au fur et à mesure";
 "Found no pages to insert: a PDF with a password or restrictions gives none" = "Aucune page à insérer : un PDF protégé par un mot de passe ou des restrictions n’en donne aucune";
 "Found no text to recognize" = "Aucun texte à reconnaître";
@@ -64,6 +66,7 @@
 "Initials" = "Initiales";
 "Insert Blank Page" = "Insérer une page vierge";
 "Insert from File…" = "Insérer depuis un fichier…";
+"Insert from Photos…" = "Insérer depuis Photos…";
 "Insert Pages" = "Insérer des pages";
 "Keywords" = "Mots-clés";
 "Leave Read Mode" = "Quitter le mode lecture";
@@ -100,6 +103,7 @@
 "PDFs you open show up here. You can also drop one on this window." = "Les PDF que vous ouvrez s’affichent ici. Vous pouvez aussi en déposer un sur cette fenêtre.";
 "Pen" = "Stylo";
 "Permissions password" = "Mot de passe des autorisations";
+"Photos %@" = "Photos du %@";
 "Photos…" = "Photos…";
 "Previous" = "Précédent";
 "Print…" = "Imprimer…";
@@ -125,7 +129,9 @@
 "Rotate Left" = "Faire pivoter à gauche";
 "Rotate Right" = "Faire pivoter à droite";
 "Save" = "Enregistrer";
+"Save a Copy…" = "Enregistrer une copie…";
 "Save As…" = "Enregistrer sous…";
+"Saved" = "Enregistré";
 "Saved %@" = "%@ enregistré";
 "Saved %lld files in %@" = "%lld fichiers enregistrés dans %@";
 "Scan Pages…" = "Numériser des pages…";

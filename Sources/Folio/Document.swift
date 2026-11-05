@@ -1,4 +1,5 @@
 import PDFKit
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -342,7 +343,32 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     /// A picture fitted to a page of the system's paper size, turned landscape for a wide picture.
     static func page(from image: NSImage) -> PDFPage? {
         let size = image.size.width > image.size.height ? CGSize(width: paper.height, height: paper.width) : paper
-        return PDFPage(image: image, options: [.mediaBox: CGRect(origin: .zero, size: size)])
+        #if os(iOS)
+        // Drawn upright, as it's seen: a phone keeps a photo on its side, with a note to turn it. And no finer than the page
+        // printed at 300 dpi: a camera's photo as it comes would make a page of tens of megabytes.
+        let pixels = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
+        let fit = min(1, max(size.width, size.height) * 300 / 72 / max(pixels.width, pixels.height, 1))
+        let drawn = CGSize(width: max(1, (pixels.width * fit).rounded()), height: max(1, (pixels.height * fit).rounded()))
+        let format = UIGraphicsImageRendererFormat()
+        (format.scale, format.opaque) = (1, true)
+        let picture = UIGraphicsImageRenderer(size: drawn, format: format).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: drawn))
+            image.draw(in: CGRect(origin: .zero, size: drawn))
+        }
+        #else
+        let picture = image
+        #endif
+        return PDFPage(image: picture, options: [.mediaBox: CGRect(origin: .zero, size: size), .compressionQuality: 0.8])
+    }
+
+    /// The photos chosen in Photos, each on a page of its own, in the order chosen.
+    static func pages(from photos: [PhotosPickerItem]) async -> [PDFPage] {
+        var pages: [PDFPage] = []
+        for photo in photos {
+            if let data = try? await photo.loadTransferable(type: Data.self) { pages += Self.pages(from: data, isPDF: false) }
+        }
+        return pages
     }
 }
 
