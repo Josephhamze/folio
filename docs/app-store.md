@@ -98,6 +98,6 @@ Folio is free and open source, and there's a version for the Mac as well.
 - **Encryption:** none beyond Apple's own. `ITSAppUsesNonExemptEncryption` is `NO` in `iOS/Info.plist`, so builds don't ask.
 - **Age rating:** None for every question, which gives 4+.
 - **Content rights:** no third-party content.
-- **Availability:** every country or region except China mainland, which needs an ICP filing.
+- **Availability:** every country or region except China mainland (which needs an ICP filing), Russia and Belarus.
 - **iPhone and iPad apps on Apple Silicon Macs:** off, since the Mac has its own Folio.
-- **App Review notes:** No sign-in. Tap + in the document browser for a blank PDF, or open any PDF from Files.
+- **App Review notes:** No sign-in. On the launch screen, tap Create Document for a blank PDF or Create from Photos for a PDF of some photos, or open any PDF from Files.
