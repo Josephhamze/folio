@@ -41,7 +41,8 @@ struct FolioApp: App {
                                                                                     Color(red: 0x9E / 255, green: 0x1B / 255, blue: 0x25 / 255)],
                                                                            startPoint: .top, endPoint: .bottom)) {
             NewDocumentButton()
-            NewDocumentButton("Create from Photos", contentType: .pdf)
+            // Its closure never runs (see noteWhichButton), but without one iOS 26 makes no document.
+            NewDocumentButton("Create from Photos", contentType: .pdf) { nil }
         }
         #endif
     }
