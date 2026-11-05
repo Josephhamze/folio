@@ -1,5 +1,4 @@
 import PDFKit
-import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -32,8 +31,6 @@ final class Viewer {
     var choosingPages = false
     #if os(iOS)
     var scanning = false
-    /// Whether Insert from Photos… is choosing its photos.
-    var choosingPhotos = false
     /// Whether Markup's tools show in place of the reading bar: any tool but Select starts it, and Done ends it. Marks can be
     /// picked only then. It ends Find, whose field it takes the place of.
     var markingUp = false {
@@ -371,8 +368,6 @@ struct DocumentView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     #else
     @Environment(\.scenePhase) private var scenePhase
-    /// The photos Insert from Photos… chose, while their pages are made.
-    @State private var photos: [PhotosPickerItem] = []
     @State private var guidingDefault = false
     #endif
 
@@ -437,13 +432,6 @@ struct DocumentView: View {
                     viewer.insertScanned(images)
                 }
                 .ignoresSafeArea()
-            }
-            .photosPicker(isPresented: $viewer.choosingPhotos, selection: $photos, selectionBehavior: .ordered, matching: .images)
-            .onChange(of: photos) {
-                guard !photos.isEmpty else { return }
-                let chosen = photos
-                photos = []
-                Task { viewer.insert(await FolioDocument.pages(from: chosen)) }
             }
             #endif
             .onAppear { viewer.doc.undo = undoManager }

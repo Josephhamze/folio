@@ -362,15 +362,51 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         return PDFPage(image: picture, options: [.mediaBox: CGRect(origin: .zero, size: size), .compressionQuality: 0.8])
     }
 
-    /// The photos chosen in Photos, each on a page of its own, in the order chosen.
-    static func pages(from photos: [PhotosPickerItem]) async -> [PDFPage] {
-        var pages: [PDFPage] = []
-        for photo in photos {
-            if let data = try? await photo.loadTransferable(type: Data.self) { pages += Self.pages(from: data, isPDF: false) }
+    #if os(iOS)
+    /// The photos chosen in Photos' picker, each on a page of its own, in the order chosen: none for Cancel.
+    @MainActor static func pagesOfChosenPhotos() async -> [PDFPage] {
+        await PhotoPicker().choose().flatMap { Self.pages(from: $0, isPDF: false) }
+    }
+    #endif
+}
+
+#if os(iOS)
+/// Photos' picker, shown over whatever is on screen. One hung on a SwiftUI view never shows from the launch screen, whose
+/// buttons are UIKit's, standing in for hidden SwiftUI ones, under the document browser.
+private final class PhotoPicker: NSObject, PHPickerViewControllerDelegate {
+    private var chosen: CheckedContinuation<[PHPickerResult], Never>?
+
+    /// The photos chosen, in the order chosen, as their files' data: none for Cancel.
+    @MainActor func choose() async -> [Data] {
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .images
+        configuration.selection = .ordered
+        configuration.selectionLimit = 0
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        var top = UIApplication.shared.connectedScenes.lazy.compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }.first
+        while let shown = top?.presentedViewController { top = shown }
+        guard let top else { return [] }
+        let results = await withCheckedContinuation { chosen = $0; top.present(picker, animated: true) }
+        var photos: [Data] = []
+        for result in results {
+            let data = await withCheckedContinuation { (loaded: CheckedContinuation<Data?, Never>) in
+                _ = result.itemProvider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in loaded.resume(returning: data) }
+            }
+            if let data { photos.append(data) }
         }
-        return pages
+        return photos
+    }
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        // Once it's gone, so the document made of them can show.
+        picker.dismiss(animated: true) { [self] in
+            chosen?.resume(returning: results)
+            chosen = nil
+        }
     }
 }
+#endif
 
 extension PDFDocument {
     /// False for a file its author restricted, open without the permissions password: pages or a file made from it, or a

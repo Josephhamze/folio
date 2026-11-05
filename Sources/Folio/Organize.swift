@@ -116,7 +116,7 @@ struct PageActions: View {
             .help("Insert from File…")
             .disabled(!idle)
         #if os(iOS)
-        Button("Insert from Photos…", systemImage: "photo.badge.plus") { viewer?.choosingPhotos = true }
+        Button("Insert from Photos…", systemImage: "photo.badge.plus") { Task { await viewer?.insert(FolioDocument.pagesOfChosenPhotos()) } }
             .disabled(!idle)
         if VNDocumentCameraViewController.isSupported {
             Button("Scan Pages…", systemImage: "doc.viewfinder") { viewer?.scanning = true }
