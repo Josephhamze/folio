@@ -559,6 +559,9 @@ struct DocumentView: View {
                     }
                 }
             }
+            // An iPhone's bar fits Undo, Redo and Done beside the back button only without the document's name: with it, iOS
+            // moves Done into a More menu.
+            .toolbar(removing: editing ? .title : nil)
             // iOS has no switch an app can turn: Files sets the app a PDF opens in.
             .alert("Make Default PDF App", isPresented: $guidingDefault) {
                 Button("Open Files") { UIApplication.shared.open(URL(string: "shareddocuments://")!) }
