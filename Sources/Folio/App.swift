@@ -45,9 +45,14 @@ struct FolioApp: App {
             NewDocumentButton("Create from Photos", contentType: .pdf) { @MainActor in
                 try await withCheckedThrowingContinuation { making = $0; choosingPhotos = true }
             }
-            .photosPicker(isPresented: $choosingPhotos, selection: $photos, selectionBehavior: .ordered, matching: .images)
-            // Add sets the photos as Photos goes, and Cancel sets none, in an order that isn't said: so this waits a turn.
-            .onChange(of: choosingPhotos) { if !choosingPhotos { DispatchQueue.main.async(execute: chosePhotos) } }
+        } overlayAccessoryView: { _ in
+            // Photos' picker hangs here: the buttons shown are UIKit's, standing in for hidden SwiftUI ones, which can't
+            // show anything.
+            Color.clear
+                .frame(width: 0, height: 0)
+                .photosPicker(isPresented: $choosingPhotos, selection: $photos, selectionBehavior: .ordered, matching: .images)
+                // Add sets the photos as Photos goes, and Cancel sets none, in an order that isn't said: so this waits a turn.
+                .onChange(of: choosingPhotos) { if !choosingPhotos { DispatchQueue.main.async(execute: chosePhotos) } }
         }
         #endif
     }
