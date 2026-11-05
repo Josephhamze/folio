@@ -327,9 +327,11 @@ extension View {
                   confirmed: @escaping () -> Void) -> some View {
         VStack(spacing: 0) {
             HStack {
-                Button("Cancel", role: .cancel, action: cancel).buttonStyle(.glass)
+                Button("Cancel", role: .cancel, action: cancel).buttonStyle(.glass).fixedSize()
+                // The buttons keep their words whole, and the title gives way.
                 Text(title).font(.headline).lineLimit(1).frame(maxWidth: .infinity)
                 Button(confirm, action: confirmed).buttonStyle(.glassProminent).keyboardShortcut(.defaultAction).disabled(!enabled)
+                    .fixedSize()
             }
             .controlSize(.large)
             .padding()
