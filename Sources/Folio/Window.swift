@@ -369,6 +369,8 @@ struct DocumentView: View {
     #else
     @Environment(\.scenePhase) private var scenePhase
     @State private var guidingDefault = false
+    /// Whether the next document to open was made by Create from Photos.
+    static var choosesPhotos = false
     #endif
 
     init(doc: FolioDocument, url: URL?) {
@@ -566,6 +568,16 @@ struct DocumentView: View {
                         }
                     }
                 }
+            }
+            // Create from Photos: a page for each photo, in the order chosen, in the new document's blank page's place; Cancel
+            // leaves it blank. SwiftUI opens the document read from the file it was made in, so the note isn't on it, and a
+            // file made earlier is one opened after the new one failed to be made.
+            .task {
+                guard Self.choosesPhotos else { return }
+                Self.choosesPhotos = false
+                guard let made = try? url?.resourceValues(forKeys: [.creationDateKey]).creationDate, made > .now - 60 else { return }
+                let pages = await FolioDocument.pagesOfChosenPhotos()
+                if !pages.isEmpty { viewer.doc.setPages(pages, name: "Create from Photos") }
             }
             // Words being typed, and form fills, are kept when the app or the document goes.
             .onChange(of: scenePhase) { if scenePhase != .active { viewer.settle() } }

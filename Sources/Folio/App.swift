@@ -19,7 +19,12 @@ struct FolioApp: App {
     #endif
 
     var body: some Scene {
-        DocumentGroup(newDocument: { FolioDocument() }) { DocumentView(doc: $0.document, url: $0.fileURL) }
+        DocumentGroup(newDocument: {
+            #if os(iOS)
+            Self.noteWhichButton()
+            #endif
+            return FolioDocument()
+        }) { DocumentView(doc: $0.document, url: $0.fileURL) }
             .commands { FolioCommands() }
             #if os(macOS)
             // The home window opens at launch, not the Open panel.
@@ -36,12 +41,7 @@ struct FolioApp: App {
                                                                                     Color(red: 0x9E / 255, green: 0x1B / 255, blue: 0x25 / 255)],
                                                                            startPoint: .top, endPoint: .bottom)) {
             NewDocumentButton()
-            // A page for each photo, in the order chosen; Cancel makes no document.
-            NewDocumentButton("Create from Photos", contentType: .pdf) { @MainActor in
-                let pages = await FolioDocument.pagesOfChosenPhotos()
-                guard !pages.isEmpty else { throw CancellationError() }
-                return try Self.pdf(of: pages)
-            }
+            NewDocumentButton("Create from Photos", contentType: .pdf)
         }
         #endif
     }
@@ -49,16 +49,25 @@ struct FolioApp: App {
 
 #if os(iOS)
 extension FolioApp {
-    /// A PDF of the pages, named for the day, in a folder of its own for the new document to be made from.
-    private static func pdf(of pages: [PDFPage]) throws -> URL {
-        let pdf = PDFDocument()
-        for page in pages { pdf.insert(page, at: pdf.pageCount) }
-        let folder = URL.temporaryDirectory.appending(path: UUID().uuidString)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let day = Date.now.formatted(.iso8601.year().month().day())
-        let file = folder.appending(path: String(localized: "Photos \(day)") + ".pdf")
-        guard pdf.write(to: file) else { throw CocoaError(.fileWriteUnknown) }
-        return file
+    /// Notes whether the document being made is for Create from Photos, for its view to show Photos' picker. SwiftUI makes
+    /// it as for Create Document, never running a closure given to that button (iOS 26 and 27), but the document browser
+    /// knows which button it was. SwiftUI makes it off the main thread, where UIKit can't be asked, and makes another as it
+    /// opens the file, with no button being made then.
+    private static func noteWhichButton() {
+        let note = {
+            MainActor.assumeIsolated {
+                for scene in UIApplication.shared.connectedScenes {
+                    var controllers = (scene as? UIWindowScene)?.windows.compactMap(\.rootViewController) ?? []
+                    while let controller = controllers.popLast() {
+                        if let intent = (controller as? UIDocumentBrowserViewController)?.activeDocumentCreationIntent {
+                            return DocumentView.choosesPhotos = intent != .default
+                        }
+                        controllers += controller.children + [controller.presentedViewController].compactMap { $0 }
+                    }
+                }
+            }
+        }
+        Thread.isMainThread ? note() : DispatchQueue.main.sync(execute: note)
     }
 }
 #endif
