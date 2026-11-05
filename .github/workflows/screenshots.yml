@@ -6,8 +6,6 @@ permissions:
   contents: read
 on:
   workflow_dispatch:
-  push:
-    branches: [listing]   # TEMPORARY: the first screenshots, before merging
 jobs:
   screenshots:
     runs-on: macos-26

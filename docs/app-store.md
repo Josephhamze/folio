@@ -36,7 +36,7 @@ The key made the certificate and the profile through the App Store Connect API. 
 - **Support URL:** https://github.com/Josephhamze/folio/issues
 - **Marketing URL:** https://github.com/Josephhamze/folio
 - **Privacy policy URL:** https://github.com/Josephhamze/folio/blob/main/PRIVACY.md
-- **Copyright:** 2026 Joseph Hamze
+- **Copyright:** 2026 Alpha PMS FZCO
 - **What's New** (1.0): First release on iPhone and iPad.
 - **What's New** (the next release): A Stamp tool for your company's stamp, a Date tool, signatures from a photo, and Add to Every Page. Organize, scan and split pages. Recognize Text, Apply Redactions, passwords and restrictions, and Properties. Send a page as a picture. And Folio now speaks French and Simplified Chinese.
 
