@@ -61,7 +61,8 @@ SIGN AND STAMP
 • Add to Every Page puts your initials on each page of a contract, or the stamp on each page of an invoice, at once.
 
 PAGES
-• Organize Pages: drag pages into a new order, rotate them, insert blank pages or pages from PDFs and pictures, extract them into a file of their own, or delete them.
+• Create from Photos makes a PDF of the photos you choose, a page each, in the order you choose them.
+• Organize Pages: drag pages into a new order, rotate them, insert blank pages or pages from PDFs, pictures and your photos, extract them into a file of their own, or delete them.
 • Scan paper with the camera into the document.
 • Split a document into files of a few pages each.
 
@@ -78,7 +79,7 @@ FILL IN FORMS
 READ
 • Thumbnails, bookmarks and every comment, in a column beside the page on iPad.
 • Find counts the matches and steps through them.
-• Each file reopens at the page you left it on, and Folio saves your changes as you make them.
+• Each file reopens at the page you left it on. Folio saves your changes as you make them, and Done or Save saves them at once. Save a Copy puts a copy in any folder.
 • Tools › Make Default PDF App shows how to have the PDFs you tap in Files open in Folio.
 • Folio asks for a protected file's password, and respects its author's editing restrictions.
 
