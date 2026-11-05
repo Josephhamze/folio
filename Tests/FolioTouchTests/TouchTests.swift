@@ -180,6 +180,22 @@ final class TouchTests: XCTestCase {
         XCTAssertEqual(undo.undoActionName, "Move")
     }
 
+    /// A tool ends Find, and one Done ends Markup with Organize Pages started over it.
+    func testToolEndsFindAndDoneEndsEveryMode() {
+        let (viewer, _) = host(makePDF([["Hi"]]))
+        viewer.finding = true
+        viewer.query = "Hi"
+        viewer.tool = .pen
+        XCTAssertTrue(viewer.markingUp)
+        XCTAssertFalse(viewer.finding)
+        XCTAssertEqual(viewer.query, "")
+        viewer.organize()
+        viewer.backToReading()
+        XCTAssertFalse(viewer.organizing)
+        XCTAssertFalse(viewer.markingUp)
+        XCTAssertEqual(viewer.tool, .select)
+    }
+
     /// A placed signature is selected, so a drag moves it straight away, rather than scrolling the page.
     func testPlacedSignatureDragsStraightAway() throws {
         let saved = Signature[.sign]

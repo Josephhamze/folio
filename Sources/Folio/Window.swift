@@ -32,8 +32,10 @@ final class Viewer {
     #if os(iOS)
     var scanning = false
     /// Whether Markup's tools show in place of the reading bar: any tool but Select starts it, and Done ends it. Marks can be
-    /// picked only then.
-    var markingUp = false
+    /// picked only then. It ends Find, whose field it takes the place of.
+    var markingUp = false {
+        didSet { if markingUp { finding = false; query = "" } }
+    }
     /// Whether the find field shows in place of the reading bar.
     var finding = false
     #endif
@@ -92,6 +94,15 @@ final class Viewer {
         if places { message = String(localized: "Tap where it goes, or drag to size it") }
         #endif
     }
+
+    #if os(iOS)
+    /// Ends Markup and Organize Pages, which iPad's keys can start one over the other, for reading.
+    func backToReading() {
+        if organizing { organize() } else { settle() }
+        tool = .select
+        markingUp = false
+    }
+    #endif
 
     func find() {
         matches = query.isEmpty ? [] : doc.pdf.findString(query, withOptions: .caseInsensitive)
@@ -518,27 +529,9 @@ struct DocumentView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     if editing {
-                        // The undo manager says nothing when it changes; each change bumps the revision.
-                        let _ = viewer.doc.revision
-                        // A tap here leaves the words being typed in their field, so they become a change of their own first.
-                        Button("Undo", systemImage: "arrow.uturn.backward") {
-                            viewer.settle()
-                            undoManager?.undo()
-                        }
-                        .disabled(!viewer.isIdle || undoManager?.canUndo != true)
-                        Button("Redo", systemImage: "arrow.uturn.forward") {
-                            viewer.settle()
-                            undoManager?.redo()
-                        }
-                        .disabled(!viewer.isIdle || undoManager?.canRedo != true)
+                        undoRedo
                         Button("Done") {
-                            if viewer.organizing {
-                                viewer.organize()
-                            } else {
-                                viewer.settle()
-                                viewer.tool = .select
-                                viewer.markingUp = false
-                            }
+                            viewer.backToReading()
                             // There's no Save: the first Done says so.
                             if !toldSaving {
                                 toldSaving = true
@@ -548,8 +541,9 @@ struct DocumentView: View {
                         .fontWeight(.semibold)
                     } else {
                         ShareButton(viewer: viewer, name: name)
-                        // iPhone has no menu bar for the Tools menu.
+                        // iPhone has no menu bar for the Tools menu. Undo is in it for what it does, which Markup doesn't show.
                         Menu("Tools", systemImage: "ellipsis.circle") {
+                            ControlGroup { undoRedo }
                             Button("Organize Pages") { viewer.organize() }.disabled(viewer.doc.pdf.isLocked)
                             Divider()
                             ToolsMenu(viewer: viewer)
@@ -585,6 +579,22 @@ struct DocumentView: View {
             .onReceive(NotificationCenter.default.publisher(for: UIWindow.didBecomeKeyNotification)) {
                 if $0.object as? UIWindow === viewer.canvas.window { Front.shared.document = (viewer, $searching) }
             }
+    }
+
+    /// Undo and Redo. A tap leaves the words being typed in their field, so they become a change of their own first.
+    @ViewBuilder private var undoRedo: some View {
+        // The undo manager says nothing when it changes; each change bumps the revision.
+        let _ = viewer.doc.revision
+        Button("Undo", systemImage: "arrow.uturn.backward") {
+            viewer.settle()
+            undoManager?.undo()
+        }
+        .disabled(!viewer.isIdle || undoManager?.canUndo != true)
+        Button("Redo", systemImage: "arrow.uturn.forward") {
+            viewer.settle()
+            undoManager?.redo()
+        }
+        .disabled(!viewer.isIdle || undoManager?.canRedo != true)
     }
 
     /// The pages and Find, the page in view, Markup, and Sign, the one most looked for.
