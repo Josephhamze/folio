@@ -401,17 +401,10 @@ struct DocumentView: View {
                 }
             }
             .sheet(item: $viewer.sheet) { sheet in
-                let content = Group {
-                    if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
-                    if sheet == .protect { PasswordSheet(viewer: viewer) }
-                    if sheet == .properties { PropertiesSheet(viewer: viewer) }
-                    if sheet == .split { SplitSheet(viewer: viewer, name: name) }
-                }
-                #if os(iOS)
-                NavigationStack { content }   // for the bar across the sheet's top
-                #else
-                content
-                #endif
+                if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
+                if sheet == .protect { PasswordSheet(viewer: viewer) }
+                if sheet == .properties { PropertiesSheet(viewer: viewer) }
+                if sheet == .split { SplitSheet(viewer: viewer, name: name) }
             }
             .fileImporter(isPresented: $viewer.choosingPages, allowedContentTypes: [.pdf, .image], allowsMultipleSelection: true) { result in
                 guard let urls = try? result.get().sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }),

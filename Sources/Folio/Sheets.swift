@@ -198,6 +198,7 @@ struct PasswordSheet: View {
                 #endif
             }
         }
+        .textFieldStyle(.roundedBorder)
         .frame(width: 340)
         .padding(20)
         #if os(iOS)
@@ -320,19 +321,21 @@ struct SplitSheet: View {
 
 #if os(iOS)
 extension View {
-    /// A sheet's title, Cancel, and the button that does what it's for, in a bar across its top, as iOS has them. The sheet
-    /// shows the bar in a NavigationStack.
+    /// A sheet's title, Cancel, and the button that does what it's for, across its top, as iOS has them. Not in a navigation
+    /// bar: one in a document's sheet shows the document's own Back too.
     func sheetBar(_ title: LocalizedStringKey, _ confirm: LocalizedStringKey, enabled: Bool = true, cancel: @escaping () -> Void,
                   confirmed: @escaping () -> Void) -> some View {
-        frame(maxHeight: .infinity, alignment: .top)
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel", role: .cancel, action: cancel) }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(confirm, action: confirmed).keyboardShortcut(.defaultAction).disabled(!enabled)
-                }
+        VStack(spacing: 0) {
+            HStack {
+                Button("Cancel", role: .cancel, action: cancel).buttonStyle(.glass)
+                Text(title).font(.headline).lineLimit(1).frame(maxWidth: .infinity)
+                Button(confirm, action: confirmed).buttonStyle(.glassProminent).keyboardShortcut(.defaultAction).disabled(!enabled)
             }
+            .controlSize(.large)
+            .padding()
+            self
+            Spacer(minLength: 0)
+        }
     }
 }
 #endif
