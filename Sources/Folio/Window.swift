@@ -569,9 +569,9 @@ struct DocumentView: View {
                     }
                 }
             }
-            // Create from Photos: a page for each photo, in the order chosen, in the new document's blank page's place; Cancel
-            // leaves it blank. SwiftUI opens the document read from the file it was made in, so the note isn't on it, and a
-            // file made earlier is one opened after the new one failed to be made.
+            // Create from Photos on iOS 27: a page for each photo, in the order chosen, in the new document's blank page's
+            // place; Cancel leaves it blank. SwiftUI opens the document read from the file it was made in, so the note isn't on
+            // it, and a file made earlier is one opened after the new one failed to be made.
             .task {
                 guard Self.choosesPhotos else { return }
                 Self.choosesPhotos = false

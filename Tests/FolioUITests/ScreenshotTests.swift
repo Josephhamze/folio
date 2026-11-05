@@ -250,13 +250,7 @@ final class ScreenshotTests: XCTestCase {
 
     /// Create from Photos makes a PDF of the photos chosen, a page each, Insert from Photos… adds another, and Done saves it.
     func testCreateFromPhotos() {
-        app.launch()
-        // The launch screen's buttons stand in for hidden, narrower ones of the same names.
-        let create = app.buttons.matching(identifier: "Create from Photos"), back = app.navigationBars.buttons["BackButton"]
-        // Folio can reopen the document it last had open, over the launch screen.
-        if !create.firstMatch.waitForExistence(timeout: 20), back.exists { back.tap() }
-        XCTAssertTrue(create.firstMatch.waitForExistence(timeout: 30), app.debugDescription)
-        create.allElementsBoundByIndex.max { $0.frame.width < $1.frame.width }?.tap()
+        launchScreen("Create from Photos")
         choosePhotos(2)
         XCTAssertTrue(app.buttons["Markup"].waitForExistence(timeout: 30), app.debugDescription)
         tools("Organize Pages")
@@ -400,11 +394,41 @@ final class ScreenshotTests: XCTestCase {
         button.tap()
     }
 
-    /// Chooses the first photos in Apple's picker, which runs apart from Folio, and adds them.
+    /// Create Document makes a blank document, with no Photos' picker: iOS 26 and 27 tell its button apart from Create from
+    /// Photos differently.
+    func testCreateDocument() {
+        launchScreen("Create Document")
+        XCTAssertTrue(app.buttons["Markup"].waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertFalse(photos.firstMatch.waitForExistence(timeout: 5), app.debugDescription)
+    }
+
+    /// Launches Folio and taps a button of its launch screen.
+    private func launchScreen(_ button: String) {
+        app.launch()
+        // The launch screen's buttons stand in for hidden, narrower ones of the same names.
+        let buttons = app.buttons.matching(identifier: button), back = app.navigationBars.buttons["BackButton"]
+        // Folio can reopen the document it last had open, over the launch screen.
+        if !buttons.firstMatch.waitForExistence(timeout: 20), back.exists { back.tap() }
+        XCTAssertTrue(buttons.firstMatch.waitForExistence(timeout: 30), app.debugDescription)
+        // A tap as the launch screen comes up goes nowhere: wait for the files under it, and tap until the button gives way.
+        XCTAssertTrue(app.collectionViews["File View"].waitForExistence(timeout: 30), app.debugDescription)
+        let shown = buttons.allElementsBoundByIndex.max { $0.frame.width < $1.frame.width }
+        for _ in 0..<3 where shown?.isHittable == true {
+            shown?.tap()
+            _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == false"), object: shown)], timeout: 10)
+        }
+    }
+
+    /// The photos in Apple's picker, which runs apart from Folio.
+    private var photos: XCUIElementQuery {
+        app.images.matching(NSPredicate(format: "identifier == 'PXGGridLayout-Info' OR label BEGINSWITH 'Photo'"))
+    }
+
+    /// Chooses the first photos in Apple's picker and adds them.
     private func choosePhotos(_ count: Int) {
-        let photos = app.images.matching(NSPredicate(format: "identifier == 'PXGGridLayout-Info' OR label BEGINSWITH 'Photo'"))
         XCTAssertTrue(photos.firstMatch.waitForExistence(timeout: 30), app.debugDescription)
-        for index in 0..<count { photos.element(boundBy: index).tap() }
+        // iOS 26 calls them unhittable when the picker is over the launch screen, though they take taps.
+        for index in 0..<count { photos.element(boundBy: index).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
         let add = app.buttons["Add"]
         XCTAssertTrue(add.waitForExistence(timeout: 5), app.debugDescription)
         add.tap()

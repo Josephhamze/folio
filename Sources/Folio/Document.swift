@@ -371,8 +371,8 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
 }
 
 #if os(iOS)
-/// Photos' picker, shown over whatever is on screen, for one call to wait on: Create from Photos shows it as a new document
-/// opens, and Organize Pages to insert photos, with no SwiftUI state to hang it on.
+/// Photos' picker, shown over whatever is on screen, for one call to wait on: Create from Photos shows it over the launch
+/// screen, or on iOS 27 as the new document opens, and Organize Pages to insert photos, with no SwiftUI state to hang it on.
 private final class PhotoPicker: NSObject, PHPickerViewControllerDelegate {
     private var chosen: CheckedContinuation<[PHPickerResult], Never>?
 

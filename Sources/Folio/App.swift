@@ -21,7 +21,7 @@ struct FolioApp: App {
     var body: some Scene {
         DocumentGroup(newDocument: {
             #if os(iOS)
-            Self.noteWhichButton()
+            if #available(iOS 27, *) { Self.noteWhichButton() }
             #endif
             return FolioDocument()
         }) { DocumentView(doc: $0.document, url: $0.fileURL) }
@@ -41,8 +41,15 @@ struct FolioApp: App {
                                                                                     Color(red: 0x9E / 255, green: 0x1B / 255, blue: 0x25 / 255)],
                                                                            startPoint: .top, endPoint: .bottom)) {
             NewDocumentButton()
-            // Its closure never runs (see noteWhichButton), but without one iOS 26 makes no document.
-            NewDocumentButton("Create from Photos", contentType: .pdf) { nil }
+            // A page for each photo, in the order chosen; Cancel makes no document. iOS 27 never runs this, making a blank
+            // document instead: see noteWhichButton.
+            NewDocumentButton("Create from Photos", for: FolioDocument.self) {
+                let pages = await FolioDocument.pagesOfChosenPhotos()
+                guard !pages.isEmpty else { throw CancellationError() }
+                let pdf = PDFDocument()
+                for page in pages { pdf.insert(page, at: pdf.pageCount) }
+                return FolioDocument(pdf: pdf)
+            }
         }
         #endif
     }
@@ -50,10 +57,10 @@ struct FolioApp: App {
 
 #if os(iOS)
 extension FolioApp {
-    /// Notes whether the document being made is for Create from Photos, for its view to show Photos' picker. SwiftUI makes
-    /// it as for Create Document, never running a closure given to that button (iOS 26 and 27), but the document browser
-    /// knows which button it was. SwiftUI makes it off the main thread, where UIKit can't be asked, and makes another as it
-    /// opens the file, with no button being made then.
+    /// Notes whether the document being made is for Create from Photos, for its view to show Photos' picker. iOS 27 makes it
+    /// as for Create Document, never running the closure given to that button, but the document browser knows which button
+    /// it was. SwiftUI makes it off the main thread, where UIKit can't be asked, and makes another as it opens the file, with
+    /// no button being made then. iOS 26 runs the closure instead, and gives every button a name made up as it launches.
     private static func noteWhichButton() {
         let note = {
             MainActor.assumeIsolated {
