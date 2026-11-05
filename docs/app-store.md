@@ -47,7 +47,7 @@ Folio is a PDF editor for iPhone and iPad. No account, no subscription, no ads.
 MARK UP
 • Highlight, underline and strike through text with a finger or Apple Pencil.
 • Add notes, text boxes, rectangles, ovals, lines, arrows and freehand ink, in any colour.
-• Tap Markup for the tools: the ones you use most in reach, the rest under More Tools. Tap a mark to select it, then drag it or delete it. A signature or note you place stays selected, ready to drag into place. Every change can be undone, and Done puts the tools away.
+• Tap Markup for the tools: all of them on iPad, and on iPhone the ones you use most, with the rest under More Tools. Tap a mark to select it, then drag it or delete it. A signature or note you place stays selected, ready to drag into place. Every change can be undone, and Done puts the tools away.
 
 TEXT THAT MATCHES
 • Tap with the Text Box tool and type. The text takes the font, size and colour of the nearest text on the page, so it looks typed into the document.

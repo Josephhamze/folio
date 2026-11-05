@@ -401,10 +401,17 @@ struct DocumentView: View {
                 }
             }
             .sheet(item: $viewer.sheet) { sheet in
-                if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
-                if sheet == .protect { PasswordSheet(viewer: viewer) }
-                if sheet == .properties { PropertiesSheet(viewer: viewer) }
-                if sheet == .split { SplitSheet(viewer: viewer, name: name) }
+                let content = Group {
+                    if case .signature(let tool) = sheet { SignatureSheet(viewer: viewer, tool: tool) }
+                    if sheet == .protect { PasswordSheet(viewer: viewer) }
+                    if sheet == .properties { PropertiesSheet(viewer: viewer) }
+                    if sheet == .split { SplitSheet(viewer: viewer, name: name) }
+                }
+                #if os(iOS)
+                NavigationStack { content }   // for the bar across the sheet's top
+                #else
+                content
+                #endif
             }
             .fileImporter(isPresented: $viewer.choosingPages, allowedContentTypes: [.pdf, .image], allowsMultipleSelection: true) { result in
                 guard let urls = try? result.get().sorted(by: { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }),
@@ -723,19 +730,11 @@ struct ToolBar: View {
             if viewer.organizing {
                 PageActions(viewer: viewer)
             } else {
-                let inReach: [Tool] = [.select, .highlight, .pen, .text, .sign]
-                ForEach(inReach) { tool in
-                    Button(tool.name, systemImage: tool.symbol) { viewer.pick(tool) }.buttonStyle(Tile(picked: viewer.tool == tool))
+                // Every tool where they fit, as on an iPad; on an iPhone, the ones used most, and the rest under More Tools.
+                ViewThatFits(in: .horizontal) {
+                    palette(Tool.allCases)
+                    palette([.select, .highlight, .pen, .text, .sign])
                 }
-                let more = Tool.allCases.filter { !inReach.contains($0) }, picked = more.contains(viewer.tool)
-                Menu {
-                    ForEach(more) { tool in Button(tool.name, systemImage: tool.symbol) { viewer.pick(tool) } }
-                } label: {
-                    Label("More Tools", systemImage: picked ? viewer.tool.symbol : "ellipsis")
-                }
-                .menuStyle(.button)
-                .buttonStyle(Tile(picked: picked))
-                colour.frame(width: 44, height: 44)
             }
         }
         .buttonStyle(Tile())
@@ -745,6 +744,28 @@ struct ToolBar: View {
         .glassEffect()
         #endif
     }
+
+    #if os(iOS)
+    /// The tools in reach, any others under More Tools, and the colour.
+    private func palette(_ inReach: [Tool]) -> some View {
+        let more = Tool.allCases.filter { !inReach.contains($0) }, picked = more.contains(viewer.tool)
+        return HStack(spacing: 0) {
+            ForEach(inReach) { tool in
+                Button(tool.name, systemImage: tool.symbol) { viewer.pick(tool) }.buttonStyle(Tile(picked: viewer.tool == tool))
+            }
+            if !more.isEmpty {
+                Menu {
+                    ForEach(more) { tool in Button(tool.name, systemImage: tool.symbol) { viewer.pick(tool) } }
+                } label: {
+                    Label("More Tools", systemImage: picked ? viewer.tool.symbol : "ellipsis")
+                }
+                .menuStyle(.button)
+                .buttonStyle(Tile(picked: picked))
+            }
+            colour.frame(width: 44, height: 44)
+        }
+    }
+    #endif
 
     private var colour: some View {
         ColorPicker("Colour", selection: Binding(get: { viewer.color.cgColor }, set: {

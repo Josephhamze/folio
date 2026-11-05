@@ -33,8 +33,12 @@ struct SignatureSheet: View {
     }
 
     var body: some View {
+        let title: LocalizedStringKey = tool == .sign ? "Signature" : tool == .initial ? "Initials" : "Stamp"
+        let ready = way == .draw ? !strokes.isEmpty : way == .type ? !name.trimmingCharacters(in: .whitespaces).isEmpty : picture != nil
         VStack(spacing: 16) {
-            Text(tool == .sign ? "Signature" : tool == .initial ? "Initials" : "Stamp").font(.headline)
+            #if os(macOS)
+            Text(title).font(.headline)
+            #endif
             Picker("Signature", selection: $way) {
                 Text("Draw").tag(Way.draw)
                 Text("Type").tag(Way.type)
@@ -89,23 +93,17 @@ struct SignatureSheet: View {
                     PhotosPicker("Photos…", selection: $photo, matching: .images)
                     Button("Files…") { choosingFile = true }
                 }
+                #if os(macOS)
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
-                Button("Save") {
-                    // The pad's y runs down; a page's runs up.
-                    Signature[tool] = switch way {
-                    case .draw: .drawn(strokes.map { $0.map { CGPoint(x: $0.x, y: pad.height - $0.y) } })
-                    case .type: .typed(name)
-                    case .image: picture.map(Signature.image)
-                    }
-                    viewer.pick(tool)
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(way == .draw ? strokes.isEmpty : way == .type ? name.trimmingCharacters(in: .whitespaces).isEmpty : picture == nil)
+                Button("Save", action: save).keyboardShortcut(.defaultAction).disabled(!ready)
+                #endif
             }
         }
         .padding(20)
+        #if os(iOS)
+        .sheetBar(title, "Save", enabled: ready, cancel: { dismiss() }, confirmed: save)
+        #endif
         .onChange(of: photo) {
             Task { show(try? await photo?.loadTransferable(type: Data.self)) }
         }
@@ -115,6 +113,18 @@ struct SignatureSheet: View {
             defer { if access { url.stopAccessingSecurityScopedResource() } }
             show(try? Data(contentsOf: url))
         }
+    }
+
+    /// Keeps it for its tool, and picks the tool to place it.
+    private func save() {
+        // The pad's y runs down; a page's runs up.
+        Signature[tool] = switch way {
+        case .draw: .drawn(strokes.map { $0.map { CGPoint(x: $0.x, y: pad.height - $0.y) } })
+        case .type: .typed(name)
+        case .image: picture.map(Signature.image)
+        }
+        viewer.pick(tool)
+        dismiss()
     }
 
     /// Shows the picture's ink lifted off its paper, or says it has none.
@@ -152,8 +162,12 @@ struct PasswordSheet: View {
         let ascii = (password + (restricts ? restrictions.password : "")).allSatisfy(\.isASCII)
         // The password that opens the file would lift its restrictions too.
         let same = restricts && !password.isEmpty && restrictions.password == password
+        let ready = ascii && !same && password == again && !(password.isEmpty && !restricts)
+            && !(restricts && (restrictions.password.isEmpty || restrictions.password != permissionsAgain))
         VStack(spacing: 16) {
+            #if os(macOS)
             Text("Password").font(.headline)
+            #endif
             Text("Once saved, the file asks for this password to open it.").foregroundStyle(.secondary)
             SecureField("Password", text: $password)
             SecureField("Again", text: $again)
@@ -177,17 +191,21 @@ struct PasswordSheet: View {
                 if viewer.doc.newPassword != nil || viewer.doc.newRestrictions != nil || viewer.doc.pdf.isEncrypted {
                     Button("Remove Password") { set(nil, nil) }
                 }
+                #if os(macOS)
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
-                Button("Set Password") { set(password.isEmpty ? nil : password, restricts ? restrictions : nil) }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!ascii || same || password != again || password.isEmpty && !restricts
-                              || restricts && (restrictions.password.isEmpty || restrictions.password != permissionsAgain))
+                Button("Set Password", action: setChosen).keyboardShortcut(.defaultAction).disabled(!ready)
+                #endif
             }
         }
         .frame(width: 340)
         .padding(20)
+        #if os(iOS)
+        .sheetBar("Password", "Set Password", enabled: ready, cancel: { dismiss() }, confirmed: setChosen)
+        #endif
     }
+
+    private func setChosen() { set(password.isEmpty ? nil : password, restricts ? restrictions : nil) }
 
     private func set(_ new: String?, _ restrictions: FolioDocument.Restrictions?) {
         // A protected file's pages move to a new document, which would show its first page.
@@ -212,7 +230,9 @@ struct PropertiesSheet: View {
 
     var body: some View {
         VStack(spacing: 16) {
+            #if os(macOS)
             Text("Properties").font(.headline)
+            #endif
             Grid(alignment: .leading) {
                 GridRow { Text("Title").gridColumnAlignment(.trailing); TextField("Title", text: $values[0]) }
                 GridRow { Text("Author"); TextField("Author", text: $values[1]) }
@@ -220,18 +240,24 @@ struct PropertiesSheet: View {
                 GridRow { Text("Keywords"); TextField("Keywords", text: $values[3], prompt: Text("Separated by commas")) }
             }
             .textFieldStyle(.roundedBorder)
+            #if os(macOS)
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
-                Button("Save") {
-                    viewer.doc.setProperties(values)
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
+                Button("Save", action: save).keyboardShortcut(.defaultAction)
             }
+            #endif
         }
         .frame(width: 340)
         .padding(20)
+        #if os(iOS)
+        .sheetBar("Properties", "Save", cancel: { dismiss() }, confirmed: save)
+        #endif
+    }
+
+    private func save() {
+        viewer.doc.setProperties(values)
+        dismiss()
     }
 }
 
@@ -248,19 +274,26 @@ struct SplitSheet: View {
     var body: some View {
         let count = viewer.doc.pdf.pageCount
         VStack(spacing: 16) {
+            #if os(macOS)
             Text("Split into Files").font(.headline)
+            #endif
             Stepper("Pages in each file: \(every)", value: $every, in: 1...max(1, count - 1))
             Text("Makes \((count + every - 1) / every) files, named “\(name) 1”, “\(name) 2” and so on.").foregroundStyle(.secondary)
             if let problem { Text(problem).foregroundStyle(.red) }
             HStack {
                 if splitting { ProgressView().controlSize(.small) }
+                #if os(macOS)
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                 Button("Choose Folder…") { choosing = true }.keyboardShortcut(.defaultAction).disabled(splitting)
+                #endif
             }
         }
         .frame(width: 340)
         .padding(20)
+        #if os(iOS)
+        .sheetBar("Split into Files", "Choose Folder…", enabled: !splitting, cancel: { dismiss() }, confirmed: { choosing = true })
+        #endif
         .fileImporter(isPresented: $choosing, allowedContentTypes: [.folder]) { result in
             guard case .success(let folder) = result else { return }
             splitting = true
@@ -284,3 +317,22 @@ struct SplitSheet: View {
         }
     }
 }
+
+#if os(iOS)
+extension View {
+    /// A sheet's title, Cancel, and the button that does what it's for, in a bar across its top, as iOS has them. The sheet
+    /// shows the bar in a NavigationStack.
+    func sheetBar(_ title: LocalizedStringKey, _ confirm: LocalizedStringKey, enabled: Bool = true, cancel: @escaping () -> Void,
+                  confirmed: @escaping () -> Void) -> some View {
+        frame(maxHeight: .infinity, alignment: .top)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel", role: .cancel, action: cancel) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(confirm, action: confirmed).keyboardShortcut(.defaultAction).disabled(!enabled)
+                }
+            }
+    }
+}
+#endif

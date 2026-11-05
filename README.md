@@ -38,7 +38,7 @@
 - **Properties.** Tools › Properties… sets the title, author, subject and keywords a file keeps about itself, which other apps and searches show.
 - **Save.** Your changes stay out of the file until you save them with ⌘S. Closing or quitting with unsaved changes asks whether to save them. File › Save As… (⌥⇧⌘S) saves the document under a new name, and you keep working in the new file.
 - **Undo.** Every change can be undone and redone.
-- **iPhone and iPad.** A document opens to read, with Pages, Find, the page number, Markup and Sign at its foot. Sign asks for your signature the first time, then places it where you tap. Markup shows the tools used most, with the rest under More Tools, and Done puts them away. Folio saves your changes as you make them. Tools › Make Default PDF App shows how to have the PDFs you tap in Files open in Folio.
+- **iPhone and iPad.** A document opens to read, with Pages, Find, the page number, Markup and Sign at its foot. Sign asks for your signature the first time, then places it where you tap. Markup shows every tool on iPad, and on iPhone the ones used most, with the rest under More Tools; Done puts them away. Out of Markup, the Tools menu has Undo and Redo. Folio saves your changes as you make them. Tools › Make Default PDF App shows how to have the PDFs you tap in Files open in Folio.
 - **English, French and Chinese.** Folio's menus, buttons and messages follow your device's language: English, French or Simplified Chinese. On the Mac, System Settings › General › Language & Region › Applications sets Folio's language alone, and on iPhone and iPad, Settings › Apps › Folio › Language does.
 - **Print**, and open PDFs from Finder. Folio asks once to be your default PDF app, and Home offers it while it isn't.
 
