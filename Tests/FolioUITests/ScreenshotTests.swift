@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 /// Needs the PDFs from this folder in Folio's Documents folder on the simulator, which `./build.sh ios-test` puts there.
@@ -43,6 +44,7 @@ final class ScreenshotTests: XCTestCase {
         done()
         tools("Apply Redactions")
         XCTAssertTrue(app.staticTexts["Redacted 1 page"].waitForExistence(timeout: 60), app.debugDescription)
+        waitUntilBlack([at(170, 261), at(205, 261), at(240, 261)])   // across the address
         shot("5 Protect")
 
         // A sample of twelve pages, to fill the organizer.
@@ -461,6 +463,23 @@ final class ScreenshotTests: XCTestCase {
             }
         } while !opened.exists && Date.now < deadline
         XCTAssert(opened.exists)
+    }
+
+    /// Waits until the screen is black at each point: a page just redacted shows blank until its picture is drawn.
+    private func waitUntilBlack(_ points: [XCUICoordinate]) {
+        let deadline = Date.now + 30
+        repeat {
+            let shot = XCUIScreen.main.screenshot().image.cgImage!, scale = CGFloat(shot.width) / app.frame.width
+            let black = points.allSatisfy { point in
+                let at = point.screenPoint, pixel = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                                              space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+                // Drawn so the screenshot's pixel at the point is the context's one.
+                pixel.draw(shot, in: CGRect(x: -at.x * scale, y: at.y * scale + 1 - CGFloat(shot.height), width: CGFloat(shot.width), height: CGFloat(shot.height)))
+                return pixel.data!.load(as: UInt8.self) < 64
+            }
+            if black { return }
+        } while Date.now < deadline
+        XCTFail("The redacted page didn't show")
     }
 
     private func point(_ x: CGFloat, _ y: CGFloat) -> XCUICoordinate {

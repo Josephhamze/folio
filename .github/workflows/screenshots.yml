@@ -26,3 +26,17 @@ jobs:
           name: app-store ${{ matrix.device }}
           path: build/app-store
           if-no-files-found: ignore
+      # The log says which test failed but not why: the results do, and their screen recording shows it.
+      - name: Say why the test failed
+        if: failure()
+        run: |
+          xcrun xcresulttool export attachments --path ".build/ios/$SIMULATOR.xcresult" --output-path failure
+          xcrun xcresulttool get test-results summary --path ".build/ios/$SIMULATOR.xcresult" --compact | jq -r '.testFailures[]? | "\(.testName): \(.failureText)"'
+        env:
+          SIMULATOR: ${{ matrix.device }}
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: failure ${{ matrix.device }}
+          path: failure
+          if-no-files-found: ignore
