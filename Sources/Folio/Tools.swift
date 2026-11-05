@@ -69,7 +69,8 @@ func rebuilt(_ page: PDFPage, text: [(text: String, box: CGRect)], over picture:
     }
     context.endPDFPage()
     context.closePDF()
-    guard let new = PDFDocument(data: data as Data)?.page(at: 0)?.copy() as? PDFPage else { return nil }
+    // Not a copy: on iOS and macOS 26, a copy draws nothing once the document it was made from is gone.
+    guard let new = PDFDocument(data: data as Data)?.page(at: 0) else { return nil }
     new.rotation = page.rotation
     new.setBounds(page.bounds(for: .cropBox), for: .cropBox)
     for a in page.annotations where a.type != "Popup" { new.addAnnotation(a.copy() as! PDFAnnotation) }

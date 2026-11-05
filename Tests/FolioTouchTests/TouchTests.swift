@@ -35,6 +35,19 @@ private func ends(ofLine row: Int, on page: PDFPage, in canvas: Canvas) -> (star
     return (canvas.convert(CGPoint(x: line.minX + 1, y: line.midY), from: page), canvas.convert(CGPoint(x: line.maxX - 1, y: line.midY), from: page))
 }
 
+/// The share of the picture's pixels in `rect`, a box of pixels from its top left, that are dark.
+private func darkShare(of image: CGImage, in rect: CGRect) -> Double {
+    let context = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+    let pixels = context.data!.bindMemory(to: UInt8.self, capacity: image.width * image.height * 4)
+    var dark = 0
+    for y in Int(rect.minY)..<Int(rect.maxY) {
+        for x in Int(rect.minX)..<Int(rect.maxX) where pixels[(y * image.width + x) * 4] < 128 { dark += 1 }
+    }
+    return Double(dark) / Double(rect.width * rect.height)
+}
+
 /// How many marks show once PDFKit has drawn: it draws each in a layer of its own.
 private func shownMarks(_ canvas: Canvas) -> Int {
     RunLoop.main.run(until: Date() + 0.3)
@@ -272,6 +285,20 @@ final class TouchTests: XCTestCase {
         XCTAssertEqual(date.contents, Date.now.formatted(date: .numeric, time: .omitted))
         XCTAssertTrue(canvas.selected === date)
         XCTAssertEqual(undo.undoActionName, "Add Date")
+    }
+
+    /// A redacted page shows the rest of its words, and black where the mark was, drawn as PDFKit draws it on screen.
+    func testRedactedPageShowsTheRest() async throws {
+        let doc = FolioDocument(pdf: makePDF([["Delivery note 2026-41", "Bank account 99-1234"]]))
+        let page = doc.pages[0], secret = try XCTUnwrap(doc.pdf.findString("Bank account 99-1234", withOptions: []).first).bounds(for: page)
+        page.addAnnotation(shape(.redact, from: secret.origin, to: CGPoint(x: secret.maxX, y: secret.maxY), color: .red))
+        let redacted = await doc.applyRedactions()
+        XCTAssertEqual(redacted, 1)
+        let shown = try XCTUnwrap(doc.pages[0].thumbnail(of: CGSize(width: 612, height: 792), for: .mediaBox).cgImage)
+        let scale = CGFloat(shown.width) / 612
+        // The first line, from 60 points below the top, and the second's black box, 25 below it.
+        XCTAssertGreaterThan(darkShare(of: shown, in: CGRect(x: 72 * scale, y: 62 * scale, width: 150 * scale, height: 14 * scale)), 0.05)
+        XCTAssertGreaterThan(darkShare(of: shown, in: CGRect(x: 80 * scale, y: 90 * scale, width: 100 * scale, height: 8 * scale)), 0.9)
     }
 
     /// A page sent as a picture is the page at two pixels a point.

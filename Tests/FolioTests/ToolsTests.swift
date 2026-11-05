@@ -168,6 +168,7 @@ final class ToolsTests: XCTestCase {
         file.page(at: 0)!.setBounds(CGRect(x: 0, y: 0, width: 612, height: 792), for: .cropBox)
         let doc = FolioDocument(pdf: try XCTUnwrap(file.dataRepresentation().flatMap(PDFDocument.init(data:)))), undo = manualUndo(doc)
         let page = doc.pages[0], secret = try XCTUnwrap(doc.pdf.findString("Bank account 99-1234", withOptions: []).first).bounds(for: page)
+        let kept = try XCTUnwrap(doc.pdf.findString("Delivery note 2026-41", withOptions: []).first).bounds(for: page)
         let mark = secret.insetBy(dx: -2, dy: -2)
         page.addAnnotation(shape(.redact, from: mark.origin, to: CGPoint(x: mark.maxX, y: mark.maxY), color: .red))
         page.addAnnotation(shape(.rect, from: secret.origin, to: CGPoint(x: secret.minX + 20, y: secret.minY + 5), color: .blue))   // overlaps: goes
@@ -188,9 +189,13 @@ final class ToolsTests: XCTestCase {
         XCTAssertEqual(doc.pages[0].rotation, 90)
         // The words' box is black: the picture is of the page's box, its rows running down from the top.
         let image = try XCTUnwrap(render(doc.pages[0], dpi: 72)), box = doc.pages[0].bounds(for: .mediaBox)
-        XCTAssertEqual(box, CGRect(x: -100, y: -50, width: 712, height: 842))
+        // Its size: macOS 26 moves the box to the origin as it saves, and the page's content with it.
+        XCTAssertEqual(box.size, CGSize(width: 712, height: 842))
         let x = Int(secret.minX - box.minX) + 2..<Int(secret.maxX - box.minX) - 2, y = Int(box.maxY - secret.maxY) + 2..<Int(box.maxY - secret.minY) - 2
         XCTAssertGreaterThan(Double(count(image, x: x, y: y) { $0 < 64 && $1 < 64 && $2 < 64 }), 0.98 * Double(x.count * y.count))
+        // And the words left show.
+        let keptX = Int(kept.minX - box.minX)..<Int(kept.maxX - box.minX), keptY = Int(box.maxY - kept.maxY)..<Int(box.maxY - kept.minY)
+        XCTAssertGreaterThan(Double(count(image, x: keptX, y: keptY) { $0 < 128 && $1 < 128 && $2 < 128 }), 0.05 * Double(keptX.count * keptY.count))
         undo.undo()
         XCTAssertEqual(doc.pdf.findString("99-1234", withOptions: []).count, 1)
         XCTAssertTrue(doc.hasRedactions)
