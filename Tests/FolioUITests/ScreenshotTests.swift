@@ -25,6 +25,9 @@ final class ScreenshotTests: XCTestCase {
             app.buttons["Type"].tap()
             app.textFields["Your name"].tap()
             app.typeText("Maria Santos")
+            // A slow Mac can still be showing the keys typed, as on GitHub, where the shot caught "Ma".
+            expectation(for: NSPredicate(format: "value == 'Maria Santos'"), evaluatedWith: app.textFields["Your name"])
+            waitForExpectations(timeout: 10)
             shot("2 Sign")
             app.buttons["Save"].tap()
         }
