@@ -1,5 +1,7 @@
+import CoreImage
 import ImageIO
 import PDFKit
+import Vision
 import XCTest
 @testable import Folio
 
@@ -122,7 +124,7 @@ final class ToolsTests: XCTestCase {
     /// for a document made for it in place of every page.
     func testScanGoesInFilledAndSearchable() async throws {
         try await requireTextRecognition()
-        // A receipt three times as tall as it's wide, on grey paper, kept at four pixels a point, smaller than a page.
+        // A receipt three times as tall as it's wide, on grey paper.
         let scan = CGContext(data: nil, width: 800, height: 2400, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceGray(),
                              bitmapInfo: CGImageAlphaInfo.none.rawValue)!
         scan.setFillColor(gray: 0.85, alpha: 1)
@@ -130,14 +132,15 @@ final class ToolsTests: XCTestCase {
         NSGraphicsContext.current = NSGraphicsContext(cgContext: scan, flipped: false)
         NSAttributedString(string: "Delivered to Lubumbashi", attributes: [.font: NSFont(name: "Helvetica", size: 56)!]).draw(at: CGPoint(x: 40, y: 2200))
         NSGraphicsContext.current = nil
-        let picture = scan.makeImage()!
-        let receipt = try XCTUnwrap(FolioDocument.page(from: NSImage(cgImage: picture, size: NSSize(width: 200, height: 600)), scan: true))
+        let receipt = try XCTUnwrap(FolioDocument.page(scanned: scan.makeImage()!, text: []))
         let paper = FolioDocument.paper, box = receipt.bounds(for: .mediaBox)
         XCTAssertEqual(box.height, paper.height, accuracy: 0.5)
         XCTAssertEqual(box.width, paper.height / 3, accuracy: 0.5)
         let shown = try XCTUnwrap(render(receipt, dpi: 72))
         XCTAssertEqual(count(shown, x: 0..<shown.width, y: 0..<3) { r, _, _ in r > 240 }, 0)
-        let card = try XCTUnwrap(FolioDocument.page(from: NSImage(cgImage: picture, size: NSSize(width: 1600, height: 1000)), scan: true)).bounds(for: .mediaBox)
+        let wide = CGContext(data: nil, width: 1600, height: 1000, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceGray(),
+                             bitmapInfo: CGImageAlphaInfo.none.rawValue)!
+        let card = try XCTUnwrap(FolioDocument.page(scanned: wide.makeImage()!, text: [])).bounds(for: .mediaBox)
         XCTAssertEqual(card.width, paper.height, accuracy: 0.5)
         XCTAssertEqual(card.height, paper.height / 1.6, accuracy: 0.5)
 
@@ -163,6 +166,145 @@ final class ToolsTests: XCTestCase {
         XCTAssertEqual(made.doc.pdf.pageCount, 1)
         XCTAssertTrue(texts(made.doc.pdf)[0].contains("Lubumbashi"))
         XCTAssertEqual(madeUndo.undoActionName, "Scan Document")
+    }
+
+    /// The scanner finds the page in a photo taken at a slant, in shadow at one side, and makes it a page of its own
+    /// shape: white paper, dark print, the signature still blue and a black box still black; or in black and white; or as
+    /// the camera saw it. Turned, it lies on its side, and the page made of it can be searched.
+    func testScannerStraightensAndCleansUpThePage() async throws {
+        let (photo, corners) = photoOfAPage()
+        try requireDocumentDetection(photo)
+        let shot = ScanShot(photo: photo)
+        for (found, real) in zip(shot.corners, corners) {
+            XCTAssertLessThan(hypot(found.x - real.x, found.y - real.y), 40, "found \(found), at \(real)")
+        }
+        let colour = try rendered(shot, .colour)
+        XCTAssertEqual(CGFloat(colour.width) / CGFloat(colour.height), 210 / 297, accuracy: 0.015)
+        // Blank paper in the shadow is white, the print dark, the signature blue and the box black.
+        let margin = (x: 0.01..<0.06, y: 0.15..<0.7), print = (x: 0.08..<0.6, y: 0.14..<0.6)
+        XCTAssertEqual(count(colour, margin) { r, g, b in min(r, g, b) < 235 }, 0)
+        XCTAssertGreaterThan(count(colour, print) { r, g, b in max(r, g, b) < 90 }, area(colour, print) / 50)
+        XCTAssertGreaterThan(count(colour, (x: 0.08..<0.4, y: 0.655..<0.668)) { r, _, b in Int(b) > Int(r) + 80 }, 500)
+        let box = (x: 0.6..<0.85, y: 0.74..<0.86)
+        XCTAssertGreaterThan(count(colour, box) { r, g, b in max(r, g, b) < 110 }, area(colour, box) * 9 / 10)
+
+        let black = try rendered(shot, .blackAndWhite)
+        XCTAssertGreaterThan(count(black, print) { r, _, _ in r < 40 || r > 215 }, area(black, print) * 9 / 10)
+        XCTAssertEqual(count(black, (x: 0.08..<0.4, y: 0.655..<0.668)) { r, g, b in r != g || g != b }, 0)
+        let seen = try rendered(shot, .photo)
+        XCTAssertGreaterThan(count(seen, margin) { r, g, b in max(r, g, b) < 225 }, area(seen, margin) / 2)
+
+        var turned = shot
+        turned.turns = 1
+        let side = try rendered(turned, .colour)
+        XCTAssertEqual(CGFloat(side.width) / CGFloat(side.height), 297 / 210, accuracy: 0.03)
+        // The heading, at the top left, is at the top right.
+        XCTAssertGreaterThan(count(side, (x: 0.9..<0.945, y: 0.08..<0.45)) { r, g, b in max(r, g, b) < 90 }, 1000)
+
+        let made = await shot.made(.colour)
+        let page = try XCTUnwrap(made?.page).bounds(for: .mediaBox)
+        XCTAssertEqual(page.width / page.height, 210 / 297, accuracy: 0.015)
+        if (try? await recognize(colour)) != nil { XCTAssertTrue(made?.page.string?.contains("INVOICE 2041") == true, made?.page.string ?? "") }
+    }
+
+    /// The scanner takes the paper once it's held still for a moment, and not again until it moves to another page or out
+    /// of view.
+    func testScannerTakesThePaperHeldStill() {
+        var steadiness = Steadiness()
+        let start = Date.now
+        let at = { (seconds: TimeInterval) in start + seconds }
+        let paper = [CGPoint(x: 0.2, y: 0.8), CGPoint(x: 0.8, y: 0.8), CGPoint(x: 0.8, y: 0.2), CGPoint(x: 0.2, y: 0.2)]
+        let moved = { (by: CGFloat) in paper.map { CGPoint(x: $0.x + by, y: $0.y) } }
+        XCTAssertFalse(steadiness.see(nil, at: at(0)))
+        XCTAssertFalse(steadiness.see(paper, at: at(0.1)))
+        XCTAssertFalse(steadiness.see(moved(0.01), at: at(0.5)))
+        // Moving starts the wait again.
+        XCTAssertFalse(steadiness.see(moved(0.05), at: at(0.7)))
+        XCTAssertFalse(steadiness.see(moved(0.05), at: at(1.4)))
+        XCTAssertTrue(steadiness.see(moved(0.055), at: at(1.6)))
+        // The same page isn't taken again, however long it's held.
+        XCTAssertFalse(steadiness.see(moved(0.06), at: at(2.5)))
+        XCTAssertFalse(steadiness.see(moved(0.06), at: at(3.5)))
+        // Out of view and back, it is.
+        XCTAssertFalse(steadiness.see(nil, at: at(3.6)))
+        XCTAssertFalse(steadiness.see(moved(0.06), at: at(3.7)))
+        XCTAssertTrue(steadiness.see(moved(0.06), at: at(4.6)))
+        // Moved on to another page, too.
+        XCTAssertFalse(steadiness.see(moved(0.3), at: at(4.7)))
+        XCTAssertTrue(steadiness.see(moved(0.3), at: at(5.6)))
+    }
+
+    /// The scan's picture in this look, rendered.
+    private func rendered(_ shot: ScanShot, _ look: ScanLook) throws -> CGImage {
+        let image = shot.picture(look)
+        return try XCTUnwrap(ScanShot.context.createCGImage(image, from: image.extent))
+    }
+
+    /// A phone's photo of an A4 page on a desk, 3024 by 4032, tilted back 25° and turned 10° as by a camera at the
+    /// main lens's focal length, lit from the bottom right, a little soft and grainy; and where the page's top left, top
+    /// right, bottom right and bottom left corners are in it, from its bottom left. The page has a heading, lines of print,
+    /// a blue signature and a black box.
+    private func photoOfAPage() -> (CIImage, [CGPoint]) {
+        let page = NSImage(size: NSSize(width: 1240, height: 1754), flipped: true) { rect in
+            NSColor.white.setFill()
+            rect.fill()
+            NSAttributedString(string: "INVOICE 2041", attributes: [.font: NSFont.boldSystemFont(ofSize: 64)]).draw(at: CGPoint(x: 100, y: 100))
+            for row in 0..<20 {
+                NSAttributedString(string: "Lubumbashi harvest report, line \(row): maize delivered on time.", attributes: [.font: NSFont.systemFont(ofSize: 26)])
+                    .draw(at: CGPoint(x: 100, y: 240 + CGFloat(row) * 42))
+            }
+            NSColor(red: 0.1, green: 0.25, blue: 0.8, alpha: 1).setFill()
+            NSRect(x: 100, y: 1150, width: 400, height: 20).fill()
+            NSColor.black.setFill()
+            NSRect(x: 700, y: 1250, width: 400, height: 300).fill()
+            return true
+        }
+        // The page's corners, in millimetres from its centre, tilted and turned, 330 from the lens, and seen through it.
+        let (tilt, turn, focal, centre) = (25 * Double.pi / 180, 10 * Double.pi / 180, 0.72 * 4032, CGPoint(x: 1512, y: 2016))
+        let corners = [(-105.0, 148.5), (105.0, 148.5), (105.0, -148.5), (-105.0, -148.5)].map { x, y in
+            let (x1, z1) = (x * cos(turn), -x * sin(turn))
+            let (y2, z2) = (y * cos(tilt) - z1 * sin(tilt), y * sin(tilt) + z1 * cos(tilt))
+            return CGPoint(x: centre.x + focal * x1 / (330 + z2), y: centre.y + focal * y2 / (330 + z2))
+        }
+        let box = CGRect(x: 0, y: 0, width: 3024, height: 4032)
+        let flat = CIImage(cgImage: page.cgImage(forProposedRect: nil, context: nil, hints: nil)!)
+        let seen = flat.applyingFilter("CIPerspectiveTransform", parameters: ["inputTopLeft": CIVector(cgPoint: corners[0]), "inputTopRight": CIVector(cgPoint: corners[1]),
+                                                                              "inputBottomRight": CIVector(cgPoint: corners[2]), "inputBottomLeft": CIVector(cgPoint: corners[3])])
+        let light = CIFilter(name: "CILinearGradient", parameters: ["inputPoint0": CIVector(x: 0, y: 4032), "inputColor0": CIColor(red: 0.55, green: 0.52, blue: 0.45),
+                                                                    "inputPoint1": CIVector(x: 3024, y: 0), "inputColor1": CIColor(red: 1, green: 0.97, blue: 0.9)])!.outputImage!
+        let grain = CIFilter(name: "CIRandomGenerator")!.outputImage!.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0.04, y: 0, z: 0, w: 0), "inputGVector": CIVector(x: 0, y: 0.04, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0.04, w: 0), "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBiasVector": CIVector(x: -0.02, y: -0.02, z: -0.02, w: 0)])
+        let photo = seen.composited(over: CIImage(color: CIColor(red: 0.36, green: 0.25, blue: 0.16)))
+            .applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: light])
+            .applyingGaussianBlur(sigma: 1.5)
+            .applyingFilter("CIAdditionCompositing", parameters: [kCIInputBackgroundImageKey: grain])
+            .cropped(to: box)
+        // Kept as a photo is, so it's taken once, not again for each look.
+        return (CIImage(cgImage: ScanShot.context.createCGImage(photo, from: box)!), corners)
+    }
+
+    /// Skips where Vision's model for finding a page doesn't run, as on GitHub's virtual Macs.
+    private func requireDocumentDetection(_ photo: CIImage) throws {
+        let runs = (try? VNImageRequestHandler(ciImage: photo).perform([VNDetectDocumentSegmentationRequest()])) != nil
+        try XCTSkipUnless(runs, "Vision's model for finding a page doesn't run on this Mac, as on GitHub's virtual ones")
+    }
+
+    /// How many of the picture's pixels are of this kind, in these shares of its width and height from its top left.
+    private func count(_ image: CGImage, _ part: (x: Range<Double>, y: Range<Double>), where kind: (UInt8, UInt8, UInt8) -> Bool) -> Int {
+        let (x, y) = pixels(image, part)
+        return count(image, x: x, y: y, where: kind)
+    }
+
+    private func area(_ image: CGImage, _ part: (x: Range<Double>, y: Range<Double>)) -> Int {
+        let (x, y) = pixels(image, part)
+        return x.count * y.count
+    }
+
+    private func pixels(_ image: CGImage, _ part: (x: Range<Double>, y: Range<Double>)) -> (Range<Int>, Range<Int>) {
+        let (w, h) = (Double(image.width), Double(image.height))
+        return (Int(part.x.lowerBound * w)..<Int(part.x.upperBound * w), Int(part.y.lowerBound * h)..<Int(part.y.upperBound * h))
     }
 
     /// Skips where Vision's accurate model doesn't run, as on GitHub's virtual Macs.

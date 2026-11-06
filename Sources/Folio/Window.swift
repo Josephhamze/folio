@@ -375,10 +375,13 @@ struct DocumentView: View {
     #else
     @Environment(\.scenePhase) private var scenePhase
     @State private var guidingDefault = false
-    /// What the next document to open was made for, by a button of the launch screen: on iOS 27 Create from Photos and Scan
-    /// Document, which then show Photos' picker or the scanner, and on iOS 26 Scan Document, which scans first.
-    enum Making { case photos, scan, scanned }
+    /// What the next document to open was made for, by a button of the launch screen on iOS 27: Create from Photos or Scan
+    /// Document, which then show Photos' picker or the scanner.
+    enum Making { case photos, scan }
     static var making: Making?
+    /// Black over a document made for Scan Document, so its blank page doesn't show as the scanner opens over it and
+    /// its pages go in.
+    @State private var covered = DocumentView.making == .scan
     #endif
 
     init(doc: FolioDocument, url: URL?) {
@@ -570,10 +573,10 @@ struct DocumentView: View {
                 }
             }
             // Create from Photos and Scan Document on iOS 27: a page for each photo, in the order chosen, or the scan, in the new
-            // document's blank page's place; Cancel leaves it blank. On iOS 26 the scan's words are left to read. SwiftUI opens
-            // the document read from the file it was made in, so the note isn't on it, and a file made earlier is one opened
-            // after the new one failed to be made.
+            // document's blank page's place; Cancel leaves it blank. SwiftUI opens the document read from the file it was made
+            // in, so the note isn't on it, and a file made earlier is one opened after the new one failed to be made.
             .task {
+                defer { covered = false }
                 guard let making = Self.making else { return }
                 Self.making = nil
                 guard let made = try? url?.resourceValues(forKeys: [.creationDateKey]).creationDate, made > .now - 60 else { return }
@@ -581,10 +584,10 @@ struct DocumentView: View {
                 case .photos:
                     let pages = await FolioDocument.pagesOfChosenPhotos()
                     if !pages.isEmpty { viewer.doc.setPages(pages, name: "Create from Photos") }
-                case .scan: await viewer.insertScanned(FolioDocument.pagesOfScan(), replacingAll: true)
-                case .scanned: viewer.recognizeText()
+                case .scan: await viewer.insertScanned(Scanner.scan(), replacingAll: true)
                 }
             }
+            .overlay { if covered { Color.black.ignoresSafeArea() } }
             // Words being typed, and form fills, are kept when the app or the document goes.
             .onChange(of: scenePhase) { if scenePhase != .active { viewer.settle() } }
             .onDisappear {

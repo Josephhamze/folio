@@ -1,9 +1,6 @@
 import PDFKit
 import SwiftUI
 import UniformTypeIdentifiers
-#if os(iOS)
-import VisionKit
-#endif
 
 @main
 struct FolioApp: App {
@@ -45,19 +42,14 @@ struct FolioApp: App {
                                                                            startPoint: .top, endPoint: .bottom)) {
             // Two buttons show, and any more fold into More…, so where there's a camera, Scan Document takes the place of
             // Create Document, which the Create Document tile among the files still does. The simulator has no camera.
-            if VNDocumentCameraViewController.isSupported {
+            if Scanner.isAvailable {
                 if #available(iOS 27, *) {
                     // iOS 27 runs no button's closure, and tells this button from Create from Photos by its content type: see
                     // noteWhichButton.
                     NewDocumentButton("Scan Document", contentType: .pdf)
                 } else {
-                    // The pages scanned, whose words the document's view then reads, showing how far it's got; Cancel makes no
-                    // document.
-                    NewDocumentButton("Scan Document", for: FolioDocument.self) {
-                        let doc = try Self.document(of: await FolioDocument.pagesOfScan())
-                        DocumentView.making = .scanned
-                        return doc
-                    }
+                    // The pages scanned, their words read; Cancel makes no document.
+                    NewDocumentButton("Scan Document", for: FolioDocument.self) { try Self.document(of: await Scanner.scan()) }
                 }
             } else {
                 NewDocumentButton()

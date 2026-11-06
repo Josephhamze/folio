@@ -14,6 +14,7 @@
 "Again" = "Confirmation";
 "Allow changes" = "Autoriser les modifications";
 "Allow copying" = "Autoriser la copie";
+"Allow Folio to use the camera in Settings to scan" = "Pour numériser, autorisez Folio à utiliser l’appareil photo dans Réglages";
 "Allow printing" = "Autoriser l’impression";
 "Already as small as it gets" = "Le fichier est déjà aussi petit que possible";
 "Apply Redactions" = "Appliquer les caviardages";
@@ -21,6 +22,8 @@
 "Apps that respect restrictions ask for this password first, but not every app does." = "Les apps qui respectent les restrictions demandent d’abord ce mot de passe, mais toutes ne le font pas.";
 "Arrow" = "Flèche";
 "Author" = "Auteur";
+"Auto" = "Auto";
+"Black & White" = "Noir et blanc";
 "Bookmarks" = "Signets";
 "Cancel" = "Annuler";
 "Change Colour" = "Changer la couleur";
@@ -35,6 +38,7 @@
 "Couldn't apply the redactions" = "Impossible d’appliquer les caviardages";
 "Couldn't save the files in %@." = "Impossible d’enregistrer les fichiers dans %@.";
 "Create from Photos" = "Créer à partir de photos";
+"Crop" = "Recadrer";
 "Date" = "Date";
 "Delete" = "Supprimer";
 "Delete Pages" = "Supprimer les pages";
@@ -58,7 +62,9 @@
 "Folio saves your changes as you make them" = "Folio enregistre vos modifications au fur et à mesure";
 "Found no pages to insert: a PDF with a password or restrictions gives none" = "Aucune page à insérer : un PDF protégé par un mot de passe ou des restrictions n’en donne aucune";
 "Found no text to recognize" = "Aucun texte à reconnaître";
+"Greyscale" = "Niveaux de gris";
 "Highlight" = "Surligner";
+"Hold still" = "Ne bougez plus";
 "Home" = "Accueil";
 "Image" = "Image";
 "In Files, touch and hold any PDF, choose Get Info, and next to Always Open With choose Folio. Then choose Always Open PDF Document Files." = "Dans Fichiers, maintenez le doigt sur un PDF, choisissez Lire les informations, puis Folio dans Toujours ouvrir avec. Choisissez ensuite de l’appliquer à tous les documents PDF.";
@@ -70,11 +76,14 @@
 "Insert Pages" = "Insérer des pages";
 "Keywords" = "Mots-clés";
 "Leave Read Mode" = "Quitter le mode lecture";
+"Light" = "Lampe";
 "Line" = "Ligne";
+"Look" = "Rendu";
 "Make Default" = "Définir par défaut";
 "Make Default PDF App" = "Définir comme app PDF par défaut";
 "Make Folio your default PDF app?" = "Faire de Folio votre app PDF par défaut ?";
 "Makes %lld files, named “%@ 1”, “%@ 2” and so on." = "Crée %lld fichiers, nommés « %@ 1 », « %@ 2 », etc.";
+"Manual" = "Manuel";
 "Mark for Redaction" = "Marquer pour caviardage";
 "Markup" = "Annoter";
 "More Tools" = "Autres outils";
@@ -90,6 +99,7 @@
 "of %lld" = "sur %lld";
 "Once saved, the file asks for this password to open it." = "Une fois enregistré, le fichier demande ce mot de passe pour s’ouvrir.";
 "Open Files" = "Ouvrir Fichiers";
+"Open Settings" = "Ouvrir Réglages";
 "Open…" = "Ouvrir…";
 "Organize Pages" = "Organiser les pages";
 "Oval" = "Ovale";
@@ -103,7 +113,9 @@
 "PDFs you open show up here. You can also drop one on this window." = "Les PDF que vous ouvrez s’affichent ici. Vous pouvez aussi en déposer un sur cette fenêtre.";
 "Pen" = "Stylo";
 "Permissions password" = "Mot de passe des autorisations";
+"Photo" = "Photo";
 "Photos…" = "Photos…";
+"Point the camera at a page" = "Visez une page avec l’appareil photo";
 "Previous" = "Précédent";
 "Print…" = "Imprimer…";
 "Properties" = "Propriétés";
@@ -135,6 +147,7 @@
 "Saved %lld files in %@" = "%lld fichiers enregistrés dans %@";
 "Scan Document" = "Numériser un document";
 "Scan Pages…" = "Numériser des pages…";
+"Scanned Pages" = "Pages numérisées";
 "Select" = "Sélectionner";
 "Send Page as Picture" = "Envoyer la page en image";
 "Separated by commas" = "Séparés par des virgules";
@@ -151,8 +164,10 @@
 "Stop Organizing" = "Terminer l’organisation";
 "Strike Through" = "Barrer";
 "Subject" = "Sujet";
+"Take Photo" = "Prendre la photo";
 "Tap where it goes, or drag to size it" = "Touchez l’endroit voulu, ou faites glisser pour choisir la taille";
 "Text Box" = "Zone de texte";
+"The camera is unavailable" = "L’appareil photo n’est pas disponible";
 "The original text stays underneath in the file." = "Le texte d’origine reste dessous, dans le fichier.";
 "The password comes off once the file is saved" = "Le mot de passe sera retiré à l’enregistrement du fichier";
 "The password goes on once the file is saved" = "Le mot de passe sera appliqué à l’enregistrement du fichier";
@@ -172,6 +187,7 @@
 "Untitled" = "Sans titre";
 "Use a permissions password other than the one that opens the file." = "Utilisez un mot de passe des autorisations différent de celui qui ouvre le fichier.";
 "Use only English letters, digits and symbols." = "Utilisez seulement des lettres sans accents, des chiffres et des symboles.";
+"Whole Photo" = "Toute la photo";
 "Wrong password" = "Mot de passe incorrect";
 "Your initials" = "Vos initiales";
 "Your name" = "Votre nom";

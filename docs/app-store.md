@@ -45,9 +45,10 @@ The key made the certificate and the profile through the App Store Connect API. 
 Folio is a PDF editor for iPhone and iPad. No account, no subscription, no ads.
 
 SCAN
-• Scan Document turns paper into a PDF with the camera. Apple's document scanner finds the page's edges, takes it once it's steady, and straightens and cleans it up.
-• Each page takes the paper's own shape, and Folio reads its words on your device, in English, French, Chinese and many other languages, so you can search, select and copy them.
-• Scan Pages adds scanned pages to any document.
+• Scan Document turns paper into a PDF with the camera. Folio outlines the page, takes it at full resolution once you hold still, and straightens it into the paper's true shape.
+• Clean white paper, even in shadow, with dark, sharp print: in colour, greyscale or black and white, or keep the photo as it is.
+• Folio reads the words on your device while you scan the next page, in English, French, Chinese and many other languages, so you can search, select and copy them.
+• Drag a page's corners, turn it or delete it before you save. Scan Pages adds scanned pages to any document.
 
 MARK UP
 • Highlight, underline and strike through text with a finger or Apple Pencil.

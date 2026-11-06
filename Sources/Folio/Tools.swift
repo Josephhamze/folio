@@ -107,6 +107,12 @@ func jpeg(_ image: CGImage) -> Data? {
     return CGImageDestinationFinalize(file) ? data as Data : nil
 }
 
+/// The picture kept as a JPEG, which a PDF holds as it is: a page-sized picture kept as drawn would weigh megabytes.
+func asJPEG(_ image: CGImage) -> CGImage? {
+    guard let data = jpeg(image), let provider = CGDataProvider(data: data as CFData) else { return nil }
+    return CGImage(jpegDataProviderSource: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+}
+
 extension FolioDocument {
     /// Reads the words on each page that has no text, such as a scan, and puts them under the page as invisible text, as one
     /// change. `progress` hears as each page begins: how many are done, of how many. It returns how many pages it read, of
@@ -141,9 +147,7 @@ extension FolioDocument {
         for page in pages {
             let marks = page.annotations.filter(\.isRedaction).map(\.bounds)
             guard !marks.isEmpty else { continue }
-            // Kept as a JPEG, which the file holds as it is: a page-sized picture kept as drawn would weigh megabytes.
-            guard let image = render(page, dpi: 300, blacking: marks), let data = jpeg(image), let provider = CGDataProvider(data: data as CFData),
-                  let picture = CGImage(jpegDataProviderSource: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent),
+            guard let image = render(page, dpi: 300, blacking: marks), let picture = asJPEG(image),
                   let redacted = rebuilt(page, text: (try? await recognize(image)) ?? [], over: picture) else { return nil }
             for a in redacted.annotations where a.isRedaction || marks.contains(where: a.bounds.intersects) { redacted.removeAnnotation(a) }
             new[page] = redacted

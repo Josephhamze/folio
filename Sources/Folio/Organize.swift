@@ -1,8 +1,5 @@
 import PDFKit
 import SwiftUI
-#if os(iOS)
-import VisionKit
-#endif
 
 /// The pages as a grid, over the page view while organizing. A click selects a page, and ⌘ and ⇧ clicks select more; on
 /// iOS a tap selects or deselects one. Dragged pages move in front of the page they're dropped on, or to the end.
@@ -118,8 +115,8 @@ struct PageActions: View {
         #if os(iOS)
         Button("Insert from Photos…", systemImage: "photo.badge.plus") { Task { await viewer?.insert(FolioDocument.pagesOfChosenPhotos()) } }
             .disabled(!idle)
-        if VNDocumentCameraViewController.isSupported {
-            Button("Scan Pages…", systemImage: "doc.viewfinder") { Task { await viewer?.insertScanned(FolioDocument.pagesOfScan()) } }
+        if Scanner.isAvailable {
+            Button("Scan Pages…", systemImage: "doc.viewfinder") { Task { await viewer?.insertScanned(Scanner.scan()) } }
                 .disabled(!idle)
         }
         #endif

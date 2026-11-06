@@ -14,6 +14,7 @@
 "Again" = "再次输入";
 "Allow changes" = "允许更改";
 "Allow copying" = "允许拷贝";
+"Allow Folio to use the camera in Settings to scan" = "请在“设置”中允许 Folio 使用相机以进行扫描";
 "Allow printing" = "允许打印";
 "Already as small as it gets" = "文件已经无法再缩小";
 "Apply Redactions" = "应用涂黑";
@@ -21,6 +22,8 @@
 "Apps that respect restrictions ask for this password first, but not every app does." = "遵守限制的 App 会先要求输入此密码，但并非所有 App 都会这样做。";
 "Arrow" = "箭头";
 "Author" = "作者";
+"Auto" = "自动";
+"Black & White" = "黑白";
 "Bookmarks" = "书签";
 "Cancel" = "取消";
 "Change Colour" = "更改颜色";
@@ -35,6 +38,7 @@
 "Couldn't apply the redactions" = "无法应用涂黑";
 "Couldn't save the files in %@." = "无法将文件存储到“%@”。";
 "Create from Photos" = "从照片创建";
+"Crop" = "裁剪";
 "Date" = "日期";
 "Delete" = "删除";
 "Delete Pages" = "删除页面";
@@ -58,7 +62,9 @@
 "Folio saves your changes as you make them" = "Folio 会随时存储你的更改";
 "Found no pages to insert: a PDF with a password or restrictions gives none" = "没有可插入的页面：带密码或限制的 PDF 不提供页面";
 "Found no text to recognize" = "未找到可识别的文本";
+"Greyscale" = "灰度";
 "Highlight" = "高亮";
+"Hold still" = "请保持不动";
 "Home" = "主页";
 "Image" = "图像";
 "In Files, touch and hold any PDF, choose Get Info, and next to Always Open With choose Folio. Then choose Always Open PDF Document Files." = "在“文件”App 中，按住任一 PDF，选取“显示简介”，然后在“始终打开方式”中选取 Folio，并应用于所有 PDF 文稿。";
@@ -70,11 +76,14 @@
 "Insert Pages" = "插入页面";
 "Keywords" = "关键词";
 "Leave Read Mode" = "退出阅读模式";
+"Light" = "手电筒";
 "Line" = "直线";
+"Look" = "效果";
 "Make Default" = "设为默认";
 "Make Default PDF App" = "设为默认 PDF 应用";
 "Make Folio your default PDF app?" = "要将 Folio 设为默认 PDF 应用吗？";
 "Makes %lld files, named “%@ 1”, “%@ 2” and so on." = "将生成 %lld 个文件，依次命名为“%@ 1”“%@ 2”等。";
+"Manual" = "手动";
 "Mark for Redaction" = "标记涂黑";
 "Markup" = "标记";
 "More Tools" = "更多工具";
@@ -90,6 +99,7 @@
 "of %lld" = "/ %lld";
 "Once saved, the file asks for this password to open it." = "存储后，打开此文件需要输入这个密码。";
 "Open Files" = "打开“文件”";
+"Open Settings" = "打开设置";
 "Open…" = "打开…";
 "Organize Pages" = "整理页面";
 "Oval" = "椭圆";
@@ -103,7 +113,9 @@
 "PDFs you open show up here. You can also drop one on this window." = "你打开的 PDF 会显示在这里。你也可以将 PDF 拖到此窗口。";
 "Pen" = "画笔";
 "Permissions password" = "权限密码";
+"Photo" = "照片";
 "Photos…" = "照片…";
+"Point the camera at a page" = "将相机对准页面";
 "Previous" = "上一个";
 "Print…" = "打印…";
 "Properties" = "属性";
@@ -135,6 +147,7 @@
 "Saved %lld files in %@" = "已将 %lld 个文件存储到“%@”";
 "Scan Document" = "扫描文稿";
 "Scan Pages…" = "扫描页面…";
+"Scanned Pages" = "已扫描的页面";
 "Select" = "选择";
 "Send Page as Picture" = "以图片发送此页";
 "Separated by commas" = "用逗号分隔";
@@ -151,8 +164,10 @@
 "Stop Organizing" = "完成整理";
 "Strike Through" = "删除线";
 "Subject" = "主题";
+"Take Photo" = "拍照";
 "Tap where it goes, or drag to size it" = "轻点要放置的位置，或拖移以调整大小";
 "Text Box" = "文本框";
+"The camera is unavailable" = "相机不可用";
 "The original text stays underneath in the file." = "原来的文本仍保留在文件中，位于下方。";
 "The password comes off once the file is saved" = "文件存储后将移除密码";
 "The password goes on once the file is saved" = "文件存储后将设置密码";
@@ -172,6 +187,7 @@
 "Untitled" = "未命名";
 "Use a permissions password other than the one that opens the file." = "请使用与打开文件的密码不同的权限密码。";
 "Use only English letters, digits and symbols." = "只能使用英文字母、数字和符号。";
+"Whole Photo" = "整张照片";
 "Wrong password" = "密码错误";
 "Your initials" = "你的姓名缩写";
 "Your name" = "你的姓名";
