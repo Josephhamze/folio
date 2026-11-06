@@ -119,40 +119,9 @@ struct PageActions: View {
         Button("Insert from Photos…", systemImage: "photo.badge.plus") { Task { await viewer?.insert(FolioDocument.pagesOfChosenPhotos()) } }
             .disabled(!idle)
         if VNDocumentCameraViewController.isSupported {
-            Button("Scan Pages…", systemImage: "doc.viewfinder") { viewer?.scanning = true }
+            Button("Scan Pages…", systemImage: "doc.viewfinder") { Task { await viewer?.insertScanned(FolioDocument.pagesOfScan()) } }
                 .disabled(!idle)
         }
         #endif
     }
 }
-
-#if os(iOS)
-/// The system's document scanner, which hands back the pages it scanned, or none when cancelled.
-struct PageScanner: UIViewControllerRepresentable {
-    let done: ([UIImage]) -> Void
-
-    func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
-        let scanner = VNDocumentCameraViewController()
-        scanner.delegate = context.coordinator
-        return scanner
-    }
-
-    func updateUIViewController(_ scanner: VNDocumentCameraViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(done: done) }
-
-    final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
-        let done: ([UIImage]) -> Void
-
-        init(done: @escaping ([UIImage]) -> Void) { self.done = done }
-
-        func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
-            done((0..<scan.pageCount).map(scan.imageOfPage(at:)))
-        }
-
-        func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) { done([]) }
-
-        func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) { done([]) }
-    }
-}
-#endif

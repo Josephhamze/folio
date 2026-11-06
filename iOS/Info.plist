@@ -59,7 +59,7 @@
 			</array>
 		</dict>
 	</array>
-	<!-- Scan Pages… opens the system's document scanner, which asks for the camera with this. -->
+	<!-- Scan Document and Scan Pages… open the system's document scanner, which asks for the camera with this. -->
 	<key>NSCameraUsageDescription</key>
 	<string>Folio scans paper into your documents with the camera.</string>
 	<!-- PDFKit's encryption, for protected files, is Apple's own. -->

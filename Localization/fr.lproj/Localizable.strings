@@ -133,9 +133,8 @@
 "Saved" = "Enregistré";
 "Saved %@" = "%@ enregistré";
 "Saved %lld files in %@" = "%lld fichiers enregistrés dans %@";
+"Scan Document" = "Numériser un document";
 "Scan Pages…" = "Numériser des pages…";
-"Scanned %lld pages. Tools › Recognize Text makes them searchable" = "%lld pages numérisées. Outils › Reconnaître le texte permet d’y faire des recherches";
-"Scanned 1 page. Tools › Recognize Text makes it searchable" = "1 page numérisée. Outils › Reconnaître le texte permet d’y faire des recherches";
 "Select" = "Sélectionner";
 "Send Page as Picture" = "Envoyer la page en image";
 "Separated by commas" = "Séparés par des virgules";

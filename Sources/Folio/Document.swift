@@ -2,6 +2,9 @@ import PDFKit
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(iOS)
+import VisionKit
+#endif
 
 /// A PDF open in a window. Every edit goes through `change`, so it can be undone and marks the document edited.
 @Observable
@@ -337,12 +340,17 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
             guard let pdf = PDFDocument(data: data), pdf.hasFullRights else { return [] }
             return (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.copy() as? PDFPage }
         }
-        return NSImage(data: data).flatMap(page(from:)).map { [$0] } ?? []
+        return NSImage(data: data).flatMap { page(from: $0) }.map { [$0] } ?? []
     }
 
-    /// A picture fitted to a page of the system's paper size, turned landscape for a wide picture.
-    static func page(from image: NSImage) -> PDFPage? {
-        let size = image.size.width > image.size.height ? CGSize(width: paper.height, height: paper.width) : paper
+    /// A picture fitted to a page of the system's paper size, turned landscape for a wide picture. A scan is the paper itself,
+    /// so it fills a page of its own shape instead, the biggest that fits that paper.
+    static func page(from image: NSImage, scan: Bool = false) -> PDFPage? {
+        var size = image.size.width > image.size.height ? CGSize(width: paper.height, height: paper.width) : paper
+        if scan {
+            let fit = min(size.width / max(image.size.width, 1), size.height / max(image.size.height, 1))
+            size = CGSize(width: image.size.width * fit, height: image.size.height * fit)
+        }
         #if os(iOS)
         // Drawn upright, as it's seen: a phone keeps a photo on its side, with a note to turn it. And no finer than the page
         // printed at 300 dpi: a camera's photo as it comes would make a page of tens of megabytes.
@@ -359,7 +367,7 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
         #else
         let picture = image
         #endif
-        return PDFPage(image: picture, options: [.mediaBox: CGRect(origin: .zero, size: size), .compressionQuality: 0.8])
+        return PDFPage(image: picture, options: [.mediaBox: CGRect(origin: .zero, size: size), .compressionQuality: 0.8, .upscaleIfSmaller: scan])
     }
 
     #if os(iOS)
@@ -367,10 +375,22 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
     @MainActor static func pagesOfChosenPhotos() async -> [PDFPage] {
         await PhotoPicker().choose().flatMap { Self.pages(from: $0, isPDF: false) }
     }
+
+    /// The pages the system's document scanner scans, in order, each filling a page of its own shape: none for Cancel.
+    @MainActor static func pagesOfScan() async -> [PDFPage] {
+        await Scanner().scan().compactMap { page(from: $0, scan: true) }
+    }
     #endif
 }
 
 #if os(iOS)
+/// What's on top of the key window, for a picker or the scanner to show over whatever is on screen.
+@MainActor private func topController() -> UIViewController? {
+    var top = UIApplication.shared.connectedScenes.lazy.compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }.first
+    while let shown = top?.presentedViewController { top = shown }
+    return top
+}
+
 /// Photos' picker, shown over whatever is on screen, for one call to wait on: Create from Photos shows it over the launch
 /// screen, or on iOS 27 as the new document opens, and Organize Pages to insert photos, with no SwiftUI state to hang it on.
 private final class PhotoPicker: NSObject, PHPickerViewControllerDelegate {
@@ -384,9 +404,7 @@ private final class PhotoPicker: NSObject, PHPickerViewControllerDelegate {
         configuration.selectionLimit = 0
         let picker = PHPickerViewController(configuration: configuration)
         picker.delegate = self
-        var top = UIApplication.shared.connectedScenes.lazy.compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }.first
-        while let shown = top?.presentedViewController { top = shown }
-        guard let top else { return [] }
+        guard let top = topController() else { return [] }
         let results = await withCheckedContinuation { chosen = $0; top.present(picker, animated: true) }
         var photos: [Data] = []
         for result in results {
@@ -403,6 +421,39 @@ private final class PhotoPicker: NSObject, PHPickerViewControllerDelegate {
         picker.dismiss(animated: true) { [self] in
             chosen?.resume(returning: results)
             chosen = nil
+        }
+    }
+}
+
+/// The system's document scanner, shown over whatever is on screen for one call to wait on, as Photos' picker is: Scan
+/// Document over the launch screen, or on iOS 27 as the new document opens, and Organize Pages to insert a scan. It finds
+/// the paper's edges, takes it once it's steady, straightens and cleans it up, and can crop, turn or filter each page.
+private final class Scanner: NSObject, VNDocumentCameraViewControllerDelegate {
+    private var scanned: CheckedContinuation<[UIImage], Never>?
+
+    /// The pages scanned, in order: none for Cancel, or when the camera fails or there's none, where the scanner would
+    /// throw as it's made.
+    @MainActor func scan() async -> [UIImage] {
+        guard VNDocumentCameraViewController.isSupported, let top = topController() else { return [] }
+        let scanner = VNDocumentCameraViewController()
+        scanner.delegate = self
+        scanner.modalPresentationStyle = .fullScreen
+        return await withCheckedContinuation { scanned = $0; top.present(scanner, animated: true) }
+    }
+
+    func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
+        finish(controller, with: (0..<scan.pageCount).map(scan.imageOfPage(at:)))
+    }
+
+    func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) { finish(controller, with: []) }
+
+    func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) { finish(controller, with: []) }
+
+    /// Once it's gone, as the picker does.
+    private func finish(_ controller: VNDocumentCameraViewController, with pages: [UIImage]) {
+        controller.dismiss(animated: true) { [self] in
+            scanned?.resume(returning: pages)
+            scanned = nil
         }
     }
 }

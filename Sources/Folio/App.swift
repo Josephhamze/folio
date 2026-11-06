@@ -1,6 +1,9 @@
 import PDFKit
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(iOS)
+import VisionKit
+#endif
 
 @main
 struct FolioApp: App {
@@ -40,16 +43,28 @@ struct FolioApp: App {
         DocumentGroupLaunchScene("Folio", backgroundStyle: LinearGradient(colors: [Color(red: 0xE5 / 255, green: 0x48 / 255, blue: 0x4D / 255),
                                                                                     Color(red: 0x9E / 255, green: 0x1B / 255, blue: 0x25 / 255)],
                                                                            startPoint: .top, endPoint: .bottom)) {
-            NewDocumentButton()
+            // Two buttons show, and any more fold into More…, so where there's a camera, Scan Document takes the place of
+            // Create Document, which the Create Document tile among the files still does. The simulator has no camera.
+            if VNDocumentCameraViewController.isSupported {
+                if #available(iOS 27, *) {
+                    // iOS 27 runs no button's closure, and tells this button from Create from Photos by its content type: see
+                    // noteWhichButton.
+                    NewDocumentButton("Scan Document", contentType: .pdf)
+                } else {
+                    // The pages scanned, whose words the document's view then reads, showing how far it's got; Cancel makes no
+                    // document.
+                    NewDocumentButton("Scan Document", for: FolioDocument.self) {
+                        let doc = try Self.document(of: await FolioDocument.pagesOfScan())
+                        DocumentView.making = .scanned
+                        return doc
+                    }
+                }
+            } else {
+                NewDocumentButton()
+            }
             // A page for each photo, in the order chosen; Cancel makes no document. iOS 27 never runs this, making a blank
             // document instead: see noteWhichButton.
-            NewDocumentButton("Create from Photos", for: FolioDocument.self) {
-                let pages = await FolioDocument.pagesOfChosenPhotos()
-                guard !pages.isEmpty else { throw CancellationError() }
-                let pdf = PDFDocument()
-                for page in pages { pdf.insert(page, at: pdf.pageCount) }
-                return FolioDocument(pdf: pdf)
-            }
+            NewDocumentButton("Create from Photos", for: FolioDocument.self) { try Self.document(of: await FolioDocument.pagesOfChosenPhotos()) }
         }
         #endif
     }
@@ -57,10 +72,19 @@ struct FolioApp: App {
 
 #if os(iOS)
 extension FolioApp {
-    /// Notes whether the document being made is for Create from Photos, for its view to show Photos' picker. iOS 27 makes it
-    /// as for Create Document, never running the closure given to that button, but the document browser knows which button
-    /// it was. SwiftUI makes it off the main thread, where UIKit can't be asked, and makes another as it opens the file, with
-    /// no button being made then. iOS 26 runs the closure instead, and gives every button a name made up as it launches.
+    /// A new document of these pages, or none for Cancel, which gave none.
+    private static func document(of pages: [PDFPage]) throws -> FolioDocument {
+        guard !pages.isEmpty else { throw CancellationError() }
+        let pdf = PDFDocument()
+        for page in pages { pdf.insert(page, at: pdf.pageCount) }
+        return FolioDocument(pdf: pdf)
+    }
+
+    /// Notes whether the document being made is for Create from Photos or Scan Document, for its view to show Photos' picker
+    /// or the scanner. iOS 27 makes it as for Create Document, never running the closure given to either button, but the
+    /// document browser knows which button it was. SwiftUI makes it off the main thread, where UIKit can't be asked, and
+    /// makes another as it opens the file, with no button being made then. iOS 26 runs the closures instead, and gives every
+    /// button a name made up as it launches.
     private static func noteWhichButton() {
         let note = {
             MainActor.assumeIsolated {
@@ -68,7 +92,9 @@ extension FolioApp {
                     var controllers = (scene as? UIWindowScene)?.windows.compactMap(\.rootViewController) ?? []
                     while let controller = controllers.popLast() {
                         if let intent = (controller as? UIDocumentBrowserViewController)?.activeDocumentCreationIntent {
-                            return DocumentView.choosesPhotos = intent != .default
+                            // Such as "SwiftUIcom.adobe.pdf-0" for Scan Document and "SwiftUIFolio.FolioDocument-1" for Create from
+                            // Photos, numbered by their place.
+                            return DocumentView.making = intent == .default ? nil : intent.rawValue.contains(UTType.pdf.identifier) ? .scan : .photos
                         }
                         controllers += controller.children + [controller.presentedViewController].compactMap { $0 }
                     }

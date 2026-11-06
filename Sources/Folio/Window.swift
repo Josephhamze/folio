@@ -30,7 +30,6 @@ final class Viewer {
     /// Whether Insert from File… is choosing its files.
     var choosingPages = false
     #if os(iOS)
-    var scanning = false
     /// Whether Markup's tools show in place of the reading bar: any tool but Select starts it, and Done ends it. Marks can be
     /// picked only then. It ends Find, whose field it takes the place of.
     var markingUp = false {
@@ -242,18 +241,25 @@ final class Viewer {
         if organizing { selection = Set(pages) }
     }
 
-    /// Puts the scanned pages, each a picture on a page of the system's paper size, after the target pages, and says how to
-    /// make them searchable.
-    func insertScanned(_ images: [NSImage]) {
-        let pages = images.compactMap(FolioDocument.page(from:))
+    /// Puts a scan's pages after the target pages, or in place of every page of a document made for it, once the words on
+    /// those with no text are read, so Find finds them and they can be selected and copied. It shows how far it's got, then
+    /// says on how many pages it read words.
+    @MainActor func insertScanned(_ pages: [PDFPage], replacingAll: Bool = false) async {
         guard !pages.isEmpty else { return }
-        insert(pages)
-        message = pages.count == 1 ? String(localized: "Scanned 1 page. Tools › Recognize Text makes it searchable")
-            : String(localized: "Scanned \(pages.count) pages. Tools › Recognize Text makes them searchable")
+        settle()
+        busy = String(localized: "Recognizing text…")
+        let read = await FolioDocument.recognized(pages.filter(\.hasNoText)) { done, count in
+            busy = String(localized: "Recognizing text… \(done + 1) of \(count)")
+        }
+        busy = nil
+        let scan = pages.map { read[$0] ?? $0 }
+        if replacingAll { doc.setPages(scan, name: "Scan Document") } else { insert(scan) }
+        guard !read.isEmpty else { return }
+        message = read.count == 1 ? String(localized: "Recognized the text on 1 page") : String(localized: "Recognized the text on \(read.count) pages")
     }
 
     /// Puts the pages of PDFs and pictures another device hands over, such as a scan from an iPhone by Continuity Camera,
-    /// after the target pages, in their order. False when the document takes no changes now.
+    /// after the target pages, in their order, as a scan goes in. False when the document takes no changes now.
     func importItems(_ providers: [NSItemProvider]) -> Bool {
         guard isIdle else { return false }
         Task { @MainActor in
@@ -265,7 +271,7 @@ final class Viewer {
                 }
                 pages += data.map { FolioDocument.pages(from: $0, isPDF: type.conforms(to: .pdf)) } ?? []
             }
-            if pages.isEmpty { message = String(localized: "Found no pages to insert: a PDF with a password or restrictions gives none") } else { insert(pages) }
+            if pages.isEmpty { message = String(localized: "Found no pages to insert: a PDF with a password or restrictions gives none") } else { await insertScanned(pages) }
         }
         return true
     }
@@ -369,8 +375,10 @@ struct DocumentView: View {
     #else
     @Environment(\.scenePhase) private var scenePhase
     @State private var guidingDefault = false
-    /// Whether the next document to open was made by Create from Photos.
-    static var choosesPhotos = false
+    /// What the next document to open was made for, by a button of the launch screen: on iOS 27 Create from Photos and Scan
+    /// Document, which then show Photos' picker or the scanner, and on iOS 26 Scan Document, which scans first.
+    enum Making { case photos, scan, scanned }
+    static var making: Making?
     #endif
 
     init(doc: FolioDocument, url: URL?) {
@@ -427,14 +435,6 @@ struct DocumentView: View {
             .focusedSceneValue(\.searchFocus, $searching)
             // File › Import from iPhone or iPad.
             .importsItemProviders([.pdf, .image]) { viewer.importItems($0) }
-            #else
-            .fullScreenCover(isPresented: $viewer.scanning) {
-                PageScanner { images in
-                    viewer.scanning = false
-                    viewer.insertScanned(images)
-                }
-                .ignoresSafeArea()
-            }
             #endif
             .onAppear { viewer.doc.undo = undoManager }
             .onChange(of: undoManager) { viewer.doc.undo = undoManager }
@@ -569,15 +569,21 @@ struct DocumentView: View {
                     }
                 }
             }
-            // Create from Photos on iOS 27: a page for each photo, in the order chosen, in the new document's blank page's
-            // place; Cancel leaves it blank. SwiftUI opens the document read from the file it was made in, so the note isn't on
-            // it, and a file made earlier is one opened after the new one failed to be made.
+            // Create from Photos and Scan Document on iOS 27: a page for each photo, in the order chosen, or the scan, in the new
+            // document's blank page's place; Cancel leaves it blank. On iOS 26 the scan's words are left to read. SwiftUI opens
+            // the document read from the file it was made in, so the note isn't on it, and a file made earlier is one opened
+            // after the new one failed to be made.
             .task {
-                guard Self.choosesPhotos else { return }
-                Self.choosesPhotos = false
+                guard let making = Self.making else { return }
+                Self.making = nil
                 guard let made = try? url?.resourceValues(forKeys: [.creationDateKey]).creationDate, made > .now - 60 else { return }
-                let pages = await FolioDocument.pagesOfChosenPhotos()
-                if !pages.isEmpty { viewer.doc.setPages(pages, name: "Create from Photos") }
+                switch making {
+                case .photos:
+                    let pages = await FolioDocument.pagesOfChosenPhotos()
+                    if !pages.isEmpty { viewer.doc.setPages(pages, name: "Create from Photos") }
+                case .scan: await viewer.insertScanned(FolioDocument.pagesOfScan(), replacingAll: true)
+                case .scanned: viewer.recognizeText()
+                }
             }
             // Words being typed, and form fills, are kept when the app or the document goes.
             .onChange(of: scenePhase) { if scenePhase != .active { viewer.settle() } }

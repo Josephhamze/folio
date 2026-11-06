@@ -77,6 +77,11 @@ func rebuilt(_ page: PDFPage, text: [(text: String, box: CGRect)], over picture:
     return new
 }
 
+extension PDFPage {
+    /// Whether the page has no text to find, as a scan has none until its words are read.
+    var hasNoText: Bool { (string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+}
+
 /// The page as it shows, its crop, turn and marks included, on white at `dpi`.
 func shown(_ page: PDFPage, dpi: CGFloat) -> CGImage? {
     let box = page.bounds(for: .cropBox), scale = dpi / 72, turned = page.rotation % 180 != 0
@@ -107,17 +112,22 @@ extension FolioDocument {
     /// change. `progress` hears as each page begins: how many are done, of how many. It returns how many pages it read, of
     /// how many had no text.
     @MainActor func recognizeText(progress: (Int, Int) -> Void) async -> (read: Int, of: Int) {
-        let scans = pages.filter { ($0.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let scans = pages.filter(\.hasNoText), new = await Self.recognized(scans, progress: progress)
+        if !new.isEmpty { setPages(pages.map { new[$0] ?? $0 }, name: "Recognize Text", replacing: new) }
+        return (new.count, scans.count)
+    }
+
+    /// Reads the words on each of these pages, and gives each it reads any on with the page that has them under it, as
+    /// invisible text. `progress` hears as each page begins: how many are done, of how many.
+    @MainActor static func recognized(_ pages: [PDFPage], progress: (Int, Int) -> Void) async -> [PDFPage: PDFPage] {
         var found: [(page: PDFPage, text: [(text: String, box: CGRect)])] = []
-        for (done, page) in scans.enumerated() {
-            progress(done, scans.count)
+        for (done, page) in pages.enumerated() {
+            progress(done, pages.count)
             guard let image = render(page, dpi: 300), let text = try? await recognize(image), !text.isEmpty else { continue }
             found.append((page, text))
         }
         // Rebuilt only now, so each keeps its page's marks as they are at the end.
-        let new = Dictionary(uniqueKeysWithValues: found.compactMap { page, text in rebuilt(page, text: text).map { (page, $0) } })
-        if !new.isEmpty { setPages(pages.map { new[$0] ?? $0 }, name: "Recognize Text", replacing: new) }
-        return (new.count, scans.count)
+        return Dictionary(uniqueKeysWithValues: found.compactMap { page, text in rebuilt(page, text: text).map { (page, $0) } })
     }
 
     /// Burns in the redaction marks, as one change. Each page with marks becomes a picture of itself at 300 dpi with the

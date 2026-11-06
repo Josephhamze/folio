@@ -530,18 +530,16 @@ final class ViewerTests: XCTestCase {
     }
 
     /// What another device hands over, such as a scan from an iPhone, a PDF's pages and a picture, goes in after the page in
-    /// view, in its order; so do scanned pages, with word of how to make them searchable.
-    func testImportedAndScannedPagesGoInAfterThePageInView() {
+    /// view, in its order, as a scan does: the PDF's own words kept as they are.
+    func testImportedPagesGoInAfterThePageInView() {
         let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"], ["B"]]))), photo = URL(fileURLWithPath: "/System/Library/Wallpapers/.default/DefaultAerial.jpg")
         viewer.canvas.document = viewer.doc.pdf
         let scan = NSItemProvider(item: makePDF([["Scan"]]).dataRepresentation()! as NSData, typeIdentifier: UTType.pdf.identifier)
         XCTAssertTrue(viewer.importItems([scan, NSItemProvider(contentsOf: photo)!]))
-        for _ in 0..<200 where viewer.doc.pdf.pageCount < 4 { RunLoop.main.run(until: Date() + 0.05) }
-        XCTAssertEqual(texts(viewer.doc.pdf), ["A", "Scan", "", "B"])
-        viewer.go(toPage: 4)
-        viewer.insertScanned([NSImage(contentsOf: photo)!])
-        XCTAssertEqual(texts(viewer.doc.pdf), ["A", "Scan", "", "B", ""])
-        XCTAssertEqual(viewer.message, "Scanned 1 page. Tools › Recognize Text makes it searchable")
+        for _ in 0..<600 where viewer.doc.pdf.pageCount < 4 { RunLoop.main.run(until: Date() + 0.05) }
+        let words = texts(viewer.doc.pdf)
+        XCTAssertEqual(words.count, 4)
+        XCTAssertEqual([words[0], words[1], words[3]], ["A", "Scan", "B"])
     }
 
     /// Applying redactions puts the pages back, and stays on the page in view.

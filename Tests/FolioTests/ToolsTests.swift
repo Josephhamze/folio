@@ -117,6 +117,54 @@ final class ToolsTests: XCTestCase {
         XCTAssertEqual(doc.revision, 0)
     }
 
+    /// A scan is the paper itself, so its page is its shape, the biggest that fits the paper, filled to the edges: a wide one
+    /// lies on its side. It goes in after the page in view with its words under it, as one step, saying it read them, or
+    /// for a document made for it in place of every page.
+    func testScanGoesInFilledAndSearchable() async throws {
+        try await requireTextRecognition()
+        // A receipt three times as tall as it's wide, on grey paper, kept at four pixels a point, smaller than a page.
+        let scan = CGContext(data: nil, width: 800, height: 2400, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceGray(),
+                             bitmapInfo: CGImageAlphaInfo.none.rawValue)!
+        scan.setFillColor(gray: 0.85, alpha: 1)
+        scan.fill(CGRect(x: 0, y: 0, width: 800, height: 2400))
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: scan, flipped: false)
+        NSAttributedString(string: "Delivered to Lubumbashi", attributes: [.font: NSFont(name: "Helvetica", size: 56)!]).draw(at: CGPoint(x: 40, y: 2200))
+        NSGraphicsContext.current = nil
+        let picture = scan.makeImage()!
+        let receipt = try XCTUnwrap(FolioDocument.page(from: NSImage(cgImage: picture, size: NSSize(width: 200, height: 600)), scan: true))
+        let paper = FolioDocument.paper, box = receipt.bounds(for: .mediaBox)
+        XCTAssertEqual(box.height, paper.height, accuracy: 0.5)
+        XCTAssertEqual(box.width, paper.height / 3, accuracy: 0.5)
+        let shown = try XCTUnwrap(render(receipt, dpi: 72))
+        XCTAssertEqual(count(shown, x: 0..<shown.width, y: 0..<3) { r, _, _ in r > 240 }, 0)
+        let card = try XCTUnwrap(FolioDocument.page(from: NSImage(cgImage: picture, size: NSSize(width: 1600, height: 1000)), scan: true)).bounds(for: .mediaBox)
+        XCTAssertEqual(card.width, paper.height, accuracy: 0.5)
+        XCTAssertEqual(card.height, paper.height / 1.6, accuracy: 0.5)
+
+        let viewer = Viewer(doc: FolioDocument(pdf: makePDF([["A"], ["B"]]))), undo = manualUndo(viewer.doc)
+        viewer.canvas.document = viewer.doc.pdf
+        undo.beginUndoGrouping()
+        await viewer.insertScanned([receipt])
+        undo.endUndoGrouping()
+        XCTAssertNil(viewer.busy)
+        let words = texts(viewer.doc.pdf)
+        XCTAssertEqual(words.count, 3)
+        XCTAssertTrue(words[1].contains("Lubumbashi"), words[1])
+        XCTAssertEqual(viewer.doc.pages[1].bounds(for: .mediaBox), box)
+        XCTAssertEqual(viewer.message, "Recognized the text on 1 page")
+        XCTAssertEqual(undo.undoActionName, "Insert Pages")
+        undo.undo()
+        XCTAssertEqual(texts(viewer.doc.pdf), ["A", "B"])
+
+        let made = Viewer(doc: FolioDocument()), madeUndo = manualUndo(made.doc)
+        madeUndo.beginUndoGrouping()
+        await made.insertScanned([receipt], replacingAll: true)
+        madeUndo.endUndoGrouping()
+        XCTAssertEqual(made.doc.pdf.pageCount, 1)
+        XCTAssertTrue(texts(made.doc.pdf)[0].contains("Lubumbashi"))
+        XCTAssertEqual(madeUndo.undoActionName, "Scan Document")
+    }
+
     /// Skips where Vision's accurate model doesn't run, as on GitHub's virtual Macs.
     private func requireTextRecognition() async throws {
         let blank = try XCTUnwrap(render(FolioDocument.blankPage(), dpi: 72))
@@ -257,7 +305,6 @@ final class ToolsTests: XCTestCase {
         return pdf
     }
 
-    /// How many of the grey picture's pixels are darker than mid grey.
     /// How many of the picture's pixels are dark.
     private func ink(_ picture: CGImage) -> Int {
         count(picture, x: 0..<picture.width, y: 0..<picture.height) { Int($0) + Int($1) + Int($2) < 3 * 128 }
