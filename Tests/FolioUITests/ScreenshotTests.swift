@@ -410,8 +410,12 @@ final class ScreenshotTests: XCTestCase {
         let deadline = Date.now + 600
         repeat {
             launchScreen(button)
-            // iOS 26 shows the picker before it makes the document, and iOS 27 once it's open.
-            if let choosing, first(of: [photo, lost]) === photo { choosing() }
+            // iOS 26 shows the picker before it makes the document, and iOS 27 once it's open, where the document is there
+            // before the picker is gone.
+            if let choosing, first(of: [photo, lost]) === photo {
+                choosing()
+                _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: photo)], timeout: 30)
+            }
             if first(of: [opened, lost]) === opened { return }
         } while Date.now < deadline
         XCTFail("The new document didn't open")
