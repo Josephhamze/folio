@@ -28,9 +28,9 @@ The key made the certificate and the profile through the App Store Connect API. 
 - **Name:** Folio: Mark Up & Sign PDFs
   - "Folio" alone is taken. The iTunes Search API found no app with this exact name in the US, UK or French store on 21 October 2026. App Store Connect has the last word, since it also knows names that are reserved but not yet live.
   - Other free names: "Folio: Sign & Mark Up PDFs", "Folio PDF: Sign & Mark Up", "Folio: Edit, Sign & Fill PDFs".
-- **Subtitle:** Annotate and fill in forms
-- **Promotional text:** Mark up, sign and fill in PDFs with a finger or Apple Pencil. Private by design: no account, no tracking and no subscription.
-- **Keywords:** highlight,signature,editor,viewer,reader,document,notes,pencil,draw,underline,text,contract,esign
+- **Subtitle:** Scan, annotate, fill in forms
+- **Promotional text:** Scan paper into searchable PDFs, then mark up, sign and fill them in with a finger or Apple Pencil. Private by design: no account, no tracking and no subscription.
+- **Keywords:** highlight,signature,editor,viewer,reader,document,notes,pencil,scan,scanner,text,contract,esign
 - **Primary category:** Productivity. **Secondary:** Business.
 - **Price:** Free.
 - **Support URL:** https://github.com/Josephhamze/folio/issues
@@ -43,6 +43,11 @@ The key made the certificate and the profile through the App Store Connect API. 
 ### Description
 
 Folio is a PDF editor for iPhone and iPad. No account, no subscription, no ads.
+
+SCAN
+• Scan Document turns paper into a PDF with the camera. Apple's document scanner finds the page's edges, takes it once it's steady, and straightens and cleans it up.
+• Each page takes the paper's own shape, and Folio reads its words on your device, in English, French, Chinese and many other languages, so you can search, select and copy them.
+• Scan Pages adds scanned pages to any document.
 
 MARK UP
 • Highlight, underline and strike through text with a finger or Apple Pencil.
@@ -63,7 +68,6 @@ SIGN AND STAMP
 PAGES
 • Create from Photos makes a PDF of the photos you choose, a page each, in the order you choose them.
 • Organize Pages: drag pages into a new order, rotate them, insert blank pages or pages from PDFs, pictures and your photos, extract them into a file of their own, or delete them.
-• Scan paper with the camera into the document.
 • Split a document into files of a few pages each.
 
 SCANS, REDACTIONS AND PASSWORDS
@@ -100,4 +104,4 @@ Folio is free and open source, and there's a version for the Mac as well.
 - **Content rights:** no third-party content.
 - **Availability:** every country or region except China mainland (which needs an ICP filing), Russia and Belarus.
 - **iPhone and iPad apps on Apple Silicon Macs:** off, since the Mac has its own Folio.
-- **App Review notes:** No sign-in. On the launch screen, tap Create Document for a blank PDF or Create from Photos for a PDF of some photos, or open any PDF from Files.
+- **App Review notes:** No sign-in. On the launch screen, tap Scan Document to scan paper into a PDF, or Create from Photos for a PDF of some photos; the Create Document tile among the files makes a blank PDF. Or open any PDF from Files.
