@@ -94,16 +94,18 @@ struct ScanShot {
     /// darkened and sharpened.
     private func cleaned(_ image: CIImage, _ look: ScanLook) -> CIImage {
         let page = image.clampedToExtent()
-        // The paper's light: the print taken out by the brightest nearby, smoothed, worked out at a quarter the size for
-        // speed. No darker than a third of the brightest paper, so a dark picture on the page isn't taken for paper in
-        // shadow, while a hand's shadow, which can halve the light, is.
+        // The paper's light: the print taken out by the brightest nearby, then the darkest of that nearby, which puts back
+        // a shadow's edge where it was, smoothed, worked out at a quarter the size for speed. In each colour, no darker
+        // than a third of the brightest paper's, so a dark picture on the page isn't taken for paper in shadow, while the
+        // paper under a hand's shadow, which can more than halve the light, is.
         let light = page.transformed(by: CGAffineTransform(scaleX: 0.25, y: 0.25))
             .applyingGaussianBlur(sigma: 1.5)
             .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: 8])
+            .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: 8])
             .applyingGaussianBlur(sigma: 10)
             .transformed(by: CGAffineTransform(scaleX: 4, y: 4))
-        let floor = Self.brightest(light.cropped(to: image.extent)) / 3
-        let even = light.applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: floor, y: floor, z: floor, w: 0)])
+        let floor = Self.brightest(light.cropped(to: image.extent))
+        let even = light.applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: floor[0] / 3, y: floor[1] / 3, z: floor[2] / 3, w: 0)])
             .applyingFilter("CIDivideBlendMode", parameters: [kCIInputBackgroundImageKey: page])
             .applyingFilter("CIUnsharpMask", parameters: [kCIInputRadiusKey: 2.5, kCIInputIntensityKey: 0.6])
             .applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: look == .colour ? 1 : 0])
@@ -114,11 +116,11 @@ struct ScanShot {
     }
 
     /// The brightest of each of the picture's colours.
-    private static func brightest(_ image: CIImage) -> CGFloat {
+    private static func brightest(_ image: CIImage) -> [CGFloat] {
         var pixel: [Float] = [0, 0, 0, 0]
         context.render(image.applyingFilter("CIAreaMaximum", parameters: [kCIInputExtentKey: CIVector(cgRect: image.extent)]), toBitmap: &pixel,
                        rowBytes: 16, bounds: CGRect(x: 0, y: 0, width: 1, height: 1), format: .RGBAf, colorSpace: nil)
-        return CGFloat(pixel[0..<3].max() ?? 1)
+        return pixel.map { CGFloat($0) }
     }
 
     /// Black from `black` down and white from `white` up, the values between stretched to fill.

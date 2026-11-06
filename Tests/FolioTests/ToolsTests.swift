@@ -187,14 +187,16 @@ final class ToolsTests: XCTestCase {
         XCTAssertGreaterThan(count(colour, (x: 0.08..<0.4, y: 0.655..<0.668)) { r, _, b in Int(b) > Int(r) + 80 }, 500)
         let box = (x: 0.6..<0.85, y: 0.74..<0.86)
         XCTAssertGreaterThan(count(colour, box) { r, g, b in max(r, g, b) < 110 }, area(colour, box) * 9 / 10)
-        // A hand's hard shadow over the right of the page, halving the light there, leaves the paper white too. It's
-        // straightened at the corners found without it: Vision takes so sharp and straight a shadow's edge for the paper's.
-        let half = CIColor(red: 0.5, green: 0.5, blue: 0.5, colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB)!)!
-        let shadow = CIImage(color: half).cropped(to: CGRect(x: 1700, y: 0, width: 1324, height: 4032))
+        // A hand's hard shadow over the right of the page, cutting the light there to 0.4, leaves the paper white too, and
+        // its edge, across blank paper, no dark stripe in black and white. It's straightened at the corners found without
+        // it: Vision takes so sharp and straight a shadow's edge for the paper's.
+        let dim = CIColor(red: 0.4, green: 0.4, blue: 0.4, colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB)!)!
+        let shadow = CIImage(color: dim).cropped(to: CGRect(x: 1700, y: 0, width: 1324, height: 4032))
             .composited(over: CIImage(color: .white)).applyingGaussianBlur(sigma: 6)
         var shaded = ScanShot(photo: photo.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: shadow]).cropped(to: photo.extent))
         shaded.corners = shot.corners
         XCTAssertEqual(count(try rendered(shaded, .colour), (x: 0.75..<0.97, y: 0.15..<0.6)) { r, g, b in min(r, g, b) < 235 }, 0)
+        XCTAssertEqual(count(try rendered(shaded, .blackAndWhite), (x: 0.45..<0.97, y: 0.625..<0.645)) { r, _, _ in r < 160 }, 0)
 
         let black = try rendered(shot, .blackAndWhite)
         XCTAssertGreaterThan(count(black, print) { r, _, _ in r < 40 || r > 215 }, area(black, print) * 9 / 10)
