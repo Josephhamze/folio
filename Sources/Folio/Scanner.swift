@@ -95,13 +95,14 @@ struct ScanShot {
     private func cleaned(_ image: CIImage, _ look: ScanLook) -> CIImage {
         let page = image.clampedToExtent()
         // The paper's light: the print taken out by the brightest nearby, smoothed, worked out at a quarter the size for
-        // speed. No darker than half the brightest paper, so a dark picture on the page isn't taken for paper in shadow.
+        // speed. No darker than a third of the brightest paper, so a dark picture on the page isn't taken for paper in
+        // shadow, while a hand's shadow, which can halve the light, is.
         let light = page.transformed(by: CGAffineTransform(scaleX: 0.25, y: 0.25))
             .applyingGaussianBlur(sigma: 1.5)
             .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: 8])
             .applyingGaussianBlur(sigma: 10)
             .transformed(by: CGAffineTransform(scaleX: 4, y: 4))
-        let floor = Self.brightest(light.cropped(to: image.extent)) / 2
+        let floor = Self.brightest(light.cropped(to: image.extent)) / 3
         let even = light.applyingFilter("CIColorClamp", parameters: ["inputMinComponents": CIVector(x: floor, y: floor, z: floor, w: 0)])
             .applyingFilter("CIDivideBlendMode", parameters: [kCIInputBackgroundImageKey: page])
             .applyingFilter("CIUnsharpMask", parameters: [kCIInputRadiusKey: 2.5, kCIInputIntensityKey: 0.6])
