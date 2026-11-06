@@ -34,7 +34,8 @@ struct ScanShot {
     /// Quarter turns clockwise.
     var turns = 0
 
-    static let context = CIContext()
+    /// Each page is drawn once, from a 12 megapixel photo: keeping what's worked out on the way takes memory for nothing.
+    static let context = CIContext(options: [.cacheIntermediates: false])
 
     /// The photo, with the paper's corners where Vision finds them, or else the photo's own.
     init(photo: CIImage) {
@@ -219,7 +220,8 @@ struct Steadiness {
     private(set) var seen: [CGPoint]?
     private(set) var state = State.starting
     var reviewing = false
-    private(set) var flashing = false
+    /// Photos taken, to flash for each.
+    private(set) var shots = 0
     /// A photo being taken, which Save waits for.
     private(set) var taking = false
     private(set) var finishing = false
@@ -233,8 +235,10 @@ struct Steadiness {
     @ObservationIgnored private var rotation: AVCaptureDevice.RotationCoordinator?
     @ObservationIgnored private var turning: NSKeyValueObservation?
 
-    /// Asks for the camera the first time, then starts it.
+    /// Asks for the camera the first time, then starts it. The screen appears again as the pages to review go, and the
+    /// camera is started only once.
     func start() async {
+        guard state == .starting else { return }
         if AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined { _ = await AVCaptureDevice.requestAccess(for: .video) }
         guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else { return state = .denied }
         camera.saw = { [weak self] in self?.see($0) }
@@ -268,10 +272,9 @@ struct Steadiness {
     func take() {
         guard state == .running, !taking, !finishing else { return }
         taking = true
-        flashing = true
+        shots += 1
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         camera.takePhoto(at: rotation?.videoRotationAngleForHorizonLevelCapture ?? 90)
-        withAnimation(.easeOut(duration: 0.3).delay(0.05)) { flashing = false }
     }
 
     private func add(_ shot: ScanShot?) {
@@ -470,7 +473,8 @@ private struct ScannerView: View {
                     }
                     .padding(32)
                 }
-                Color.white.opacity(scanner.flashing ? 0.7 : 0).allowsHitTesting(false)
+                Color.white.allowsHitTesting(false)
+                    .phaseAnimator([0, 0.7], trigger: scanner.shots) { $0.opacity($1) } animation: { $0 == 0 ? .easeOut(duration: 0.3) : .linear(duration: 0.04) }
             }
             HStack {
                 Button { scanner.reviewing = true } label: { Thumbnail(page: scanner.pages.last, count: scanner.pages.count) }
@@ -649,7 +653,8 @@ private struct ReviewView: View {
             }
         }
         .environment(\.colorScheme, .dark)
-        .onAppear { shown = scanner.pages.last?.id }
+        // It appears again as Crop goes, on the page cropped.
+        .onAppear { if shown == nil { shown = scanner.pages.last?.id } }
     }
 
     private var title: String {
@@ -665,12 +670,14 @@ private struct ReviewView: View {
     }
 }
 
-/// A page's photo, with its paper's corners to drag where they should be.
+/// A page's photo, with its paper's corners to drag where they should be, magnified above the finger as one moves.
 private struct CropView: View {
     let scanner: Scanner
     let page: Scanner.Page
     @State private var corners: [CGPoint] = []
     @State private var photo: CGImage?
+    /// The corner being dragged, and where it was on screen as the drag began.
+    @State private var dragging: (corner: Int, from: CGPoint)?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -689,9 +696,9 @@ private struct CropView: View {
                 ZStack {
                     if let photo { Image(decorative: photo, scale: 1).resizable().frame(width: box.width, height: box.height).position(x: box.midX, y: box.midY) }
                     if corners.count == 4 {
-                        let outline = Path { $0.addLines(corners.map(shown)); $0.closeSubpath() }
-                        outline.fill(.tint.opacity(0.2))
-                        outline.stroke(.tint, lineWidth: 2)
+                        // The photo outside the paper dimmed.
+                        Path { $0.addRect(box); $0.addLines(corners.map(shown)); $0.closeSubpath() }.fill(.black.opacity(0.55), style: FillStyle(eoFill: true))
+                        Path { $0.addLines(corners.map(shown)); $0.closeSubpath() }.stroke(.tint, lineWidth: 2)
                         ForEach(0..<4, id: \.self) { i in
                             ZStack {
                                 Circle().fill(.white.opacity(0.3))
@@ -699,14 +706,36 @@ private struct CropView: View {
                             }
                             .frame(width: 40, height: 40)
                             .contentShape(.circle.inset(by: -8))
-                            .gesture(DragGesture(coordinateSpace: .named("photo")).onChanged { corners[i] = placed($0.location) })
+                            // The corner moves as far as the finger does, not to under it.
+                            .gesture(DragGesture(coordinateSpace: .named("photo"))
+                                .onChanged { drag in
+                                    let from = dragging?.from ?? shown(corners[i])
+                                    dragging = (i, from)
+                                    corners[i] = placed(CGPoint(x: from.x + drag.translation.width, y: from.y + drag.translation.height))
+                                }
+                                .onEnded { _ in dragging = nil })
                             .position(shown(corners[i]))
+                        }
+                        // What's under the finger, three times the size, above it, or below it near the top.
+                        if let photo, let i = dragging?.corner {
+                            let at = shown(corners[i]), zoom: CGFloat = 3
+                            Image(decorative: photo, scale: 1).resizable()
+                                .frame(width: box.width * zoom, height: box.height * zoom)
+                                .offset(x: (box.midX - at.x) * zoom, y: (box.midY - at.y) * zoom)
+                                .frame(width: 120, height: 120)
+                                .clipShape(.circle)
+                                .overlay { Circle().fill(.tint).frame(width: 6, height: 6) }
+                                .overlay { Circle().strokeBorder(.white, lineWidth: 2) }
+                                .position(x: min(max(at.x, 64), space.size.width - 64), y: at.y > 160 ? at.y - 110 : at.y + 110)
+                                .allowsHitTesting(false)
                         }
                     }
                 }
                 .coordinateSpace(.named("photo"))
             }
             .background(.black)
+            .navigationTitle("Crop")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
