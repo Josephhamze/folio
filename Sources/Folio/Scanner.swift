@@ -50,6 +50,17 @@ struct ScanShot {
         [CGPoint(x: box.minX, y: box.maxY), CGPoint(x: box.maxX, y: box.maxY), CGPoint(x: box.maxX, y: box.minY), CGPoint(x: box.minX, y: box.minY)]
     }
 
+    /// Whether corners make a shape a page could be cropped to: going round one way, none bent back in, which also leaves
+    /// room for a page.
+    static func isPage(_ corners: [CGPoint]) -> Bool {
+        guard corners.count == 4 else { return false }
+        let bends = (0..<4).map { i in
+            let (a, b, c) = (corners[i], corners[(i + 1) % 4], corners[(i + 2) % 4])
+            return (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x)
+        }
+        return bends.allSatisfy { $0 > 0 } || bends.allSatisfy { $0 < 0 }
+    }
+
     /// Where the paper's corners are in a picture, as Vision finds them, each as a share of its width and height from its
     /// bottom left, in the order they're kept: none where it finds no paper.
     static func paper(in picture: VNImageRequestHandler) -> [CGPoint]? {
@@ -138,7 +149,8 @@ struct ScanShot {
         let image = picture(look)
         guard let picture = Self.context.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)),
               let page = FolioDocument.page(scanned: picture, text: (try? await recognize(picture)) ?? []) else { return nil }
-        return (page, Self.preview(CIImage(cgImage: picture), side: 1200) ?? picture)
+        // The preview kept as a JPEG, as the page is, takes a fraction of the memory: a scan can run to many pages.
+        return (page, Self.preview(CIImage(cgImage: picture), side: 1200).flatMap(asJPEG) ?? picture)
     }
 
     /// The picture shrunk to fit a square this many pixels a side, to show.
@@ -203,6 +215,11 @@ struct Steadiness {
             host.modalPresentationStyle = .fullScreen
             scanner.host = host
             top.present(host, animated: true)
+            // UIKit drops a presentation over one still coming or going, as a new document can be on iOS 27.
+            if host.presentingViewController == nil {
+                scanner.done = nil
+                done.resume(returning: [])
+            }
         }
     }
 
@@ -376,15 +393,16 @@ final class Camera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCa
             session.addOutput(frames)
             frames.alwaysDiscardsLateVideoFrames = true
             frames.setSampleBufferDelegate(self, queue: queue)
-            // The biggest photo up to 12 megapixels: past 300 dpi for a page that fills it, and quick to take.
-            let pixels = { (size: CMVideoDimensions) in Int(size.width) * Int(size.height) }
-            if let size = device.activeFormat.supportedMaxPhotoDimensions.filter({ pixels($0) <= 12_600_000 }).max(by: { pixels($0) < pixels($1) }) {
-                photos.maxPhotoDimensions = size
-            }
             photos.maxPhotoQualityPrioritization = .quality
         }
         session.commitConfiguration()
         guard fits else { return false }
+        // The biggest photo up to 12 megapixels: past 300 dpi for a page that fills it, and quick to take. The preset's
+        // format is the device's only once committed.
+        let pixels = { (size: CMVideoDimensions) in Int(size.width) * Int(size.height) }
+        if let size = device.activeFormat.supportedMaxPhotoDimensions.filter({ pixels($0) <= 12_600_000 }).max(by: { pixels($0) < pixels($1) }) {
+            photos.maxPhotoDimensions = size
+        }
         if (try? device.lockForConfiguration()) != nil {
             // A set of lenses starts at its widest: start at the main one instead.
             if let main = device.virtualDeviceSwitchOverVideoZoomFactors.first { device.videoZoomFactor = CGFloat(truncating: main) }
@@ -396,7 +414,10 @@ final class Camera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCa
         return session.isRunning
     }
 
-    func stop() { queue.async { self.session.stopRunning() } }
+    func stop() {
+        light(false)
+        queue.async { self.session.stopRunning() }
+    }
 
     /// Reads the camera's pictures turned as the preview is, by this many degrees clockwise.
     func turn(_ angle: CGFloat) {
@@ -447,11 +468,15 @@ private final class ScannerHost: UIHostingController<ScannerView> {
 
 private struct ScannerView: View {
     @Bindable var scanner: Scanner
+    @State private var discarding = false
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 22) {
-                Button("Cancel") { scanner.finish(saving: false) }
+                Button("Cancel") { if scanner.pages.isEmpty { scanner.finish(saving: false) } else { discarding = true } }
+                    .confirmationDialog("Discard Scanned Pages", isPresented: $discarding) {
+                        Button("Discard Scanned Pages", role: .destructive) { scanner.finish(saving: false) }
+                    }
                 Spacer()
                 if scanner.camera.device?.hasTorch == true {
                     Button("Light", systemImage: scanner.light ? "flashlight.on.fill" : "flashlight.off.fill") { scanner.switchLight() }
@@ -498,6 +523,8 @@ private struct ScannerView: View {
         }
         .foregroundStyle(.white)
         .background(.black)
+        // Save takes the pages as they are.
+        .disabled(scanner.finishing)
         .environment(\.colorScheme, .dark)
         .statusBarHidden()
         .fullScreenCover(isPresented: $scanner.reviewing) { ReviewView(scanner: scanner) }
@@ -655,6 +682,7 @@ private struct ReviewView: View {
                 if let page = scanner.pages.first(where: { $0.id == shown }) { CropView(scanner: scanner, page: page) }
             }
         }
+        .disabled(scanner.finishing)
         .environment(\.colorScheme, .dark)
         // It appears again as Crop goes, on the page cropped.
         .onAppear { if shown == nil { shown = scanner.pages.last?.id } }
@@ -746,6 +774,7 @@ private struct CropView: View {
                         scanner.crop(page.id, to: corners)
                         dismiss()
                     }
+                    .disabled(!ScanShot.isPage(corners))
                 }
             }
             .safeAreaInset(edge: .bottom) {

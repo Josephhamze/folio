@@ -217,6 +217,18 @@ final class ToolsTests: XCTestCase {
         if (try? await recognize(colour)) != nil { XCTAssertTrue(made?.page.string?.contains("INVOICE 2041") == true, made?.page.string ?? "") }
     }
 
+    /// A page is cropped only to corners that make a shape a page could be.
+    func testScannerCropsOnlyToAPage() {
+        let square = ScanShot.corners(of: CGRect(x: 0, y: 0, width: 100, height: 100))
+        XCTAssertTrue(ScanShot.isPage(square))
+        XCTAssertTrue(ScanShot.isPage([CGPoint(x: 10, y: 90), CGPoint(x: 95, y: 80), CGPoint(x: 90, y: 5), CGPoint(x: 0, y: 15)]))
+        // Two corners swapped, one bent back in, all at one place, or too few.
+        XCTAssertFalse(ScanShot.isPage([square[1], square[0], square[2], square[3]]))
+        XCTAssertFalse(ScanShot.isPage([CGPoint(x: 60, y: 40), square[1], square[2], square[3]]))
+        XCTAssertFalse(ScanShot.isPage(Array(repeating: CGPoint(x: 5, y: 5), count: 4)))
+        XCTAssertFalse(ScanShot.isPage([]))
+    }
+
     /// The scanner takes the paper once it's held still for a moment, and not again until it moves to another page or out
     /// of view.
     func testScannerTakesThePaperHeldStill() {
