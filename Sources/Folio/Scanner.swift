@@ -205,9 +205,10 @@ struct Steadiness {
 
     /// The pages scanned, in order, their words read: none for Cancel, or when the camera can't be used.
     static func scan() async -> [PDFPage] {
-        guard isAvailable, !isScanning, let top = topController() else { return [] }
+        guard isAvailable, !isScanning else { return [] }
         isScanning = true
         defer { isScanning = false }
+        guard let top = await topController() else { return [] }
         let scanner = Scanner()
         return await withCheckedContinuation { done in
             scanner.done = done
@@ -215,7 +216,8 @@ struct Steadiness {
             host.modalPresentationStyle = .fullScreen
             scanner.host = host
             top.present(host, animated: true)
-            // UIKit drops a presentation over one still coming or going, as a new document can be on iOS 27.
+            // UIKit drops a presentation it can't make now. One over a controller coming or going, which it would hold
+            // back instead, topController waited out.
             if host.presentingViewController == nil {
                 scanner.done = nil
                 done.resume(returning: [])
@@ -288,13 +290,14 @@ struct Steadiness {
         if steadiness.see(corners, at: .now), auto, !reviewing { take() }
     }
 
-    /// Takes a photo, level as the device is held.
+    /// Takes a photo, turned as the preview shows it. Level with the horizon goes by gravity, which can't tell which way is
+    /// up when the phone looks down at paper on a table, and turned a page on its side.
     func take() {
         guard state == .running, !taking, !finishing else { return }
         taking = true
         shots += 1
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        camera.takePhoto(at: rotation?.videoRotationAngleForHorizonLevelCapture ?? 90)
+        camera.takePhoto(at: rotation?.videoRotationAngleForHorizonLevelPreview ?? 90)
     }
 
     private func add(_ shot: ScanShot?) {
@@ -440,7 +443,7 @@ final class Camera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCa
         Task { @MainActor in saw(corners) }
     }
 
-    /// Photographs the page, level at this many degrees clockwise.
+    /// Photographs the page, turned this many degrees clockwise.
     func takePhoto(at angle: CGFloat) {
         queue.async { [self] in
             guard session.isRunning else {

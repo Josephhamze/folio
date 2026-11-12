@@ -386,11 +386,17 @@ final class FolioDocument: ReferenceFileDocument, @unchecked Sendable {
 }
 
 #if os(iOS)
-/// What's on top of the key window, for a picker or the scanner to show over whatever is on screen.
-@MainActor func topController() -> UIViewController? {
+/// What's on top of the key window, for a picker or the scanner to show over whatever is on screen, once it's done coming
+/// or going: UIKit holds back a presentation over a controller still coming or going, as a new document is while it
+/// opens on iOS 27, and shows it after its caller has taken it for dropped.
+@MainActor func topController() async -> UIViewController? {
     var top = UIApplication.shared.connectedScenes.lazy.compactMap { ($0 as? UIWindowScene)?.keyWindow?.rootViewController }.first
     while let shown = top?.presentedViewController { top = shown }
-    return top
+    guard let coordinator = top?.transitionCoordinator else { return top }
+    let waited = await withCheckedContinuation { done in
+        if !coordinator.animate(alongsideTransition: nil, completion: { _ in done.resume(returning: true) }) { done.resume(returning: false) }
+    }
+    return waited ? await topController() : top
 }
 
 /// Photos' picker, shown over whatever is on screen, for one call to wait on: Create from Photos shows it over the launch
@@ -406,7 +412,7 @@ private final class PhotoPicker: NSObject, PHPickerViewControllerDelegate {
         configuration.selectionLimit = 0
         let picker = PHPickerViewController(configuration: configuration)
         picker.delegate = self
-        guard let top = topController() else { return [] }
+        guard let top = await topController() else { return [] }
         let results = await withCheckedContinuation { chosen = $0; top.present(picker, animated: true) }
         var photos: [Data] = []
         for result in results {
