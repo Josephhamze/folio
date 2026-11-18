@@ -5,12 +5,13 @@
 <h1 align="center">Folio</h1>
 
 <p align="center">
-  A native PDF viewer and editor for the Mac, built on PDFKit, the engine behind Preview.<br>
+  A native PDF viewer and editor for the Mac, iPhone and iPad, built on PDFKit, the engine behind Preview.<br>
   Free and open source. No account, no subscription.
 </p>
 
 <p align="center">
   <a href="https://github.com/Josephhamze/folio/releases/latest/download/Folio.dmg"><img src="https://img.shields.io/badge/Download-Folio.dmg-2ea44f?logo=apple&logoColor=white" alt="Download Folio.dmg"></a>
+  <a href="https://apps.apple.com/app/id6830885527"><img src="https://img.shields.io/badge/App_Store-iPhone_%26_iPad-0D96F6?logo=appstore&logoColor=white" alt="Folio on the App Store, for iPhone and iPad"></a>
   <img src="https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white" alt="macOS 26 or later">
   <img src="https://img.shields.io/badge/Swift-SwiftUI%20%2B%20PDFKit-F05138?logo=swift&logoColor=white" alt="Swift, SwiftUI and PDFKit">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -44,9 +45,11 @@
 
 ## Install
 
-[Download Folio.dmg](https://github.com/Josephhamze/folio/releases/latest/download/Folio.dmg), open it and drag Folio to Applications. You need macOS 26 or later on an Apple Silicon Mac. Folio is signed and notarised by Apple, so it opens like any other app.
+On iPhone and iPad, get Folio from the [App Store](https://apps.apple.com/app/id6830885527). It needs iOS or iPadOS 26 or later.
 
-To build it yourself instead, you need Xcode:
+On the Mac, [download Folio.dmg](https://github.com/Josephhamze/folio/releases/latest/download/Folio.dmg), open it and drag Folio to Applications. You need macOS 26 or later on an Apple Silicon Mac. Folio is signed and notarised by Apple, so it opens like any other app.
+
+To build the Mac app yourself instead, you need Xcode:
 
 ```sh
 git clone https://github.com/Josephhamze/folio.git

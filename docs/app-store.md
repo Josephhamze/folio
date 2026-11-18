@@ -38,7 +38,6 @@ The key made the certificate and the profile through the App Store Connect API. 
 - **Privacy policy URL:** https://github.com/Josephhamze/folio/blob/main/PRIVACY.md
 - **Copyright:** 2026 Alpha PMS FZCO
 - **What's New** (1.0): First release on iPhone and iPad.
-- **What's New** (the next release): A Stamp tool for your company's stamp, a Date tool, signatures from a photo, and Add to Every Page. Organize, scan and split pages. Recognize Text, Apply Redactions, passwords and restrictions, and Properties. Send a page as a picture. And Folio now speaks French and Simplified Chinese.
 
 ### Description
 
@@ -103,6 +102,6 @@ Folio is free and open source, and there's a version for the Mac as well.
 - **Encryption:** none beyond Apple's own. `ITSAppUsesNonExemptEncryption` is `NO` in `iOS/Info.plist`, so builds don't ask.
 - **Age rating:** None for every question, which gives 4+.
 - **Content rights:** no third-party content.
-- **Availability:** every country or region except China mainland (which needs an ICP filing), Russia and Belarus.
+- **Availability:** every country or region except China mainland (which needs an ICP filing), Russia and Belarus. The 27 EU countries also need the account's Digital Services Act trader status, set by the Account Holder or an Admin under Business › Agreements › Compliance › Digital Services Act › Complete Compliance Requirements. Without it, App Store Connect marks them TRADER_STATUS_NOT_PROVIDED and Folio isn't sold there.
 - **iPhone and iPad apps on Apple Silicon Macs:** off, since the Mac has its own Folio.
 - **App Review notes:** No sign-in. On the launch screen, tap Scan Document to scan paper into a PDF, or Create from Photos for a PDF of some photos; the Create Document tile among the files makes a blank PDF. Or open any PDF from Files.
